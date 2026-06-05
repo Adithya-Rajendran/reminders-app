@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vikunja-files
+  namespace: reminders-app
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: ceph-rbd
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vikunja
+  namespace: reminders-app
+  labels: { app: vikunja, tier: backend }
+spec:
+  selector: { app: vikunja }
+  ports:
+    - name: http
+      port: 3456
+      targetPort: 3456
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vikunja
+  namespace: reminders-app
+  labels: { app: vikunja, tier: backend }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: vikunja }
+  template:
+    metadata:
+      labels: { app: vikunja, tier: backend, app.kubernetes.io/part-of: reminders-app }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-for-pg
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z pg 5432; do echo waiting for pg; sleep 2; done"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 32Mi }
+      containers:
+        - name: vikunja
+          image: vikunja/vikunja:2.3.0
+          args: ["web"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - containerPort: 3456
+          env:
+            - name: VIKUNJA_DATABASE_TYPE
+              value: postgres
+            - name: VIKUNJA_DATABASE_HOST
+              value: pg
+            - name: VIKUNJA_DATABASE_USER
+              value: postgres
+            - name: VIKUNJA_DATABASE_PASSWORD
+              valueFrom: { secretKeyRef: { name: reminders-pg, key: password } }
+            - name: VIKUNJA_DATABASE_DATABASE
+              value: vikunja
+            - name: VIKUNJA_SERVICE_PUBLICURL
+              value: https://tasks.rke.alaras.net/
+            - name: VIKUNJA_SERVICE_JWTSECRET
+              valueFrom: { secretKeyRef: { name: vikunja-secret, key: jwt } }
+            - name: VIKUNJA_SERVICE_ENABLEREGISTRATION
+              value: "false"
+            - name: VIKUNJA_CORS_ENABLE
+              value: "false"
+            # Allow webhook delivery to in-cluster (RFC1918) destinations.
+            # Safe here: only our BFF registers webhooks; single-user personal app.
+            - name: VIKUNJA_WEBHOOKS_ALLOWNONROUTABLEIPS
+              value: "true"
+            - name: VIKUNJA_OUTGOINGREQUESTS_ALLOWNONROUTABLEIPS
+              value: "true"
+            - name: VIKUNJA_FILES_BASEPATH
+              value: /app/vikunja/files
+          volumeMounts:
+            - name: files
+              mountPath: /app/vikunja/files
+          readinessProbe:
+            httpGet: { path: /api/v1/info, port: 3456 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 384Mi }
+      volumes:
+        - name: files
+          persistentVolumeClaim:
+            claimName: vikunja-files

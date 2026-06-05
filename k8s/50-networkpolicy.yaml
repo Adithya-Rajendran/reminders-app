@@ -1,0 +1,19 @@
+# Restrict the sensitive backends (Postgres, Vikunja) to in-namespace traffic
+# only, so no other workload/namespace in the cluster can reach them directly.
+# The reminders-app BFF is the public entrypoint (auth-protected) and is left
+# reachable by the gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backends-in-namespace-only
+  namespace: reminders-app
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: reminders-app

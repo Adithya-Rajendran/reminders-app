@@ -1,0 +1,13 @@
+# Secrets / cluster access — NEVER commit
+kubeconfig.yaml
+*.kubeconfig
+.runtime-secrets
+.env
+
+# Build / deploy artifacts
+app/node_modules/
+app/public/
+app/app-bundle.tar.gz
+app/.ready
+**/*.log
+node_modules/

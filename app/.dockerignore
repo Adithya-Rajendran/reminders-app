@@ -1,0 +1,8 @@
+node_modules
+public
+app-bundle.tar.gz
+.ready
+*.log
+.git
+Dockerfile
+.dockerignore
