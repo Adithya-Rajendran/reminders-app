@@ -77,7 +77,7 @@ export default function CalendarWidget() {
         for (const t of (Array.isArray(vkRes.value) ? vkRes.value : [])) {
           if (!t.due_date || t.due_date === ZERO_DATE) continue
           out.push({
-            id: 'vk-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: false,
+            id: 'vk-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: true,
             classNames: ['cal-task', 'cal-task-vikunja'],
             extendedProps: { kind: 'task', source: 'vikunja', taskId: t.id, done: !!t.done },
           })
@@ -135,6 +135,12 @@ export default function CalendarWidget() {
   // Drag / resize of an event -> PATCH in place; revert tasks and on failure.
   const onEventChange = async (arg) => {
     const p = arg.event.extendedProps
+    // Drag a Vikunja task on the calendar -> reschedule its due date.
+    if (p.kind === 'task' && p.source === 'vikunja') {
+      try { await vk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }) }
+      catch { arg.revert() }
+      return
+    }
     if (p.kind !== 'event') { arg.revert(); return }
     try {
       await api('/api/calendar/events', {

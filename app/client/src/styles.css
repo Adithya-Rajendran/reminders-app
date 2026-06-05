@@ -1036,3 +1036,52 @@ body {
 .field-row { display: flex; gap: 12px; }
 .field-row .field { flex: 1; min-width: 0; }
 .err { color: var(--danger); font-size: 12.5px; background: var(--danger-soft); border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent); padding: 8px 11px; border-radius: 10px; }
+
+/* ===== Interactive task widgets ===== */
+.tasklist { display: flex; flex-direction: column; gap: 2px; height: 100%; }
+.task-stream { display: flex; flex-direction: column; gap: 1px; }
+.add-row.qa { margin-bottom: 2px; }
+.add-row.qa input { font-size: 13.5px; }
+
+/* button-based animated checkbox */
+.check-btn {
+  appearance: none; width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px;
+  border-radius: 6px; border: 1.75px solid var(--line-strong); background: transparent;
+  cursor: pointer; position: relative; transition: background .15s, border-color .15s, transform .1s;
+}
+.check-btn:hover { border-color: var(--accent); }
+.check-btn.on { background: var(--accent-grad); border-color: transparent; }
+.check-btn.on::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(43deg); }
+.check-btn.burst { animation: checkPop .42s cubic-bezier(.2,.8,.3,1); }
+@keyframes checkPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+.repeat-badge { color: var(--faint); font-size: 12px; }
+.pdot.p0 { background: var(--line-strong); }
+
+/* inline priority + scheduler controls */
+.inline-ctl { position: relative; display: inline-flex; }
+.pri-dot-btn { background: transparent; border: 0; cursor: pointer; padding: 3px; display: inline-flex; border-radius: 6px; }
+.pri-dot-btn:hover { background: var(--panel2); }
+.due-chip { cursor: pointer; border: 1px solid var(--line); }
+.due-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
+.due-chip:hover { filter: brightness(1.12); border-color: var(--accent); }
+.due-chip svg { opacity: .8; }
+.label-chip { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+.mini-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 70;
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 5px; min-width: 150px; animation: menuIn 120ms ease;
+}
+.mini-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); padding: 7px 9px; border: 0; background: transparent; border-radius: 8px; cursor: pointer; }
+.mini-item:hover, .mini-item.active { background: var(--accent-soft); }
+
+/* undo bar */
+.undo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 4px 2px; background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; box-shadow: var(--shadow-sm); animation: slideup .2s ease; }
+.undo-btn { background: transparent; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; font-size: 12.5px; }
+
+/* reminders feed actions */
+.feed { display: flex; flex-direction: column; }
+.feed-actions { display: flex; gap: 2px; margin-left: auto; align-items: center; opacity: 0; transition: opacity .15s; }
+.feed-item:hover .feed-actions, .feed-item:focus-within .feed-actions { opacity: 1; }
+.feed-item.acted { opacity: .55; }

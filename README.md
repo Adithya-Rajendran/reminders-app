@@ -27,12 +27,17 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 |---|---|
 | ![settings](docs/screenshots/settings-caldav.png) | ![login](docs/screenshots/login.png) |
 
+**Interactive tasks** — natural-language quick-add, one-click scheduling (popover open) & priority, recurring badges, grouped Upcoming, actionable reminders
+
+![interactive tasks](docs/screenshots/interactive-tasks.png)
+
 ---
 
 ## Features
 
 - 🧩 **Customizable dashboard** — draggable, resizable widget grid ([react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)); arrange it however you like, layout auto-saves per user.
-- ✅ **Task widgets** backed by Vikunja's REST API — project lists, an **Upcoming** view grouped by Today / Tomorrow / This week, priority dots, due chips, inline add.
+- ✅ **Task widgets** backed by Vikunja's REST API — project lists and an **Upcoming** view grouped by Today / Tomorrow / This week.
+- ⚡ **Interactive tasks** (influenced by Todoist / TickTick / Things) — **natural-language quick-add** (`report tomorrow !2 *work` → due date + priority + label), one-click **scheduling** (Today / Tomorrow / Weekend / Next week / clear) and **priority** menus, **recurring-aware** completion with a satisfying pop + **Undo**, **drag tasks on the calendar** to reschedule, and an **actionable reminders feed** (complete / snooze).
 - 📅 **Multi-view calendar** ([FullCalendar](https://fullcalendar.io)) — month / week / day / agenda; create, drag-reschedule, edit & delete events; tasks overlay automatically.
 - ☁️ **CalDAV sync** — connect **Nextcloud**, **Apple iCloud**, or any **generic CalDAV** server; discover task lists, toggle which to sync, read & complete tasks, two-way calendar **events** (VEVENT) write-back.
 - 🔔 **Live reminders feed** — Vikunja webhooks → server → SSE → instant in-app updates.
