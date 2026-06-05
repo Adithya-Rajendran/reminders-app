@@ -76,7 +76,7 @@ Needs a **Vikunja** instance, a **Postgres** database, and an **OIDC** provider.
 
 ### Kubernetes
 
-Manifests are under [`k8s/`](k8s/) (namespace, Postgres, Vikunja, the app + HTTPRoute, NetworkPolicy). They were written for an RKE2 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. Point the app Deployment at `ghcr.io/adithya-rajendran/reminders-app:latest`.
+Manifests are under [`k8s/`](k8s/) (namespace, Postgres, Vikunja, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. Point the app Deployment at `ghcr.io/adithya-rajendran/reminders-app:latest`.
 
 ## Development
 
