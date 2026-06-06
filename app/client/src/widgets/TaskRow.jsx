@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { dueChip, isRealDate, pdotClass, PRIORITIES } from '../tasklib.js'
+import { IconTrash } from '../icons.jsx'
 
 function usePopover(open, setOpen) {
   const ref = useRef(null)
@@ -28,8 +29,9 @@ const ClockMini = () => (
   </svg>
 )
 
-// An interactive task row: animated complete, inline priority menu + scheduler popover.
-export default function TaskRow({ task, onToggle, onSetDue, onSetPriority }) {
+// An interactive task row: animated complete, inline priority menu + scheduler
+// popover, and a hover-revealed delete affordance.
+export default function TaskRow({ task, onToggle, onDelete, onSetDue, onSetPriority }) {
   const [burst, setBurst] = useState(false)
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
@@ -59,6 +61,16 @@ export default function TaskRow({ task, onToggle, onSetDue, onSetPriority }) {
           {(task.labels || []).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
         </div>
       </div>
+      {onDelete && (
+        <button
+          className="iconbtn sm task-del danger-hover"
+          title="Delete task"
+          aria-label={`Delete: ${task.title}`}
+          onClick={() => onDelete(task)}
+        >
+          <IconTrash size={15} />
+        </button>
+      )}
     </div>
   )
 }

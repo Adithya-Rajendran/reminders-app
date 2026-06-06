@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { updateTask } from '../tasklib.js'
-import { IconBell, IconCheck, IconClock } from '../icons.jsx'
+import { emitTasksChanged } from '../tasksbus.js'
+import { IconBell, IconCheck, IconClock, IconX } from '../icons.jsx'
 
 function taskOf(ev) { const e = ev?.data?.event || {}; return (e.data && e.data.task) || e.task || null }
+function keyOf(ev, i) { const t = taskOf(ev); return String(ev?.id ?? (t ? t.id + ':' + (ev?.at ?? i) : i)) }
 function rel(at) {
   const s = Math.round((Date.now() - at) / 1000)
   if (s < 60) return 'just now'
@@ -19,46 +21,54 @@ function kindOf(ev) {
   return 'sync'
 }
 
-// Live, actionable reminders feed — each fired reminder can be completed or snoozed.
+// Live, actionable reminders feed — each fired reminder can be completed
+// (with Undo), snoozed, or dismissed from the feed.
 export default function RemindersWidget({ events }) {
-  const [acted, setActed] = useState({})
-  const items = (events || []).filter((e) => taskOf(e))
+  const [acted, setActed] = useState({})       // taskId -> 'done' | 'snoozed'
+  const [dismissed, setDismissed] = useState({}) // feed key -> true
+  const all = (events || []).map((e, i) => ({ e, key: keyOf(e, i) })).filter(({ e }) => taskOf(e))
+  const items = all.filter(({ key }) => !dismissed[key])
 
-  const complete = async (t) => { setActed((a) => ({ ...a, [t.id]: 'done' })); try { await updateTask(t.id, { done: true }) } catch { /* */ } }
+  const complete = async (t) => { setActed((a) => ({ ...a, [t.id]: 'done' })); try { await updateTask(t.id, { done: true }); emitTasksChanged() } catch { /* */ } }
+  const undoComplete = async (t) => {
+    setActed((a) => { const n = { ...a }; delete n[t.id]; return n })
+    try { await updateTask(t.id, { done: false }); emitTasksChanged() } catch { /* */ }
+  }
   const snooze = async (t) => {
     setActed((a) => ({ ...a, [t.id]: 'snoozed' }))
     const iso = new Date(Date.now() + 3600e3).toISOString()
-    try { await updateTask(t.id, { reminders: [{ reminder: iso }] }) } catch { /* */ }
+    try { await updateTask(t.id, { reminders: [{ reminder: iso }] }); emitTasksChanged() } catch { /* */ }
   }
+  const dismiss = (key) => setDismissed((d) => ({ ...d, [key]: true }))
 
   if (items.length === 0) {
     return (
       <div className="state">
         <div className="state-ic"><IconBell size={22} /></div>
         <div className="state-title">No reminders yet</div>
-        <div className="state-sub">Fired reminders &amp; overdue alerts stream in here live — complete or snooze them right here.</div>
+        <div className="state-sub">Fired reminders &amp; overdue alerts stream in here live — complete, snooze, or dismiss them right here.</div>
       </div>
     )
   }
 
   return (
     <div className="feed">
-      {items.map((e, i) => {
+      {items.map(({ e, key }) => {
         const t = taskOf(e)
         const a = acted[t.id]
         return (
-          <div className={`feed-item${a ? ' acted' : ''}`} key={i}>
+          <div className={`feed-item${a ? ' acted' : ''}`} key={key}>
             <div className={`feed-ic ${kindOf(e)}`}><IconBell size={15} /></div>
             <div className="feed-main">
               <div className="feed-text"><b>{t.title}</b></div>
               <div className="feed-time">{a === 'done' ? 'Completed ✓' : a === 'snoozed' ? 'Snoozed 1h' : rel(e.at)}</div>
             </div>
-            {!a && (
-              <div className="feed-actions">
-                <button className="iconbtn sm" title="Complete" aria-label="Complete" onClick={() => complete(t)}><IconCheck size={15} /></button>
-                <button className="iconbtn sm" title="Snooze 1 hour" aria-label="Snooze 1 hour" onClick={() => snooze(t)}><IconClock size={15} /></button>
-              </div>
-            )}
+            <div className="feed-actions">
+              {!a && <button className="iconbtn sm" title="Complete" aria-label="Complete" onClick={() => complete(t)}><IconCheck size={15} /></button>}
+              {!a && <button className="iconbtn sm" title="Snooze 1 hour" aria-label="Snooze 1 hour" onClick={() => snooze(t)}><IconClock size={15} /></button>}
+              {a === 'done' && <button className="undo-btn sm-undo" title="Undo complete" onClick={() => undoComplete(t)}>Undo</button>}
+              <button className="iconbtn sm danger-hover" title="Dismiss" aria-label="Dismiss reminder" onClick={() => dismiss(key)}><IconX size={15} /></button>
+            </div>
           </div>
         )
       })}
