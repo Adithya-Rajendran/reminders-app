@@ -27,7 +27,9 @@ export async function getLayout(userId, dashboardId) {
 
 export async function saveLayout(userId, dashboardId, body) {
   const layout = body?.layout ?? body
-  const version = Number(body?.layout?.version || body?.version || 1)
+  let version = Number(body?.layout?.version || body?.version || 1)
+  if (!Number.isFinite(version)) version = 1
+  version = Math.trunc(version)
   await pool.query(
     `INSERT INTO user_dashboards (user_id, dashboard_id, layout_json, layout_version, updated_at)
      VALUES ($1, $2, $3, $4, now())
@@ -35,6 +37,8 @@ export async function saveLayout(userId, dashboardId, body) {
      DO UPDATE SET layout_json = EXCLUDED.layout_json,
                    layout_version = EXCLUDED.layout_version,
                    updated_at = now()`,
-    [userId, dashboardId, layout, version],
+    // Serialize explicitly so an array layout is stored as jsonb rather than
+    // being coerced into a Postgres array literal (which errors on a jsonb col).
+    [userId, dashboardId, JSON.stringify(layout), version],
   )
 }

@@ -43,14 +43,36 @@ const HOP_BY_HOP = new Set([
   'upgrade', 'content-length', 'content-encoding',
 ])
 
+// Vikunja's `POST /tasks/{id}` is a FULL-OBJECT write: any column omitted from
+// the request body is reset to its zero value (priority 0, due_date cleared,
+// reminders dropped, …). The SPA sends single-field patches — complete
+// (`{done:true}`), inline priority/due edits, calendar drag (`{due_date}`) — so
+// without intervention each of those silently wipes the task's other fields.
+// Matching exactly /tasks/{numericId} lets us turn those into read-modify-write.
+const TASK_UPDATE_RE = /^\/api\/vikunja\/tasks\/\d+$/
+
 export async function proxyVikunja(req, res) {
+  const reqPath = req.originalUrl.split('?')[0]
   const target = BASE + req.originalUrl.replace(/^\/api\/vikunja/, '/api/v1')
+  const isTaskUpdate = req.method === 'POST' && TASK_UPDATE_RE.test(reqPath) &&
+    req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+
   const send = async (tok) => {
+    let payload = req.body
+    // Read-modify-write: merge the patch over the task's current full state so
+    // omitted fields are preserved instead of zeroed. Makes every client safe.
+    if (isTaskUpdate) {
+      const cur = await fetch(target, { headers: { Authorization: 'Bearer ' + tok } })
+      if (cur.ok) {
+        const current = await cur.json().catch(() => null)
+        if (current && typeof current === 'object' && !Array.isArray(current)) payload = { ...current, ...req.body }
+      }
+    }
     const headers = { Authorization: 'Bearer ' + tok }
     let body
-    if (!['GET', 'HEAD', 'DELETE'].includes(req.method) && req.body && Object.keys(req.body).length) {
+    if (!['GET', 'HEAD', 'DELETE'].includes(req.method) && payload && Object.keys(payload).length) {
       headers['content-type'] = 'application/json'
-      body = JSON.stringify(req.body)
+      body = JSON.stringify(payload)
     }
     return fetch(target, { method: req.method, headers, body })
   }

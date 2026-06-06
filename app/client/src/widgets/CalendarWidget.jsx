@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import { api, vk } from '../api.js'
+import { emitTasksChanged } from '../tasksbus.js'
 import { Calendar, X, Trash, Check, Spinner } from '../icons.jsx'
 
 const ZERO_DATE = '0001-01-01T00:00:00Z'
@@ -137,7 +138,7 @@ export default function CalendarWidget() {
     const p = arg.event.extendedProps
     // Drag a Vikunja task on the calendar -> reschedule its due date.
     if (p.kind === 'task' && p.source === 'vikunja') {
-      try { await vk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }) }
+      try { await vk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }); emitTasksChanged() }
       catch { arg.revert() }
       return
     }

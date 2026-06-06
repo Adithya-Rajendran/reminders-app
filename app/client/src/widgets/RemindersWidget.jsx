@@ -4,7 +4,6 @@ import { emitTasksChanged } from '../tasksbus.js'
 import { IconBell, IconCheck, IconClock, IconX } from '../icons.jsx'
 
 function taskOf(ev) { const e = ev?.data?.event || {}; return (e.data && e.data.task) || e.task || null }
-function keyOf(ev, i) { const t = taskOf(ev); return String(ev?.id ?? (t ? t.id + ':' + (ev?.at ?? i) : i)) }
 function rel(at) {
   const s = Math.round((Date.now() - at) / 1000)
   if (s < 60) return 'just now'
@@ -25,9 +24,18 @@ function kindOf(ev) {
 // (with Undo), snoozed, or dismissed from the feed.
 export default function RemindersWidget({ events }) {
   const [acted, setActed] = useState({})       // taskId -> 'done' | 'snoozed'
-  const [dismissed, setDismissed] = useState({}) // feed key -> true
-  const all = (events || []).map((e, i) => ({ e, key: keyOf(e, i) })).filter(({ e }) => taskOf(e))
-  const items = all.filter(({ key }) => !dismissed[key])
+  const [dismissed, setDismissed] = useState({}) // taskId -> true
+
+  // Collapse to one item per task (the most recent alert): a single task can
+  // emit several events at once (reminder + overdue + updated) and we don't want
+  // to show it three times.
+  const byTask = new Map()
+  ;(events || []).forEach((e, i) => {
+    const t = taskOf(e); if (!t) return
+    const prev = byTask.get(t.id)
+    if (!prev || (e?.at ?? i) >= (prev.at ?? prev.i)) byTask.set(t.id, { e, at: e?.at, i, t })
+  })
+  const items = [...byTask.values()].filter(({ t }) => !dismissed[t.id])
 
   const complete = async (t) => { setActed((a) => ({ ...a, [t.id]: 'done' })); try { await updateTask(t.id, { done: true }); emitTasksChanged() } catch { /* */ } }
   const undoComplete = async (t) => {
@@ -39,7 +47,7 @@ export default function RemindersWidget({ events }) {
     const iso = new Date(Date.now() + 3600e3).toISOString()
     try { await updateTask(t.id, { reminders: [{ reminder: iso }] }); emitTasksChanged() } catch { /* */ }
   }
-  const dismiss = (key) => setDismissed((d) => ({ ...d, [key]: true }))
+  const dismiss = (id) => setDismissed((d) => ({ ...d, [id]: true }))
 
   if (items.length === 0) {
     return (
@@ -53,11 +61,10 @@ export default function RemindersWidget({ events }) {
 
   return (
     <div className="feed">
-      {items.map(({ e, key }) => {
-        const t = taskOf(e)
+      {items.map(({ e, t }) => {
         const a = acted[t.id]
         return (
-          <div className={`feed-item${a ? ' acted' : ''}`} key={key}>
+          <div className={`feed-item${a ? ' acted' : ''}`} key={t.id}>
             <div className={`feed-ic ${kindOf(e)}`}><IconBell size={15} /></div>
             <div className="feed-main">
               <div className="feed-text"><b>{t.title}</b></div>
@@ -67,7 +74,7 @@ export default function RemindersWidget({ events }) {
               {!a && <button className="iconbtn sm" title="Complete" aria-label="Complete" onClick={() => complete(t)}><IconCheck size={15} /></button>}
               {!a && <button className="iconbtn sm" title="Snooze 1 hour" aria-label="Snooze 1 hour" onClick={() => snooze(t)}><IconClock size={15} /></button>}
               {a === 'done' && <button className="undo-btn sm-undo" title="Undo complete" onClick={() => undoComplete(t)}>Undo</button>}
-              <button className="iconbtn sm danger-hover" title="Dismiss" aria-label="Dismiss reminder" onClick={() => dismiss(key)}><IconX size={15} /></button>
+              <button className="iconbtn sm danger-hover" title="Dismiss" aria-label="Dismiss reminder" onClick={() => dismiss(t.id)}><IconX size={15} /></button>
             </div>
           </div>
         )
