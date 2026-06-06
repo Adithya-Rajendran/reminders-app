@@ -1,0 +1,16 @@
+# Small block volume for the SQLite config DB (CalDAV re-platform). ceph-rbd is
+# block storage (real ext4/xfs), so SQLite's POSIX file locking + WAL are safe
+# here — never put SQLite on CephFS/NFS. RWO + single replica + Recreate means
+# exactly one process ever opens the file.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reminders-data
+  namespace: reminders-app
+  labels: { app: reminders-app }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: ceph-rbd
+  resources:
+    requests:
+      storage: 1Gi

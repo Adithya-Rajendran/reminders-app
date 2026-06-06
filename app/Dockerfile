@@ -1,6 +1,10 @@
 # ---- build the SPA + install deps ----
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
+# Toolchain for native deps (better-sqlite3) in case a prebuilt binary isn't
+# available; the compiled node_modules is copied into the slim runtime stage.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
