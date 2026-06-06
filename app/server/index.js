@@ -92,6 +92,9 @@ app.get('/api/layouts/:id', requireAuth, async (req, res, next) => {
   try { res.json(await getLayout(req.session.user.sub, req.params.id)) } catch (e) { next(e) }
 })
 app.put('/api/layouts/:id', requireAuth, async (req, res, next) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'layout body must be a JSON object' })
+  }
   try { await saveLayout(req.session.user.sub, req.params.id, req.body); res.json({ ok: true }) } catch (e) { next(e) }
 })
 // CalDAV settings + tasks
@@ -120,8 +123,11 @@ app.get('*', (req, res, next) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('unhandled error:', err)
-  res.status(500).json({ error: 'internal error' })
+  // Honor an explicit status (e.g. body-parser sets 400 on malformed JSON) so
+  // client mistakes surface as 4xx instead of a misleading 500.
+  const status = err.status || err.statusCode || 500
+  if (status >= 500) console.error('unhandled error:', err)
+  res.status(status).json({ error: status >= 500 ? 'internal error' : (err.message || 'bad request') })
 })
 
 const start = async () => {

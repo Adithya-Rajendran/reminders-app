@@ -606,6 +606,9 @@ body {
 .task.checked .task-title .t { color: var(--faint); text-decoration: line-through; }
 .task .task-sub { display: flex; align-items: center; gap: 7px; margin-top: 5px; flex-wrap: wrap; }
 .task-meta { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
+.task .task-del { align-self: center; flex: 0 0 auto; opacity: 0; transition: opacity 120ms ease; }
+.task:hover .task-del, .task:focus-within .task-del { opacity: 1; }
+@media (hover: none) { .task .task-del { opacity: 1; } }
 
 .add-row {
   display: flex; align-items: center; gap: 9px;
@@ -1084,7 +1087,10 @@ body {
 .feed { display: flex; flex-direction: column; }
 .feed-actions { display: flex; gap: 2px; margin-left: auto; align-items: center; opacity: 0; transition: opacity .15s; }
 .feed-item:hover .feed-actions, .feed-item:focus-within .feed-actions { opacity: 1; }
-.feed-item.acted { opacity: .55; }
+.feed-item.acted { opacity: .7; }
+.feed-item.acted .feed-actions { opacity: 1; }
+.feed-actions .undo-btn.sm-undo { padding: 0 8px; height: 28px; font-size: 12px; border-radius: 8px; }
+.feed-actions .undo-btn.sm-undo:hover { background: var(--accent-soft); }
 
 /* ===== Accent picker ===== */
 .accent-pop { min-width: 0; padding: 8px; }
