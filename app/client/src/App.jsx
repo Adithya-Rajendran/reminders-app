@@ -3,8 +3,9 @@ import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
-  IconShield, IconKey, IconSpinner,
+  IconShield, IconKey, IconSpinner, IconPalette,
 } from './icons.jsx'
+import { ACCENTS, applyAccent } from './accents.js'
 
 /* close a popover on outside-click + Esc */
 function usePopover(open, setOpen) {
@@ -75,8 +76,38 @@ function ThemeToggle({ theme, onToggle }) {
   )
 }
 
+/* ---------- Accent color picker ---------- */
+function AccentPicker({ accent, onPick }) {
+  const [open, setOpen] = useState(false)
+  const ref = usePopover(open, setOpen)
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button className="iconbtn" aria-label="Accent color" title="Accent color" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <IconPalette size={18} />
+      </button>
+      {open && (
+        <div className="menu accent-pop" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+          <div className="menu-label">Accent color</div>
+          <div className="accent-grid">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.key}
+                className={`accent-swatch${a.key === accent ? ' active' : ''}`}
+                title={a.name}
+                aria-label={a.name}
+                style={{ background: `linear-gradient(135deg, ${a.a}, ${a.b})` }}
+                onClick={() => { onPick(a.key); setOpen(false) }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ---------- TopBar ---------- */
-function TopBar({ user, theme, onToggleTheme, onOpenSettings }) {
+function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const ref = usePopover(menuOpen, setMenuOpen)
   const initials = initialsFor(user)
@@ -94,6 +125,7 @@ function TopBar({ user, theme, onToggleTheme, onOpenSettings }) {
           <span className="email-text">{email}</span>
         </span>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+        <AccentPicker accent={accent} onPick={onAccent} />
         <button className="iconbtn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
           <IconGear size={18} />
         </button>
@@ -141,6 +173,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
   const [theme, setTheme] = useState(() => localStorage.getItem('reminders-theme') || 'dark')
+  const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || 'indigo')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Theme: persist + reflect on <html data-theme>.
@@ -148,6 +181,12 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('reminders-theme', theme)
   }, [theme])
+
+  // Accent: persist + apply to the accent CSS vars.
+  useEffect(() => {
+    applyAccent(accent)
+    localStorage.setItem('reminders-accent', accent)
+  }, [accent])
 
   // Session: fetch /api/me directly so a 401 shows the login screen instead of
   // the api() helper's auto-redirect (the login button starts the OIDC flow).
@@ -183,6 +222,8 @@ export default function App() {
             user={user}
             theme={theme}
             onToggleTheme={toggleTheme}
+            accent={accent}
+            onAccent={setAccent}
             onOpenSettings={() => setSettingsOpen(true)}
           />
           <Dashboard user={user} onOpenSettings={() => setSettingsOpen(true)} />

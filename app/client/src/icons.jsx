@@ -141,6 +141,15 @@ export const IconSliders = (p) => (
   </Icon>
 )
 export const IconArrowUp = (p) => <Icon {...p} d="M12 19V5M5 12l7-7 7 7" />
+export const IconPalette = (p) => (
+  <Icon {...p}>
+    <path d="M12 2a10 10 0 1 0 0 20 2.4 2.4 0 0 0 2.4-2.4c0-.66-.27-1.25-.7-1.7-.27-.3-.45-.7-.45-1.13 0-.87.7-1.57 1.57-1.57H17a5 5 0 0 0 5-5c0-4.7-4.48-8.2-10-8.2z" />
+    <circle cx="8.5" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="13.5" cy="6.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="10" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="6.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+  </Icon>
+)
 export const IconFlag = (p) => (
   <Icon {...p}>
     <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z" />

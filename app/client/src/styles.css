@@ -1085,3 +1085,14 @@ body {
 .feed-actions { display: flex; gap: 2px; margin-left: auto; align-items: center; opacity: 0; transition: opacity .15s; }
 .feed-item:hover .feed-actions, .feed-item:focus-within .feed-actions { opacity: 1; }
 .feed-item.acted { opacity: .55; }
+
+/* ===== Accent picker ===== */
+.accent-pop { min-width: 0; padding: 8px; }
+.accent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; padding: 4px 4px 2px; }
+.accent-swatch {
+  width: 26px; height: 26px; border-radius: 8px; border: 0; cursor: pointer;
+  box-shadow: var(--shadow-sm); outline: 2px solid transparent; outline-offset: 2px;
+  transition: transform .1s ease, outline-color .15s ease;
+}
+.accent-swatch:hover { transform: scale(1.1); }
+.accent-swatch.active { outline-color: var(--text); }
