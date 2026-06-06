@@ -50,8 +50,16 @@ export function useTaskList(loader) {
     try {
       const r = await updateTask(task.id, { done: true })
       emitTasksChanged()
-      if (r && r.done === false) { showUndo('Rescheduled ↻', null); load() } // recurring: bumped due_date, reappears
-      else showUndo('Completed', async () => { await updateTask(task.id, { done: false }).catch(() => {}); emitTasksChanged(); load() })
+      if (r && r.done === false) {
+        // Recurring: Vikunja keeps the task open and (if it can) bumps the due date.
+        // If the date didn't actually advance (e.g. no due date set), it can never
+        // complete — say so honestly instead of a misleading "Rescheduled".
+        const advanced = isRealDate(r.due_date) && (!isRealDate(task.due_date) || new Date(r.due_date) > new Date(task.due_date))
+        showUndo(advanced ? 'Rescheduled ↻' : 'Recurring — set a due date to complete', null)
+        load()
+      } else {
+        showUndo('Completed', async () => { await updateTask(task.id, { done: false }).catch(() => {}); emitTasksChanged(); load() })
+      }
     } catch { setTasks(snapshot) }
   }
 

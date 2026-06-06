@@ -2,9 +2,50 @@
 // read tasks, and toggle completion (editing the VTODO in place to preserve
 // VALARMs / unknown properties — RFC 4791 §8.6). Uses tsdav + ical.js.
 import crypto from 'node:crypto'
+import dns from 'node:dns/promises'
+import net from 'node:net'
 import { createDAVClient } from 'tsdav'
 import ICAL from 'ical.js'
 import { pool } from './db.js'
+
+// ---- SSRF egress guard for outbound CalDAV requests ----
+// CalDAV server/object URLs are user-supplied, so every outbound request must be
+// vetted. Loopback, the unspecified address, link-local (incl. the cloud
+// metadata IP 169.254.169.254) and multicast are NEVER a valid CalDAV target and
+// are always blocked. RFC1918 / ULA are allowed by default because self-hosted
+// CalDAV commonly lives on a LAN/cluster IP; set CALDAV_BLOCK_PRIVATE=1 to also
+// block those on internet-facing deployments.
+const BLOCK_PRIVATE = process.env.CALDAV_BLOCK_PRIVATE === '1'
+function ipBlocked(ip) {
+  const m = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)
+  const v = m ? m[1] : ip
+  if (net.isIPv4(v)) {
+    const o = v.split('.').map(Number)
+    if (o[0] === 0 || o[0] === 127 || (o[0] === 169 && o[1] === 254) || o[0] >= 224) return true
+    const priv = o[0] === 10 || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168) || (o[0] === 100 && o[1] >= 64 && o[1] <= 127)
+    return priv ? BLOCK_PRIVATE : false
+  }
+  const lo = ip.toLowerCase()
+  if (lo === '::' || lo === '::1' || lo.startsWith('fe80') || lo.startsWith('ff')) return true
+  if (lo.startsWith('fc') || lo.startsWith('fd')) return BLOCK_PRIVATE
+  return false
+}
+async function assertEgressAllowed(urlStr) {
+  let u
+  try { u = new URL(urlStr) } catch { const e = new Error('invalid URL'); e.status = 400; throw e }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') { const e = new Error('only http(s) URLs are allowed'); e.status = 400; throw e }
+  const host = u.hostname.replace(/^\[|\]$/g, '')
+  let addrs
+  if (net.isIP(host)) addrs = [{ address: host }]
+  else { try { addrs = await dns.lookup(host, { all: true }) } catch { const e = new Error('host did not resolve'); e.status = 400; throw e } }
+  for (const a of addrs) if (ipBlocked(a.address)) { const e = new Error('destination address not allowed'); e.status = 400; throw e }
+}
+// Guarded fetch: vet the destination, and never follow redirects (a redirect
+// could bounce an allowed host to a blocked internal one / enable DNS rebinding).
+async function safeFetch(url, opts = {}) {
+  await assertEgressAllowed(url)
+  return fetch(url, { ...opts, redirect: 'error' })
+}
 
 // tsdav's fetchCalendarObjects defaults to a VEVENT filter, which excludes
 // tasks — we must explicitly query for VTODO components.
@@ -48,6 +89,7 @@ function normalizeServerUrl(type, serverUrl) {
 }
 
 async function clientFor(acc) {
+  await assertEgressAllowed(acc.server_url)
   return createDAVClient({
     serverUrl: acc.server_url,
     credentials: { username: acc.username, password: dec(acc.password_enc) },
@@ -221,7 +263,7 @@ export async function toggleHandler(req, res) {
   try {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc || !objectUrl) return res.status(400).json({ error: 'bad request' })
-    const r = await fetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
+    const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
     if (!r.ok) return res.status(502).json({ error: 'fetch failed' })
     const etag = r.headers.get('etag')
     const comp = new ICAL.Component(ICAL.parse(await r.text()))
@@ -238,7 +280,7 @@ export async function toggleHandler(req, res) {
     }
     const headers = { Authorization: authHeader(acc), 'Content-Type': 'text/calendar; charset=utf-8' }
     if (etag) headers['If-Match'] = etag
-    const put = await fetch(objectUrl, { method: 'PUT', headers, body: comp.toString() })
+    const put = await safeFetch(objectUrl, { method: 'PUT', headers, body: comp.toString() })
     if (!put.ok && put.status !== 204) return res.status(502).json({ error: 'update failed (' + put.status + ')' })
     res.json({ ok: true })
   } catch (e) {
@@ -350,18 +392,27 @@ async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
   ve.updatePropertyWithValue('summary', (summary || '(untitled)') + '')
   ve.updatePropertyWithValue('sequence', 0)
   setTimeProp(ve, 'dtstart', timeFromISO(start, allDay))
-  if (end !== undefined && end !== null && end !== '') setTimeProp(ve, 'dtend', timeFromISO(end, allDay))
+  if (allDay) {
+    // All-day VEVENTs need an EXCLUSIVE DTEND (>= start + 1 day); otherwise a
+    // zero-length all-day event is dropped from day/week/list views.
+    const sd = new Date(start)
+    let ed = (end !== undefined && end !== null && end !== '') ? new Date(end) : null
+    if (!ed || isNaN(ed.getTime()) || ed.getTime() <= sd.getTime()) { ed = new Date(sd); ed.setUTCDate(ed.getUTCDate() + 1) }
+    setTimeProp(ve, 'dtend', timeFromISO(ed.toISOString(), true))
+  } else if (end !== undefined && end !== null && end !== '') {
+    setTimeProp(ve, 'dtend', timeFromISO(end, false))
+  }
   vcal.addSubcomponent(ve)
 
   const objectUrl = (listUrl.endsWith('/') ? listUrl : listUrl + '/') + uid + '.ics'
   const headers = { Authorization: authHeader(acc), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }
-  const put = await fetch(objectUrl, { method: 'PUT', headers, body: vcal.toString() })
+  const put = await safeFetch(objectUrl, { method: 'PUT', headers, body: vcal.toString() })
   if (!put.ok && put.status !== 201 && put.status !== 204) throw new Error('create failed (' + put.status + ')')
   return parseVevents(vcal.toString(), { accountId: acc.id, listUrl, objectUrl, etag: put.headers.get('etag') })[0]
 }
 
 async function updateEvent(acc, { objectUrl, summary, start, end, allDay }) {
-  const r = await fetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
+  const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
   if (!r.ok) throw new Error('fetch failed (' + r.status + ')')
   const etag = r.headers.get('etag')
   const comp = new ICAL.Component(ICAL.parse(await r.text()))
@@ -387,25 +438,37 @@ async function updateEvent(acc, { objectUrl, summary, start, end, allDay }) {
     if (curEnd) setTimeProp(ve, 'dtend', recastTime(curEnd, isAllDay))
   }
 
+  // An all-day event must keep an EXCLUSIVE DTEND strictly after DTSTART — e.g.
+  // converting a same-day timed event to all-day would otherwise yield
+  // DTEND==DTSTART (zero length) and vanish from day/week/list views.
+  if (isAllDay) {
+    const ds = ve.getFirstPropertyValue('dtstart')
+    const de = ve.getFirstPropertyValue('dtend')
+    if (ds && (!de || de.compare(ds) <= 0)) {
+      const ne = ds.clone(); ne.adjust(1, 0, 0, 0)
+      setTimeProp(ve, 'dtend', ne)
+    }
+  }
+
   ve.updatePropertyWithValue('sequence', Number(ve.getFirstPropertyValue('sequence') || 0) + 1)
   ve.updatePropertyWithValue('last-modified', ICAL.Time.now())
   ve.updatePropertyWithValue('dtstamp', ICAL.Time.now())
 
   const headers = { Authorization: authHeader(acc), 'Content-Type': 'text/calendar; charset=utf-8' }
   if (etag) headers['If-Match'] = etag
-  const put = await fetch(objectUrl, { method: 'PUT', headers, body: comp.toString() })
+  const put = await safeFetch(objectUrl, { method: 'PUT', headers, body: comp.toString() })
   if (!put.ok && put.status !== 204) throw new Error('update failed (' + put.status + ')')
 }
 
 async function deleteEvent(acc, { objectUrl }) {
   let etag
   try {
-    const r = await fetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
+    const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
     if (r.ok) etag = r.headers.get('etag')
   } catch { /* fall through to an unconditional delete */ }
   const headers = { Authorization: authHeader(acc) }
   if (etag) headers['If-Match'] = etag
-  const del = await fetch(objectUrl, { method: 'DELETE', headers })
+  const del = await safeFetch(objectUrl, { method: 'DELETE', headers })
   if (!del.ok && del.status !== 204 && del.status !== 404) throw new Error('delete failed (' + del.status + ')')
 }
 
@@ -423,6 +486,11 @@ export async function calendarEventsHandler(req, res) {
 export async function createEventHandler(req, res) {
   const { accountId, listUrl, summary, start, end, allDay } = req.body || {}
   if (!accountId || !listUrl || !start) return res.status(400).json({ error: 'accountId, listUrl and start are required' })
+  if (isNaN(new Date(start).getTime())) return res.status(400).json({ error: 'invalid start date' })
+  if (end != null && end !== '') {
+    if (isNaN(new Date(end).getTime())) return res.status(400).json({ error: 'invalid end date' })
+    if (!allDay && new Date(end).getTime() <= new Date(start).getTime()) return res.status(400).json({ error: 'end must be after start' })
+  }
   try {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc) return res.status(404).json({ error: 'not found' })
@@ -437,6 +505,9 @@ export async function createEventHandler(req, res) {
 export async function updateEventHandler(req, res) {
   const { accountId, objectUrl, summary, start, end, allDay } = req.body || {}
   if (!accountId || !objectUrl) return res.status(400).json({ error: 'accountId and objectUrl are required' })
+  if (start != null && start !== '' && isNaN(new Date(start).getTime())) return res.status(400).json({ error: 'invalid start date' })
+  if (end != null && end !== '' && isNaN(new Date(end).getTime())) return res.status(400).json({ error: 'invalid end date' })
+  if (start && end && end !== '' && !allDay && new Date(end).getTime() <= new Date(start).getTime()) return res.status(400).json({ error: 'end must be after start' })
   try {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc) return res.status(404).json({ error: 'not found' })

@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react'
 import { vk } from '../api.js'
 import { useTaskList } from '../useTasks.js'
+import { emitTasksChanged } from '../tasksbus.js'
 import { parseQuickAdd, createTask, attachLabels } from '../tasklib.js'
 import TaskRow from './TaskRow.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
@@ -25,6 +26,7 @@ export default function TaskListWidget({ projectId }) {
       const t = await createTask(projectId, { title: title || text, priority, ...(due_date ? { due_date } : {}) })
       if (labels.length && t?.id) await attachLabels(t.id, labels)
     } catch { /* fall through to reload */ }
+    emitTasksChanged() // let Upcoming / Reminders / Calendar pick up the new task too
     load()
   }
 
