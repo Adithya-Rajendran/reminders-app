@@ -75,8 +75,27 @@ export default function Dashboard({ user, onOpenSettings }) {
       try { saved = await api('/api/layouts/' + DASH) } catch { /* none */ }
       if (saved?.layout) {
         // Any persisted layout is authoritative — including an intentionally empty one.
-        setWidgets(saved.layout.widgets || [])
+        // BUT repair tasklist widgets pinned to a project this user no longer owns
+        // (e.g. an old layout from before per-user isolation): repoint to the first
+        // available project (Inbox) so the widget loads instead of 404ing, and
+        // persist the heal so it sticks.
+        const validIds = new Set(pr.map((p) => p.id))
+        const fallback = pr[0]?.id
+        let repaired = false
+        const sw = (saved.layout.widgets || []).flatMap((w) => {
+          if (w.type !== 'tasklist' || validIds.has(w.projectId)) return [w]
+          if (fallback == null) return [] // nothing to fall back to → drop it
+          repaired = true
+          return [{ ...w, projectId: fallback }]
+        })
+        setWidgets(sw)
         setLayouts(saved.layout.layouts || {})
+        if (repaired) {
+          api('/api/layouts/' + DASH, {
+            method: 'PUT',
+            body: JSON.stringify({ layout: { version: 1, widgets: sw, layouts: saved.layout.layouts || {} } }),
+          }).catch(() => {})
+        }
       } else {
         const def = []
         if (pr[0]) def.push({ i: newId(), type: 'tasklist', projectId: pr[0].id })
