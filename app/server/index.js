@@ -8,6 +8,7 @@ import { proxyVikunja } from './vikunja.js'
 import * as tasks from './tasks.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler, handleWebhook } from './events.js'
+import { startScheduler } from './scheduler.js'
 import * as caldav from './caldav.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -151,6 +152,7 @@ const start = async () => {
   await initDb()
   await caldav.initCaldavDb()
   await initOidc()
+  startScheduler() // dormant unless TASKS_BACKEND=postgres
   app.listen(PORT, () => console.log('reminders-app BFF listening on :' + PORT))
 }
 start().catch((e) => { console.error('fatal startup error:', e); process.exit(1) })
