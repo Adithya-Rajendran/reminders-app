@@ -4,10 +4,9 @@ import connectPgSimple from 'connect-pg-simple'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { initDb, getLayout, saveLayout, pool } from './db.js'
-import { proxyVikunja } from './vikunja.js'
 import * as tasks from './tasks.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
-import { sseHandler, handleWebhook } from './events.js'
+import { sseHandler } from './events.js'
 import { startScheduler } from './scheduler.js'
 import * as caldav from './caldav.js'
 
@@ -25,10 +24,6 @@ if (!SESSION_SECRET) {
 const app = express()
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
-
-// The Vikunja webhook receiver needs the RAW body to verify the HMAC
-// signature, so it is registered BEFORE the JSON body parser, on its own path.
-app.post('/api/webhooks/vikunja', express.raw({ type: '*/*', limit: '1mb' }), handleWebhook)
 
 app.use(express.json({ limit: '2mb' }))
 const PgStore = connectPgSimple(session)
@@ -114,23 +109,19 @@ app.post('/api/calendar/events', requireAuth, caldav.createEventHandler)
 app.patch('/api/calendar/events', requireAuth, caldav.updateEventHandler)
 app.delete('/api/calendar/events', requireAuth, caldav.deleteEventHandler)
 
-// Task backend: 'vikunja' (proxy, default) or 'postgres' (native store). The
-// native handlers are mounted on the SAME paths/verbs so the SPA is unchanged;
-// the cutover is a single env-var flip, reversible by flipping back.
-if ((process.env.TASKS_BACKEND || 'vikunja') === 'postgres') {
-  app.get('/api/vikunja/projects', requireAuth, tasks.listProjects)
-  app.get('/api/vikunja/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
-  app.put('/api/vikunja/projects/:id/tasks', requireAuth, tasks.createTask)
-  app.get('/api/vikunja/tasks', requireAuth, tasks.listTasks)
-  app.post('/api/vikunja/tasks/:id', requireAuth, tasks.patchTask)
-  app.delete('/api/vikunja/tasks/:id', requireAuth, tasks.deleteTask)
-  app.get('/api/vikunja/labels', requireAuth, tasks.listLabels)
-  app.put('/api/vikunja/labels', requireAuth, tasks.createLabel)
-  app.put('/api/vikunja/tasks/:id/labels', requireAuth, tasks.attachLabel)
-  app.all('/api/vikunja/*', requireAuth, (_q, r) => r.status(404).json({ error: 'not found' }))
-} else {
-  app.all('/api/vikunja/*', requireAuth, proxyVikunja)
-}
+// Tasks / projects / labels — Postgres-native store (Vikunja retired). The URL
+// paths keep the historical /api/vikunja prefix so the SPA is unchanged;
+// renaming them is a cosmetic follow-up.
+app.get('/api/vikunja/projects', requireAuth, tasks.listProjects)
+app.get('/api/vikunja/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
+app.put('/api/vikunja/projects/:id/tasks', requireAuth, tasks.createTask)
+app.get('/api/vikunja/tasks', requireAuth, tasks.listTasks)
+app.post('/api/vikunja/tasks/:id', requireAuth, tasks.patchTask)
+app.delete('/api/vikunja/tasks/:id', requireAuth, tasks.deleteTask)
+app.get('/api/vikunja/labels', requireAuth, tasks.listLabels)
+app.put('/api/vikunja/labels', requireAuth, tasks.createLabel)
+app.put('/api/vikunja/tasks/:id/labels', requireAuth, tasks.attachLabel)
+app.all('/api/vikunja/*', requireAuth, (_q, r) => r.status(404).json({ error: 'not found' }))
 
 // ---- Static SPA + client-side routing fallback ----
 app.use(express.static(PUBLIC_DIR))
@@ -152,7 +143,7 @@ const start = async () => {
   await initDb()
   await caldav.initCaldavDb()
   await initOidc()
-  startScheduler() // dormant unless TASKS_BACKEND=postgres
+  startScheduler() // in-app reminder poller -> per-user SSE
   app.listen(PORT, () => console.log('reminders-app BFF listening on :' + PORT))
 }
 start().catch((e) => { console.error('fatal startup error:', e); process.exit(1) })

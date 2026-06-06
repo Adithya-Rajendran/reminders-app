@@ -36,11 +36,11 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 ## Features
 
 - 🧩 **Customizable dashboard** — draggable, resizable widget grid ([react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)); arrange it however you like, layout auto-saves per user.
-- ✅ **Task widgets** backed by Vikunja's REST API — project lists and an **Upcoming** view grouped by Today / Tomorrow / This week.
+- ✅ **Task widgets** backed by a **Postgres-native** task store — project lists and an **Upcoming** view grouped by Today / Tomorrow / This week. Tasks are scoped per user (OIDC `sub`); recurrence and reminders are handled in-app.
 - ⚡ **Interactive tasks** (influenced by Todoist / TickTick / Things) — **natural-language quick-add** (`report tomorrow !2 *work` → due date + priority + label), one-click **scheduling** (Today / Tomorrow / Weekend / Next week / clear) and **priority** menus, **recurring-aware** completion with a satisfying pop + **Undo**, **drag tasks on the calendar** to reschedule, and an **actionable reminders feed** (complete / snooze).
 - 📅 **Multi-view calendar** ([FullCalendar](https://fullcalendar.io)) — month / week / day / agenda; create, drag-reschedule, edit & delete events; tasks overlay automatically.
 - ☁️ **CalDAV sync** — connect **Nextcloud**, **Apple iCloud**, or any **generic CalDAV** server; discover task lists, toggle which to sync, read & complete tasks, two-way calendar **events** (VEVENT) write-back.
-- 🔔 **Live reminders feed** — Vikunja webhooks → server → SSE → instant in-app updates.
+- 🔔 **Live reminders feed** — an in-app reminder scheduler → **per-user** SSE → instant in-app updates.
 - 🔐 **OIDC single sign-on** (Authentik / Keycloak / any OpenID Connect provider) via a backend-for-frontend; sessions persisted in Postgres.
 - 🎨 **Light & dark themes + selectable accents** — a one-click theme toggle and an 8-swatch **accent picker** in the top bar, both persisted per browser.
 
@@ -49,14 +49,14 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 ```
 Browser ──TLS──▶ Gateway/Ingress ──▶ Reminders (Node BFF + React SPA)
                                          │  OIDC (PKCE) ──▶ your IdP
-                                         │  /api/vikunja/* ─▶ Vikunja (tasks, recurrence, reminders, webhooks)
+                                         │  tasks/projects/labels/recurrence ─▶ Postgres (per user)
                                          │  /api/caldav/*, /api/calendar/* ─▶ CalDAV (Nextcloud/iCloud/…)
                                          │  /api/layouts, sessions ─▶ Postgres
                                          ▼
-                              SSE reminders ◀─ Vikunja webhooks
+                       reminder scheduler ─▶ per-user SSE
 ```
 
-The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly Postgres-backed session, reverse-proxies the Vikunja API with a service account, talks CalDAV (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), persists per-user dashboard layouts, and relays reminder webhooks to the browser over SSE. The **SPA** (`app/client`, React 18 + Vite) is the dashboard.
+The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly Postgres-backed session, owns the **Postgres-native task store** (tasks/projects/labels scoped by OIDC `sub`, recurrence, and a polling **reminder scheduler** that pushes per-user SSE), talks CalDAV (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), and persists per-user dashboard layouts. The **SPA** (`app/client`, React 18 + Vite) is the dashboard. Multi-tenancy is enforced in the database (every row keyed by user; composite foreign keys). See [`docs/REPLATFORM_PLAN.md`](docs/REPLATFORM_PLAN.md) for the design.
 
 ## Quick start (container image)
 
@@ -70,18 +70,15 @@ docker run -p 8080:8080 \
   -e OIDC_CLIENT_ID=... -e OIDC_CLIENT_SECRET=... \
   -e OIDC_REDIRECT_URI="https://reminders.example.com/auth/callback" \
   -e APP_BASE_URL="https://reminders.example.com" \
-  -e VIKUNJA_URL="http://vikunja:3456" \
-  -e VIKUNJA_USERNAME=... -e VIKUNJA_PASSWORD=... \
-  -e WEBHOOK_SECRET="$(openssl rand -hex 32)" \
   -e CALDAV_ENC_KEY="$(openssl rand -hex 32)" \
   ghcr.io/adithya-rajendran/reminders-app:latest
 ```
 
-Needs a **Vikunja** instance, a **Postgres** database, and an **OIDC** provider. You also need to register the OAuth2 redirect URI with your IdP and a Vikunja webhook → `…/api/webhooks/vikunja`.
+Needs a **Postgres** database and an **OIDC** provider. Register the OAuth2 redirect URI with your IdP. The task schema is created automatically on first boot. Optional: `REMINDER_POLL_MS` (reminder poll interval, default 30000); `CALDAV_BLOCK_PRIVATE=1` to also block RFC1918 destinations for the CalDAV egress guard.
 
 ### Kubernetes
 
-Manifests are under [`k8s/`](k8s/) (namespace, Postgres, Vikunja, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. The app Deployment pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-pg`, `vikunja-secret`, and `reminders-app-env` secrets.
+Manifests are under [`k8s/`](k8s/) (namespace, Postgres, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. The app Deployment pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-pg` and `reminders-app-env` secrets.
 
 ## Development
 
@@ -102,8 +99,8 @@ The UI was generated from a reusable design prompt and ported into the app — s
 
 ## Licensing
 
-For **personal, single-user self-hosting** the practical obligations are near zero. Components are FOSS — permissive (MIT/Apache/MPL: React, FullCalendar, tsdav, Express, pg…) or copyleft (AGPL: Vikunja/Nextcloud — running upstream images for yourself doesn't trigger the network-source-offer). Not legal advice. Don't run this as a multi-tenant/commercial service without reviewing each component's license.
+The app's own components are FOSS and permissive (MIT/Apache/MPL: React, FullCalendar, react-grid-layout, tsdav, ical.js, Express, pg…). Nextcloud (AGPL) is reached only as an external CalDAV server you run yourself. Not legal advice. Don't run this as a multi-tenant/commercial service without reviewing each component's license.
 
 ## Acknowledgements
 
-[Vikunja](https://vikunja.io) · [FullCalendar](https://fullcalendar.io) · [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout) · [tsdav](https://github.com/natelindev/tsdav) · [ical.js](https://github.com/kewisch/ical.js) · [Authentik](https://goauthentik.io) · [Nextcloud](https://nextcloud.com).
+[FullCalendar](https://fullcalendar.io) · [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout) · [tsdav](https://github.com/natelindev/tsdav) · [ical.js](https://github.com/kewisch/ical.js) · [Authentik](https://goauthentik.io) · [Nextcloud](https://nextcloud.com).

@@ -73,7 +73,6 @@ async function tick() {
 
 let timer = null
 export function startScheduler() {
-  if ((process.env.TASKS_BACKEND || 'vikunja') !== 'postgres') return
   const ms = Math.max(5000, Number(process.env.REMINDER_POLL_MS) || 30000)
   tick() // immediate boot catch-up for anything due while we were down
   timer = setInterval(tick, ms)
