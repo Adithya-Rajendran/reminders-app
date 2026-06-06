@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { vk } from '../api.js'
+import { tk } from '../api.js'
 import { useTaskList } from '../useTasks.js'
 import { emitTasksChanged } from '../tasksbus.js'
 import { parseQuickAdd, createTask, attachLabels } from '../tasklib.js'
@@ -9,7 +9,7 @@ import { IconPlus } from '../icons.jsx'
 
 export default function TaskListWidget({ projectId }) {
   const loader = useCallback(async () => {
-    const all = await vk(`/projects/${projectId}/tasks?per_page=100`)
+    const all = await tk(`/projects/${projectId}/tasks?per_page=100`)
     return (Array.isArray(all) ? all : []).filter((t) => !t.done)
   }, [projectId])
 

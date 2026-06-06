@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
-import { api, vk } from './api.js'
+import { api, tk } from './api.js'
 import TaskListWidget from './widgets/TaskListWidget.jsx'
 import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
@@ -9,7 +9,7 @@ import CalendarWidget from './widgets/CalendarWidget.jsx'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconClock, IconBell, IconCloud, IconCalendar,
-  IconGrip, IconX, IconInbox,
+  IconX, IconInbox,
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
@@ -67,7 +67,7 @@ export default function Dashboard({ user, onOpenSettings }) {
   useEffect(() => {
     (async () => {
       let pr = []
-      try { pr = await vk('/projects') } catch { pr = [] }
+      try { pr = await tk('/projects') } catch { pr = [] }
       pr = Array.isArray(pr) ? pr.filter((p) => p.id > 0) : []
       setProjects(pr)
 
@@ -102,7 +102,7 @@ export default function Dashboard({ user, onOpenSettings }) {
     let stopped = false
     const connect = () => {
       es = new EventSource('/api/events')
-      es.addEventListener('vikunja', (e) => {
+      es.addEventListener('reminder', (e) => {
         let data = {}
         try { data = JSON.parse(e.data) } catch { /* ignore */ }
         setEvents((prev) => [{ at: Date.now(), data }, ...prev].slice(0, 50))
@@ -195,7 +195,9 @@ export default function Dashboard({ user, onOpenSettings }) {
             cols={COLS}
             rowHeight={30}
             margin={[16, 16]}
-            draggableHandle=".widget-grip"
+            draggableHandle=".widget-head"
+            draggableCancel="button,.iconbtn,.widget-head-actions"
+            resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => (
@@ -301,16 +303,7 @@ function WidgetFrame({ type, title, onRemove, children }) {
   const Ic = TYPE_ICON[type] || IconList
   return (
     <div className="widget">
-      <div className="widget-head">
-        <span
-          className="widget-grip"
-          title="Drag to move"
-          aria-label="Drag to move widget"
-          role="button"
-          tabIndex={0}
-        >
-          <IconGrip size={16} />
-        </span>
+      <div className="widget-head" title="Drag to move">
         <span className="widget-title">
           <Ic size={17} />
           <span className="t-text">{title}</span>

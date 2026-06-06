@@ -86,7 +86,7 @@ async function replaceReminders(client, uid, taskId, reminders) {
   }
 }
 
-// ---- handlers (mounted on the existing /api/vikunja/* grammar) ----
+// ---- handlers (mounted at /api/projects, /api/tasks, /api/labels) ----
 export async function listProjects(req, res, next) {
   try {
     const uid = req.session.user.sub

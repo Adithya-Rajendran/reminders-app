@@ -11,8 +11,8 @@ import { sendToUser } from './events.js'
 const ZERO = '0001-01-01T00:00:00Z'
 const outTs = (d) => (d && new Date(d).getUTCFullYear() > 1) ? new Date(d).toISOString() : ZERO
 
-// Byte-compatible with the old Vikunja webhook envelope so RemindersWidget /
-// Dashboard need zero change (event name "vikunja"; ev.data.event.data.task).
+// SSE envelope consumed by RemindersWidget / Dashboard (event name "reminder";
+// ev.data.event.data.task).
 function reminderEvent(name, row) {
   return {
     receivedAt: Date.now(),
@@ -48,7 +48,7 @@ async function tick() {
       RETURNING r.task_id, r.user_id, r.remind_at, t.title, t.due_date, t.done, t.priority`)
     for (const row of due.rows) {
       if (row.done) continue // task completed before the reminder fired
-      sendToUser(row.user_id, 'vikunja', reminderEvent('task.reminder', row))
+      sendToUser(row.user_id, 'reminder', reminderEvent('task.reminder', row))
     }
 
     // (2) Overdue sweep — one alert per task per due_date (re-fires if rescheduled later).
@@ -62,7 +62,7 @@ async function tick() {
         FROM claimed WHERE t.id = claimed.id
       RETURNING t.id AS task_id, t.user_id, t.title, t.due_date, t.priority, t.done`)
     for (const row of over.rows) {
-      sendToUser(row.user_id, 'vikunja', reminderEvent('task.overdue', row))
+      sendToUser(row.user_id, 'reminder', reminderEvent('task.overdue', row))
     }
   } catch (e) {
     console.error('scheduler tick error:', e?.message || e)
