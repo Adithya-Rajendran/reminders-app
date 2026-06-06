@@ -19,6 +19,9 @@ metadata:
   labels: { app: reminders-app }
 spec:
   replicas: 1
+  # RWO ceph-rbd volume can't be multi-attached, so a rolling update would
+  # deadlock — recreate the pod instead (brief downtime on deploy is fine).
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app: reminders-app }
   template:
@@ -30,6 +33,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+        fsGroup: 1000              # so uid 1000 can write the freshly-attached /data volume
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
@@ -43,8 +47,13 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: CONFIG_DB_PATH
+              value: /data/config.db
           envFrom:
             - secretRef: { name: reminders-app-env }
+          volumeMounts:
+            - name: data
+              mountPath: /data
           resources:
             requests: { cpu: 50m, memory: 96Mi }
             limits: { memory: 256Mi }
@@ -56,3 +65,7 @@ spec:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 30
             periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: reminders-data

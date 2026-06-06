@@ -1,4 +1,5 @@
 import pg from 'pg'
+import Database from 'better-sqlite3'
 
 // bigint (oid 20) columns come back as JS numbers so the wire JSON matches what
 // the client/Vikunja used (our ids stay well under 2^53). No existing column is
@@ -19,7 +20,32 @@ export async function initDb() {
     )
   `)
   await initTaskSchema()
+  initSqlite()
   console.log('db ready')
+}
+
+// Optional SQLite config handle (CalDAV re-platform, phase P0). Opened only when
+// CONFIG_DB_PATH is set — the cluster mounts a ceph-rbd block volume at /data.
+// Dormant for now (CONFIG_STORE defaults to postgres); this just proves the infra
+// works: the native module loads, the volume is writable, and WAL is sound on RBD
+// block storage. Non-fatal so a storage hiccup can never take the live app down.
+export let sqlite = null
+function initSqlite() {
+  const path = process.env.CONFIG_DB_PATH
+  if (!path) return
+  try {
+    sqlite = new Database(path)
+    sqlite.pragma('journal_mode = WAL')
+    sqlite.pragma('busy_timeout = 5000')
+    sqlite.pragma('synchronous = NORMAL')
+    sqlite.pragma('foreign_keys = ON')
+    sqlite.exec("CREATE TABLE IF NOT EXISTS _config_migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))")
+    sqlite.prepare('INSERT INTO _config_migrations (id) VALUES (?) ON CONFLICT(id) DO NOTHING').run('p0-standup')
+    console.log('sqlite config db ready at', path, '(journal_mode=' + sqlite.pragma('journal_mode', { simple: true }) + ')')
+  } catch (e) {
+    console.error('sqlite config db init failed (non-fatal):', e?.message || e)
+    sqlite = null
+  }
 }
 
 // Postgres-native task store (replaces Vikunja). All rows scoped by user_id
