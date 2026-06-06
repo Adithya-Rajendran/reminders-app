@@ -1,4 +1,4 @@
-import { vk } from './api.js'
+import { tk } from './api.js'
 
 export const ZERO_DATE = '0001-01-01T00:00:00Z'
 export const isRealDate = (d) => !!d && d !== ZERO_DATE && !isNaN(new Date(d).getTime())
@@ -85,19 +85,19 @@ export const PRIORITIES = [
 export const pdotClass = (p) => (p >= 4 ? 'p1' : p === 3 ? 'p2' : p >= 1 ? 'p3' : 'p4')
 
 // ---- mutations ----
-export const updateTask = (id, patch) => vk('/tasks/' + id, { method: 'POST', body: JSON.stringify(patch) })
-export const createTask = (projectId, body) => vk('/projects/' + projectId + '/tasks', { method: 'PUT', body: JSON.stringify(body) })
-export const deleteTask = (id) => vk('/tasks/' + id, { method: 'DELETE' })
+export const updateTask = (id, patch) => tk('/tasks/' + id, { method: 'POST', body: JSON.stringify(patch) })
+export const createTask = (projectId, body) => tk('/projects/' + projectId + '/tasks', { method: 'PUT', body: JSON.stringify(body) })
+export const deleteTask = (id) => tk('/tasks/' + id, { method: 'DELETE' })
 
 // Resolve-or-create labels by title, then attach to a task (best effort).
 export async function attachLabels(taskId, names) {
   if (!names?.length) return
   let all = []
-  try { all = await vk('/labels') } catch { all = [] }
+  try { all = await tk('/labels') } catch { all = [] }
   all = Array.isArray(all) ? all : []
   for (const name of names) {
     let lab = all.find((l) => (l.title || '').toLowerCase() === name.toLowerCase())
-    if (!lab) { try { lab = await vk('/labels', { method: 'PUT', body: JSON.stringify({ title: name }) }) } catch { continue } }
-    if (lab?.id) { try { await vk('/tasks/' + taskId + '/labels', { method: 'PUT', body: JSON.stringify({ label_id: lab.id }) }) } catch { /* ignore */ } }
+    if (!lab) { try { lab = await tk('/labels', { method: 'PUT', body: JSON.stringify({ title: name }) }) } catch { continue } }
+    if (lab?.id) { try { await tk('/tasks/' + taskId + '/labels', { method: 'PUT', body: JSON.stringify({ label_id: lab.id }) }) } catch { /* ignore */ } }
   }
 }

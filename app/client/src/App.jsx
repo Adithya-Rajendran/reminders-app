@@ -55,7 +55,7 @@ function Login() {
         </button>
         <div className="sso-detail"><IconKey size={13} /> Authenticated with OpenID Connect</div>
         <div className="login-foot">
-          <IconShield size={13} /> Self-hosted · syncs with Vikunja &amp; CalDAV
+          <IconShield size={13} /> Self-hosted · OIDC + CalDAV sync
         </div>
       </div>
     </div>

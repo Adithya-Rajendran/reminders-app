@@ -109,19 +109,18 @@ app.post('/api/calendar/events', requireAuth, caldav.createEventHandler)
 app.patch('/api/calendar/events', requireAuth, caldav.updateEventHandler)
 app.delete('/api/calendar/events', requireAuth, caldav.deleteEventHandler)
 
-// Tasks / projects / labels — Postgres-native store (Vikunja retired). The URL
-// paths keep the historical /api/vikunja prefix so the SPA is unchanged;
-// renaming them is a cosmetic follow-up.
-app.get('/api/vikunja/projects', requireAuth, tasks.listProjects)
-app.get('/api/vikunja/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
-app.put('/api/vikunja/projects/:id/tasks', requireAuth, tasks.createTask)
-app.get('/api/vikunja/tasks', requireAuth, tasks.listTasks)
-app.post('/api/vikunja/tasks/:id', requireAuth, tasks.patchTask)
-app.delete('/api/vikunja/tasks/:id', requireAuth, tasks.deleteTask)
-app.get('/api/vikunja/labels', requireAuth, tasks.listLabels)
-app.put('/api/vikunja/labels', requireAuth, tasks.createLabel)
-app.put('/api/vikunja/tasks/:id/labels', requireAuth, tasks.attachLabel)
-app.all('/api/vikunja/*', requireAuth, (_q, r) => r.status(404).json({ error: 'not found' }))
+// Tasks / projects / labels — Postgres-native store.
+app.get('/api/projects', requireAuth, tasks.listProjects)
+app.get('/api/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
+app.put('/api/projects/:id/tasks', requireAuth, tasks.createTask)
+app.get('/api/tasks', requireAuth, tasks.listTasks)
+app.post('/api/tasks/:id', requireAuth, tasks.patchTask)
+app.delete('/api/tasks/:id', requireAuth, tasks.deleteTask)
+app.get('/api/labels', requireAuth, tasks.listLabels)
+app.put('/api/labels', requireAuth, tasks.createLabel)
+app.put('/api/tasks/:id/labels', requireAuth, tasks.attachLabel)
+// Any other /api/* is a real 404 (JSON, so the SPA doesn't get an HTML page).
+app.all('/api/*', (_q, r) => r.status(404).json({ error: 'not found' }))
 
 // ---- Static SPA + client-side routing fallback ----
 app.use(express.static(PUBLIC_DIR))

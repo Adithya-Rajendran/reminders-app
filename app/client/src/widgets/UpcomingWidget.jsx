@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { vk } from '../api.js'
+import { tk } from '../api.js'
 import { useTaskList } from '../useTasks.js'
 import { isRealDate } from '../tasklib.js'
 import TaskRow from './TaskRow.jsx'
@@ -19,7 +19,7 @@ const ORDER = ['overdue', 'today', 'tomorrow', 'week', 'later']
 
 export default function UpcomingWidget() {
   const loader = useCallback(async () => {
-    const all = await vk('/tasks?sort_by=due_date&order_by=asc&per_page=100')
+    const all = await tk('/tasks?sort_by=due_date&order_by=asc&per_page=100')
     return (Array.isArray(all) ? all : []).filter((t) => !t.done && isRealDate(t.due_date))
   }, [])
 

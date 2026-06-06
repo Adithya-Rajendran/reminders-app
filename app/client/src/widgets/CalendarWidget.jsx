@@ -4,7 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { api, vk } from '../api.js'
+import { api, tk } from '../api.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { Calendar, X, Trash, Check, Spinner } from '../icons.jsx'
 
@@ -67,23 +67,23 @@ export default function CalendarWidget() {
   // Refetch when any other widget mutates a task, so the calendar stays in sync.
   useEffect(() => onTasksChanged(() => calRef.current?.getApi().refetchEvents()), [])
 
-  // ---- merged event source: Vikunja tasks + CalDAV VTODOs + CalDAV events ----
+  // ---- merged event source: local tasks + CalDAV VTODOs + CalDAV events ----
   const loadEvents = useCallback((info, success, failure) => {
     const start = info.startStr, end = info.endStr
     Promise.allSettled([
-      vk('/tasks?sort_by=due_date&order_by=asc&per_page=100'),
+      tk('/tasks?sort_by=due_date&order_by=asc&per_page=100'),
       api('/api/caldav/tasks'),
       api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
-    ]).then(([vkRes, ctRes, evRes]) => {
+    ]).then(([taskRes, ctRes, evRes]) => {
       const out = []
-      // (a) Vikunja tasks — green, read-only
-      if (vkRes.status === 'fulfilled') {
-        for (const t of (Array.isArray(vkRes.value) ? vkRes.value : [])) {
+      // (a) local tasks — green, draggable to reschedule
+      if (taskRes.status === 'fulfilled') {
+        for (const t of (Array.isArray(taskRes.value) ? taskRes.value : [])) {
           if (!t.due_date || t.due_date === ZERO_DATE) continue
           out.push({
-            id: 'vk-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: true,
-            classNames: ['cal-task', 'cal-task-vikunja'],
-            extendedProps: { kind: 'task', source: 'vikunja', taskId: t.id, done: !!t.done },
+            id: 'task-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: true,
+            classNames: ['cal-task', 'cal-task-local'],
+            extendedProps: { kind: 'task', source: 'local', taskId: t.id, done: !!t.done },
           })
         }
       }
@@ -140,8 +140,8 @@ export default function CalendarWidget() {
   const onEventChange = async (arg) => {
     const p = arg.event.extendedProps
     // Drag a Vikunja task on the calendar -> reschedule its due date.
-    if (p.kind === 'task' && p.source === 'vikunja') {
-      try { await vk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }); emitTasksChanged() }
+    if (p.kind === 'task' && p.source === 'local') {
+      try { await tk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }); emitTasksChanged() }
       catch { arg.revert() }
       return
     }

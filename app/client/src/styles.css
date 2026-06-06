@@ -529,20 +529,11 @@ body {
   padding: 12px 12px 12px 14px;
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
-}
-.widget-grip {
-  display: inline-flex;
-  align-items: center;
-  color: var(--faint);
-  cursor: grab;
-  margin-left: -4px;
-  padding: 2px;
-  border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease;
+  cursor: grab;             /* the whole header is the drag handle */
   touch-action: none;
+  user-select: none;
 }
-.widget-grip:hover { color: var(--muted); background: var(--panel2); }
-.widget:active .widget-grip { cursor: grabbing; }
+.react-grid-item.react-draggable-dragging .widget-head { cursor: grabbing; }
 .widget-title {
   font-size: 16px; font-weight: 600;
   display: flex; align-items: center; gap: 8px;
@@ -570,22 +561,6 @@ body {
   padding: 6px;
   min-height: 0;
 }
-
-/* resize handle */
-.resize-handle {
-  position: absolute;
-  right: 2px; bottom: 2px;
-  width: 18px; height: 18px;
-  cursor: nwse-resize;
-  color: var(--faint);
-  display: grid; place-items: center;
-  opacity: 0;
-  transition: opacity 150ms ease, color 150ms ease;
-  z-index: 6;
-  touch-action: none;
-}
-.widget:hover .resize-handle { opacity: 0.7; }
-.resize-handle:hover { color: var(--accent); opacity: 1; }
 
 /* ---------- Task rows ---------- */
 .task {
@@ -945,12 +920,23 @@ body {
 }
 /* the widget frame fills the grid item */
 .react-grid-item > .widget { height: 100%; }
-.react-grid-item > .react-resizable-handle { position: absolute; width: 22px; height: 22px; bottom: 0; right: 0; cursor: se-resize; }
-.react-grid-item > .react-resizable-handle::after {
-  content: ""; position: absolute; right: 6px; bottom: 6px; width: 7px; height: 7px;
-  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); opacity: .5;
+/* Resize from any border or corner. Handles sit mostly in the inter-widget
+   margin (negative offset) so they barely overlap content. */
+.react-grid-item > .react-resizable-handle { position: absolute; background: transparent; z-index: 5; }
+.react-grid-item > .react-resizable-handle-n  { top: -3px;    left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
+.react-grid-item > .react-resizable-handle-s  { bottom: -3px; left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
+.react-grid-item > .react-resizable-handle-e  { right: -3px;  top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
+.react-grid-item > .react-resizable-handle-w  { left: -3px;   top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
+.react-grid-item > .react-resizable-handle-ne { top: -3px;    right: -3px; width: 16px; height: 16px; cursor: nesw-resize; z-index: 6; }
+.react-grid-item > .react-resizable-handle-nw { top: -3px;    left: -3px;  width: 16px; height: 16px; cursor: nwse-resize; z-index: 6; }
+.react-grid-item > .react-resizable-handle-se { bottom: -3px; right: -3px; width: 16px; height: 16px; cursor: nwse-resize; z-index: 6; }
+.react-grid-item > .react-resizable-handle-sw { bottom: -3px; left: -3px;  width: 16px; height: 16px; cursor: nesw-resize; z-index: 6; }
+/* subtle visible cue on the bottom-right corner */
+.react-grid-item > .react-resizable-handle-se::after {
+  content: ""; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); opacity: .45;
 }
-.react-grid-item:hover > .react-resizable-handle::after { opacity: 1; }
+.react-grid-item:hover > .react-resizable-handle-se::after { opacity: 1; }
 
 /* ============================================================
    FullCalendar v6 — themed via FC CSS vars + scoped overrides.
@@ -1019,7 +1005,7 @@ body {
 .cal-wrap .fc .fc-event .fc-event-title { color: inherit; }
 .cal-wrap .fc .cal-event { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, transparent); color: var(--accent); }
 .cal-wrap .fc .cal-task { cursor: default; }
-.cal-wrap .fc .cal-task-vikunja { background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 50%, transparent); color: var(--green); }
+.cal-wrap .fc .cal-task-local { background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 50%, transparent); color: var(--green); }
 .cal-wrap .fc .cal-task-caldav { background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 50%, transparent); color: var(--warn); }
 
 /* List / agenda view */

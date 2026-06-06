@@ -14,5 +14,5 @@ export async function api(path, opts = {}) {
   return ct.includes('json') ? res.json() : res.text()
 }
 
-// Vikunja REST API, proxied (and authenticated) by the BFF.
-export const vk = (path, opts) => api('/api/vikunja' + path, opts)
+// Task / project / label API (Postgres-native), served by the BFF.
+export const tk = (path, opts) => api('/api' + path, opts)
