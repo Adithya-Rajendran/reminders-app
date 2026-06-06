@@ -93,7 +93,7 @@ export default function Dashboard({ user, onOpenSettings }) {
     })()
   }, [])
 
-  // Live reminder/overdue events from the BFF (fed by Vikunja webhooks).
+  // Live reminder/overdue events from the BFF (fed by the in-app scheduler).
   // EventSource does NOT auto-reconnect after an HTTP error (e.g. 401), so we
   // reconnect manually; api('/api/me') redirects to login if the session expired.
   useEffect(() => {

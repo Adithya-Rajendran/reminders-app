@@ -1,7 +1,4 @@
-import crypto from 'node:crypto'
-
 // SSE clients grouped by user (OIDC sub) so a reminder reaches ONLY its owner.
-// (The previous global Set broadcast every event to every connected user.)
 const userClients = new Map() // sub -> Set<res>
 
 function writeSse(res, event, data) {
@@ -34,33 +31,4 @@ export function sendToUser(userId, event, data) {
   const set = userClients.get(userId)
   if (!set) return
   for (const res of set) writeSse(res, event, data)
-}
-
-// Fan out to everyone — retained only for the legacy Vikunja webhook path during
-// the soak/rollback window; removed at Vikunja retirement.
-export function broadcast(event, data) {
-  for (const set of userClients.values()) for (const res of set) writeSse(res, event, data)
-}
-
-// Vikunja calls this with an HMAC-SHA256 signature over the raw body.
-export function handleWebhook(req, res) {
-  const secret = process.env.WEBHOOK_SECRET
-  // Fail closed: never accept unsigned webhooks on this public, unauthenticated route.
-  if (!secret) {
-    console.error('webhook: WEBHOOK_SECRET not configured — rejecting')
-    return res.status(503).end()
-  }
-  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
-  const provided = req.get('x-vikunja-signature') || ''
-  const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex')
-  const a = Buffer.from(provided)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    console.warn('webhook: invalid signature')
-    return res.status(401).end()
-  }
-  let evt = {}
-  try { evt = JSON.parse(raw.toString('utf8')) } catch { /* keep empty */ }
-  broadcast('vikunja', { receivedAt: Date.now(), event: evt })
-  res.status(200).json({ ok: true })
 }
