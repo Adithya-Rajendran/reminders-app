@@ -5,7 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import { api, vk } from '../api.js'
-import { emitTasksChanged } from '../tasksbus.js'
+import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { Calendar, X, Trash, Check, Spinner } from '../icons.jsx'
 
 const ZERO_DATE = '0001-01-01T00:00:00Z'
@@ -63,6 +63,9 @@ export default function CalendarWidget() {
   }, [])
 
   const refetch = () => calRef.current?.getApi().refetchEvents()
+
+  // Refetch when any other widget mutates a task, so the calendar stays in sync.
+  useEffect(() => onTasksChanged(() => calRef.current?.getApi().refetchEvents()), [])
 
   // ---- merged event source: Vikunja tasks + CalDAV VTODOs + CalDAV events ----
   const loadEvents = useCallback((info, success, failure) => {

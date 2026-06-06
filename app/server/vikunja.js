@@ -68,6 +68,11 @@ export async function proxyVikunja(req, res) {
         if (current && typeof current === 'object' && !Array.isArray(current)) payload = { ...current, ...req.body }
       }
     }
+    // Clamp priority to Vikunja's valid 0..5 range on any task write.
+    if (payload && typeof payload === 'object' && typeof payload.priority === 'number') {
+      const p = Math.max(0, Math.min(5, Math.trunc(payload.priority)))
+      if (p !== payload.priority) payload = { ...payload, priority: p }
+    }
     const headers = { Authorization: 'Bearer ' + tok }
     let body
     if (!['GET', 'HEAD', 'DELETE'].includes(req.method) && payload && Object.keys(payload).length) {

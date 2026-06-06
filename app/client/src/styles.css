@@ -1087,6 +1087,8 @@ body {
 .feed { display: flex; flex-direction: column; }
 .feed-actions { display: flex; gap: 2px; margin-left: auto; align-items: center; opacity: 0; transition: opacity .15s; }
 .feed-item:hover .feed-actions, .feed-item:focus-within .feed-actions { opacity: 1; }
+/* On touch / pointer-less devices there is no hover — keep the actions visible. */
+@media (hover: none) { .feed-actions { opacity: 1; } }
 .feed-item.acted { opacity: .7; }
 .feed-item.acted .feed-actions { opacity: 1; }
 .feed-actions .undo-btn.sm-undo { padding: 0 8px; height: 28px; font-size: 12px; border-radius: 8px; }
