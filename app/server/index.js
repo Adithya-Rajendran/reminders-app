@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { initDb, getLayout, saveLayout, pool } from './db.js'
 import { proxyVikunja } from './vikunja.js'
+import * as tasks from './tasks.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler, handleWebhook } from './events.js'
 import * as caldav from './caldav.js'
@@ -112,7 +113,23 @@ app.post('/api/calendar/events', requireAuth, caldav.createEventHandler)
 app.patch('/api/calendar/events', requireAuth, caldav.updateEventHandler)
 app.delete('/api/calendar/events', requireAuth, caldav.deleteEventHandler)
 
-app.all('/api/vikunja/*', requireAuth, proxyVikunja)
+// Task backend: 'vikunja' (proxy, default) or 'postgres' (native store). The
+// native handlers are mounted on the SAME paths/verbs so the SPA is unchanged;
+// the cutover is a single env-var flip, reversible by flipping back.
+if ((process.env.TASKS_BACKEND || 'vikunja') === 'postgres') {
+  app.get('/api/vikunja/projects', requireAuth, tasks.listProjects)
+  app.get('/api/vikunja/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
+  app.put('/api/vikunja/projects/:id/tasks', requireAuth, tasks.createTask)
+  app.get('/api/vikunja/tasks', requireAuth, tasks.listTasks)
+  app.post('/api/vikunja/tasks/:id', requireAuth, tasks.patchTask)
+  app.delete('/api/vikunja/tasks/:id', requireAuth, tasks.deleteTask)
+  app.get('/api/vikunja/labels', requireAuth, tasks.listLabels)
+  app.put('/api/vikunja/labels', requireAuth, tasks.createLabel)
+  app.put('/api/vikunja/tasks/:id/labels', requireAuth, tasks.attachLabel)
+  app.all('/api/vikunja/*', requireAuth, (_q, r) => r.status(404).json({ error: 'not found' }))
+} else {
+  app.all('/api/vikunja/*', requireAuth, proxyVikunja)
+}
 
 // ---- Static SPA + client-side routing fallback ----
 app.use(express.static(PUBLIC_DIR))
