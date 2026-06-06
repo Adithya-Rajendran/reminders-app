@@ -42,7 +42,7 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 - ☁️ **CalDAV sync** — connect **Nextcloud**, **Apple iCloud**, or any **generic CalDAV** server; discover task lists, toggle which to sync, read & complete tasks, two-way calendar **events** (VEVENT) write-back.
 - 🔔 **Live reminders feed** — Vikunja webhooks → server → SSE → instant in-app updates.
 - 🔐 **OIDC single sign-on** (Authentik / Keycloak / any OpenID Connect provider) via a backend-for-frontend; sessions persisted in Postgres.
-- 🌗 **Light & dark themes** with a one-click toggle.
+- 🎨 **Light & dark themes + selectable accents** — a one-click theme toggle and an 8-swatch **accent picker** in the top bar, both persisted per browser.
 
 ## How it works
 
@@ -81,7 +81,7 @@ Needs a **Vikunja** instance, a **Postgres** database, and an **OIDC** provider.
 
 ### Kubernetes
 
-Manifests are under [`k8s/`](k8s/) (namespace, Postgres, Vikunja, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. Point the app Deployment at `ghcr.io/adithya-rajendran/reminders-app:latest`.
+Manifests are under [`k8s/`](k8s/) (namespace, Postgres, Vikunja, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. The app Deployment pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-pg`, `vikunja-secret`, and `reminders-app-env` secrets.
 
 ## Development
 
