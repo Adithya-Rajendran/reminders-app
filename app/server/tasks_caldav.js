@@ -4,7 +4,8 @@
 // labels = CATEGORIES. Selected at boot via taskstore.js (TASK_STORE=caldav).
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
-import { clientFor, authHeader, safeFetch, VTODO_FILTER, listsWithId, getListById } from './caldav.js'
+import { clientFor, authHeader, safeFetch, VTODO_FILTER } from './caldav.js'
+import { listsWithId, getListById } from './config.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
 import { advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo, isRecurring, registerTimezones } from './recurrence_caldav.js'
 import { applyReminders, readReminders } from './valarm.js'

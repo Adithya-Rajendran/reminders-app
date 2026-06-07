@@ -11,7 +11,7 @@
 // app is open. On boot the first poll SEEDS everything already due WITHOUT
 // firing, so a deploy never replays a burst of stale toasts.
 import { sendToUser } from './events.js'
-import { usersWithCaldav } from './caldav.js'
+import { usersWithCaldav } from './config.js'
 import { allUserVtodos, serializeVtodo } from './tasks_caldav.js'
 
 const ZERO = '0001-01-01T00:00:00Z'
