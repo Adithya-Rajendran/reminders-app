@@ -1,9 +1,9 @@
 import express from 'express'
 import session from 'express-session'
-import connectPgSimple from 'connect-pg-simple'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initDb, getLayout, saveLayout, pool } from './db.js'
+import { initDb } from './db.js'
+import * as config from './config.js'
 import { store as tasks } from './taskstore.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler } from './events.js'
@@ -29,12 +29,12 @@ app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
 app.use(express.json({ limit: '2mb' }))
-const PgStore = connectPgSimple(session)
 app.use(
   session({
     name: 'rsid',
-    // Postgres-backed store so logins survive pod restarts / kubectl-cp redeploys.
-    store: new PgStore({ pool, createTableIfMissing: true }),
+    // Persistent store (SQLite or Postgres, per CONFIG_STORE) so logins survive
+    // pod restarts / redeploys.
+    store: config.createSessionStore(),
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
@@ -89,13 +89,13 @@ function requireAuth(req, res, next) {
 app.get('/api/me', requireAuth, (req, res) => res.json(req.session.user))
 app.get('/api/events', requireAuth, sseHandler)
 app.get('/api/layouts/:id', requireAuth, async (req, res, next) => {
-  try { res.json(await getLayout(req.session.user.sub, req.params.id)) } catch (e) { next(e) }
+  try { res.json(await config.getLayout(req.session.user.sub, req.params.id)) } catch (e) { next(e) }
 })
 app.put('/api/layouts/:id', requireAuth, async (req, res, next) => {
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
     return res.status(400).json({ error: 'layout body must be a JSON object' })
   }
-  try { await saveLayout(req.session.user.sub, req.params.id, req.body); res.json({ ok: true }) } catch (e) { next(e) }
+  try { await config.saveLayout(req.session.user.sub, req.params.id, req.body); res.json({ ok: true }) } catch (e) { next(e) }
 })
 // CalDAV settings + tasks
 app.get('/api/caldav/accounts', requireAuth, caldav.listAccountsHandler)
@@ -142,8 +142,9 @@ app.use((err, req, res, next) => {
 })
 
 const start = async () => {
-  await initDb()
-  await caldav.initCaldavDb()
+  if (TASK_STORE === 'postgres') await initDb() // dormant pg task schema (skipped on CalDAV)
+  await config.initConfigSchema()
+  await config.migrateConfigFromPostgres() // one-time PG->SQLite config copy (no-op unless CONFIG_STORE=sqlite & empty)
   await initOidc()
   // Reminder firing -> per-user SSE. CalDAV polls VALARMs in-memory; Postgres
   // uses the durable task_reminders scheduler. Exactly one runs, per backend.
