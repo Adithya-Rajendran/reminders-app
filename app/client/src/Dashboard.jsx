@@ -4,12 +4,11 @@ import { api, tk } from './api.js'
 import TaskListWidget from './widgets/TaskListWidget.jsx'
 import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
-import CaldavWidget from './widgets/CaldavWidget.jsx'
 import CalendarWidget from './widgets/CalendarWidget.jsx'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
-  IconList, IconClock, IconBell, IconCloud, IconCalendar,
-  IconX, IconInbox,
+  IconList, IconClock, IconBell, IconCalendar, IconCloud,
+  IconX, IconInbox, IconRefresh,
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
@@ -24,19 +23,29 @@ const TYPE_ICON = {
   tasklist: IconList,
   upcoming: IconClock,
   reminders: IconBell,
-  caldav: IconCloud,
   calendar: IconCalendar,
 }
+const KNOWN_TYPES = new Set(Object.keys(TYPE_ICON))
 
 const WIDGET_MENU = [
-  { type: 'tasklist', label: 'Project task list', icon: IconList, hasSub: true },
+  { type: 'tasklist', label: 'Tasks (by project)', icon: IconList, hasSub: true },
   { type: 'upcoming', label: 'Upcoming', icon: IconClock },
-  { type: 'reminders', label: 'Reminders feed', icon: IconBell },
-  { type: 'caldav', label: 'CalDAV tasks', icon: IconCloud },
+  { type: 'reminders', label: 'Reminders', icon: IconBell },
   { type: 'calendar', label: 'Calendar', icon: IconCalendar },
 ]
 
 const newId = () => 'w-' + crypto.randomUUID()
+
+// A clean default dashboard: Tasks · Upcoming · Reminders, three across.
+function buildDefault(pr) {
+  const def = []
+  if (pr[0]) def.push({ i: newId(), type: 'tasklist', projectId: pr[0].id })
+  def.push({ i: newId(), type: 'upcoming' })
+  def.push({ i: newId(), type: 'reminders' })
+  const lay = {}
+  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * 4) % COLS[bp], y: 0, w: 4, h: 8 }))
+  return { widgets: def, layouts: lay }
+}
 
 /* close a popover on outside-click + Esc */
 function usePopover(open, setOpen) {
@@ -87,13 +96,15 @@ export default function Dashboard({ user, onOpenSettings }) {
         // persist the heal so it sticks.
         const validIds = new Set(pr.map((p) => p.id))
         const fallback = pr[0]?.id
+        const original = saved.layout.widgets || []
         let repaired = false
-        const sw = (saved.layout.widgets || []).flatMap((w) => {
+        const sw = original.filter((w) => KNOWN_TYPES.has(w.type)).flatMap((w) => {
           if (w.type !== 'tasklist' || validIds.has(w.projectId)) return [w]
           if (fallback == null) return [] // nothing to fall back to → drop it
           repaired = true
           return [{ ...w, projectId: fallback }]
         })
+        if (sw.length !== original.length) repaired = true // dropped a retired widget type (e.g. caldav)
         setWidgets(sw)
         setLayouts(saved.layout.layouts || {})
         if (repaired) {
@@ -103,14 +114,7 @@ export default function Dashboard({ user, onOpenSettings }) {
           }).catch(() => {})
         }
       } else {
-        const def = []
-        if (pr[0]) def.push({ i: newId(), type: 'tasklist', projectId: pr[0].id })
-        def.push({ i: newId(), type: 'upcoming' })
-        def.push({ i: newId(), type: 'reminders' })
-        const lay = {}
-        for (const bp of Object.keys(COLS)) {
-          lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * 4) % COLS[bp], y: 0, w: 4, h: 8 }))
-        }
+        const { widgets: def, layouts: lay } = buildDefault(pr)
         setWidgets(def)
         setLayouts(lay)
       }
@@ -185,6 +189,14 @@ export default function Dashboard({ user, onOpenSettings }) {
     persist(nextWidgets, nextLayouts)
   }
 
+  // Escape hatch for a cluttered/confusing board: back to the clean default.
+  const resetLayout = () => {
+    const { widgets: def, layouts: lay } = buildDefault(projects)
+    setWidgets(def)
+    setLayouts(lay)
+    persist(def, lay)
+  }
+
   if (!loaded) {
     return (
       <div className="grid-wrap">
@@ -212,7 +224,7 @@ export default function Dashboard({ user, onOpenSettings }) {
 
   return (
     <>
-      <Toolbar projects={projects} onAdd={addWidget} />
+      <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} />
       <div className="grid-wrap">
         {widgets.length === 0 ? (
           <div
@@ -243,7 +255,6 @@ export default function Dashboard({ user, onOpenSettings }) {
                   {w.type === 'tasklist' && <TaskListWidget projectId={w.projectId} />}
                   {w.type === 'upcoming' && <UpcomingWidget />}
                   {w.type === 'reminders' && <RemindersWidget events={events} />}
-                  {w.type === 'caldav' && <CaldavWidget />}
                   {w.type === 'calendar' && <CalendarWidget />}
                 </WidgetFrame>
               </div>
@@ -278,7 +289,7 @@ function OnboardingCard({ onOpenSettings }) {
 }
 
 /* ---------- Toolbar ---------- */
-function Toolbar({ projects, onAdd }) {
+function Toolbar({ projects, onAdd, onReset }) {
   const now = new Date()
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
   return (
@@ -288,19 +299,20 @@ function Toolbar({ projects, onAdd }) {
         <div className="sub">{dateLabel}</div>
       </div>
       <div className="toolbar-spacer" />
-      <AddWidgetMenu projects={projects} onAdd={onAdd} />
+      <AddWidgetMenu projects={projects} onAdd={onAdd} onReset={onReset} />
     </div>
   )
 }
 
 /* ---------- Add-widget dropdown (with project submenu) ---------- */
-function AddWidgetMenu({ projects, onAdd }) {
+function AddWidgetMenu({ projects, onAdd, onReset }) {
   const [open, setOpen] = useState(false)
   const [sub, setSub] = useState(false)
   const ref = usePopover(open, setOpen)
   useEffect(() => { if (!open) setSub(false) }, [open])
 
   const pick = (type, projectId) => { onAdd(type, projectId); setOpen(false) }
+  const reset = () => { onReset?.(); setOpen(false) }
 
   return (
     <div style={{ position: 'relative' }} ref={ref}>
@@ -331,11 +343,19 @@ function AddWidgetMenu({ projects, onAdd }) {
                   </button>
                 )
               })}
+              {onReset && (
+                <>
+                  <div className="menu-sep" />
+                  <button className="menu-item" role="menuitem" onClick={reset} style={{ color: 'var(--muted)' }}>
+                    <IconRefresh size={15} /> Reset layout
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <>
               <button className="menu-item" role="menuitem" onClick={() => setSub(false)} style={{ color: 'var(--muted)' }}>
-                <IconChevL size={15} /> Project task list
+                <IconChevL size={15} /> Tasks (by project)
               </button>
               <div className="menu-sep" />
               <div className="menu-label">Choose a project</div>
@@ -386,7 +406,6 @@ function WidgetFrame({ type, title, onRemove, children }) {
 function titleFor(w, projects) {
   if (w.type === 'upcoming') return 'Upcoming'
   if (w.type === 'reminders') return 'Reminders'
-  if (w.type === 'caldav') return 'CalDAV Tasks'
   if (w.type === 'calendar') return 'Calendar'
   const p = projects.find((p) => p.id === w.projectId)
   return p ? p.title : 'Tasks'
