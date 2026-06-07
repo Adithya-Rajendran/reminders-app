@@ -57,6 +57,7 @@ function usePopover(open, setOpen) {
 
 export default function Dashboard({ user, onOpenSettings }) {
   const [projects, setProjects] = useState([])
+  const [caldavAccounts, setCaldavAccounts] = useState(null) // null until loaded
   const [widgets, setWidgets] = useState([])
   const [layouts, setLayouts] = useState({})
   const [loaded, setLoaded] = useState(false)
@@ -70,6 +71,11 @@ export default function Dashboard({ user, onOpenSettings }) {
       try { pr = await tk('/projects') } catch { pr = [] }
       pr = Array.isArray(pr) ? pr.filter((p) => p.id > 0) : []
       setProjects(pr)
+
+      // How many CalDAV accounts are linked — drives the onboarding gate.
+      let acctCount = 0
+      try { const r = await api('/api/caldav/accounts'); acctCount = (r.accounts || []).length } catch { acctCount = 0 }
+      setCaldavAccounts(acctCount)
 
       let saved = null
       try { saved = await api('/api/layouts/' + DASH) } catch { /* none */ }
@@ -192,6 +198,18 @@ export default function Dashboard({ user, onOpenSettings }) {
     )
   }
 
+  // Onboarding: tasks live in the user's own CalDAV server, so with no account
+  // linked there is nothing to show — prompt them to link one. (In every other
+  // state at least an Inbox/list exists, so this only fires for a fresh user.)
+  if (projects.length === 0 && caldavAccounts === 0) {
+    return (
+      <>
+        <Toolbar projects={projects} onAdd={addWidget} />
+        <OnboardingCard onOpenSettings={onOpenSettings} />
+      </>
+    )
+  }
+
   return (
     <>
       <Toolbar projects={projects} onAdd={addWidget} />
@@ -234,6 +252,28 @@ export default function Dashboard({ user, onOpenSettings }) {
         )}
       </div>
     </>
+  )
+}
+
+/* ---------- Onboarding (no CalDAV account linked) ---------- */
+function OnboardingCard({ onOpenSettings }) {
+  return (
+    <div className="grid-wrap">
+      <div
+        className="glass"
+        style={{ borderRadius: 'var(--r-card)', padding: '48px 24px', textAlign: 'center', maxWidth: 480, margin: '40px auto' }}
+      >
+        <div className="state-ic" style={{ margin: '0 auto 14px' }}><IconCloud size={24} /></div>
+        <div className="state-title" style={{ fontSize: 17 }}>Link a CalDAV account</div>
+        <div className="state-sub" style={{ margin: '8px auto 20px', maxWidth: 360 }}>
+          Your tasks &amp; reminders live in your own CalDAV server — Nextcloud, Apple iCloud, or any
+          CalDAV provider. Connect an account to start adding tasks.
+        </div>
+        <button className="btn primary" onClick={onOpenSettings}>
+          <IconCloud size={16} /> Connect CalDAV
+        </button>
+      </div>
+    </div>
   )
 }
 
