@@ -1090,3 +1090,41 @@ body {
 }
 .accent-swatch:hover { transform: scale(1.1); }
 .accent-swatch.active { outline-color: var(--text); }
+
+/* ===== Date / time picker popover ===== */
+/* Native controls (the time input's UA glyphs/picker) follow the APP theme, not the OS. */
+[data-theme="dark"] { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+.dtpick {
+  z-index: 80; background: var(--panel-solid); border: 1px solid var(--line-strong);
+  border-radius: 14px; box-shadow: var(--shadow); padding: 10px; animation: menuIn 120ms ease;
+  max-height: calc(100vh - 16px); overflow-y: auto; /* keep the Set/Clear row reachable on short viewports */
+}
+.dt-presets { display: flex; gap: 6px; margin-bottom: 8px; }
+.dt-chip {
+  flex: 1; font: inherit; font-size: 12px; font-weight: 600; color: var(--text);
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px; cursor: pointer;
+}
+.dt-chip:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.dt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dt-title { font-size: 13px; font-weight: 700; }
+.dt-head .iconbtn.sm { font-size: 18px; line-height: 1; width: 26px; height: 26px; }
+.dt-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
+.dt-dow span { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted); padding: 2px 0; }
+.dt-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dt-day {
+  aspect-ratio: 1; min-height: 30px; font: inherit; font-size: 12.5px; color: var(--text);
+  background: transparent; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+}
+.dt-day:hover { background: var(--accent-soft); }
+.dt-day.today { font-weight: 800; color: var(--accent); }
+.dt-day.sel { background: var(--accent-grad); color: #fff; font-weight: 700; }
+.dt-time-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.dt-time-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.dt-time-lbl svg { opacity: .8; }
+.dt-time { width: 120px; padding: 6px 8px; font-size: 13px; }
+.dt-remind { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.dt-remind span { display: inline-flex; align-items: center; gap: 5px; }
+.dt-remind span svg { opacity: .8; }
+.dt-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.dt-actions .btn.sm { padding: 6px 14px; font-size: 12.5px; }

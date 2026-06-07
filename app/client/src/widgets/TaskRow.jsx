@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { dueChip, isRealDate, pdotClass, PRIORITIES } from '../tasklib.js'
-import { IconTrash } from '../icons.jsx'
+import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
+import { IconTrash, IconBell } from '../icons.jsx'
+import DateTimePicker from './DateTimePicker.jsx'
 
 function usePopover(open, setOpen) {
   const ref = useRef(null)
@@ -15,14 +16,6 @@ function usePopover(open, setOpen) {
   return ref
 }
 
-const SCHED = [
-  { k: 'today', label: 'Today' },
-  { k: 'tomorrow', label: 'Tomorrow' },
-  { k: 'weekend', label: 'This weekend' },
-  { k: 'nextweek', label: 'Next week' },
-  { k: 'clear', label: 'No date' },
-]
-
 const ClockMini = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" />
@@ -31,7 +24,7 @@ const ClockMini = () => (
 
 // An interactive task row: animated complete, inline priority menu + scheduler
 // popover, and a hover-revealed delete affordance.
-export default function TaskRow({ task, onToggle, onDelete, onSetDue, onSetPriority }) {
+export default function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority }) {
   const [burst, setBurst] = useState(false)
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
@@ -57,7 +50,7 @@ export default function TaskRow({ task, onToggle, onDelete, onSetDue, onSetPrior
         </div>
         <div className="task-sub">
           <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />
-          <DueControl chip={chip} hasDate={isRealDate(task.due_date)} onSet={(k) => onSetDue(task, k)} />
+          <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
           {(task.labels || []).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
         </div>
       </div>
@@ -96,20 +89,32 @@ function PriorityControl({ value, onSet }) {
   )
 }
 
-function DueControl({ chip, hasDate, onSet }) {
+// Opens a mini calendar + time picker; picking a date/time sets the due date and
+// (by default) a reminder at that time. A bell on the chip means a reminder is set.
+function DueControl({ task, chip, onSchedule }) {
   const [open, setOpen] = useState(false)
-  const ref = usePopover(open, setOpen)
+  const btnRef = useRef(null)
+  const hasReminder = (task.reminders || []).length > 0
+  const t = timeLabel(task.due_date)
   return (
-    <span className="inline-ctl" ref={ref}>
-      <button className={`chip due-chip${chip ? ' ' + chip.cls : ' empty'}`} onClick={() => setOpen((o) => !o)}>
-        <ClockMini /> {chip ? chip.label : 'Schedule'}
+    <span className="inline-ctl">
+      <button
+        ref={btnRef}
+        className={`chip due-chip${chip ? ' ' + chip.cls : ' empty'}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {hasReminder ? <IconBell size={12} /> : <ClockMini />} {chip ? chip.label : 'Schedule'}{chip && t ? ' · ' + t : ''}
       </button>
       {open && (
-        <div className="mini-menu" role="menu">
-          {SCHED.filter((s) => s.k !== 'clear' || hasDate).map((s) => (
-            <button key={s.k} className="mini-item" role="menuitem" onClick={() => { onSet(s.k); setOpen(false) }}>{s.label}</button>
-          ))}
-        </div>
+        <DateTimePicker
+          anchorRef={btnRef}
+          value={task.due_date}
+          hasReminder={hasReminder}
+          onApply={(payload) => { onSchedule(payload); setOpen(false) }}
+          onClose={() => setOpen(false)}
+        />
       )}
     </span>
   )

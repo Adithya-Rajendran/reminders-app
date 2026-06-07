@@ -11,3 +11,6 @@ app/app-bundle.tar.gz
 app/.ready
 **/*.log
 node_modules/
+
+# local Claude Code session state
+.claude/
