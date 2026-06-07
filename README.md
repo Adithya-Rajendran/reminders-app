@@ -36,12 +36,12 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 ## Features
 
 - 🧩 **Customizable dashboard** — draggable, resizable widget grid ([react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)); arrange it however you like, layout auto-saves per user.
-- ✅ **Task widgets** backed by a **Postgres-native** task store — project lists and an **Upcoming** view grouped by Today / Tomorrow / This week. Tasks are scoped per user (OIDC `sub`); recurrence and reminders are handled in-app.
+- ✅ **Task widgets** backed by **CalDAV** — your tasks live as VTODOs in your own server (Nextcloud / iCloud / any CalDAV); projects are your task calendars and an **Upcoming** view groups by Today / Tomorrow / This week. Recurrence (RRULE) and reminders (VALARM) round-trip and sync to your devices.
 - ⚡ **Interactive tasks** (influenced by Todoist / TickTick / Things) — **natural-language quick-add** (`report tomorrow !2 *work` → due date + priority + label), one-click **scheduling** (Today / Tomorrow / Weekend / Next week / clear) and **priority** menus, **recurring-aware** completion with a satisfying pop + **Undo**, **drag tasks on the calendar** to reschedule, and an **actionable reminders feed** (complete / snooze).
 - 📅 **Multi-view calendar** ([FullCalendar](https://fullcalendar.io)) — month / week / day / agenda; create, drag-reschedule, edit & delete events; tasks overlay automatically.
 - ☁️ **CalDAV sync** — connect **Nextcloud**, **Apple iCloud**, or any **generic CalDAV** server; discover task lists, toggle which to sync, read & complete tasks, two-way calendar **events** (VEVENT) write-back.
-- 🔔 **Live reminders feed** — an in-app reminder scheduler → **per-user** SSE → instant in-app updates.
-- 🔐 **OIDC single sign-on** (Authentik / Keycloak / any OpenID Connect provider) via a backend-for-frontend; sessions persisted in Postgres.
+- 🔔 **Live reminders feed** — a poller over your CalDAV VALARMs → **per-user** SSE → instant in-app updates (the alarms also fire natively on your devices).
+- 🔐 **OIDC single sign-on** (Authentik / Keycloak / any OpenID Connect provider) via a backend-for-frontend; sessions persisted in a small local SQLite file.
 - 🎨 **Light & dark themes + selectable accents** — a one-click theme toggle and an 8-swatch **accent picker** in the top bar, both persisted per browser.
 
 ## How it works
@@ -49,23 +49,23 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 ```
 Browser ──TLS──▶ Gateway/Ingress ──▶ Reminders (Node BFF + React SPA)
                                          │  OIDC (PKCE) ──▶ your IdP
-                                         │  tasks/projects/labels/recurrence ─▶ Postgres (per user)
-                                         │  /api/caldav/*, /api/calendar/* ─▶ CalDAV (Nextcloud/iCloud/…)
-                                         │  /api/layouts, sessions ─▶ Postgres
+                                         │  tasks/projects/labels/recurrence/reminders ─▶ CalDAV (Nextcloud/iCloud/…)
+                                         │  calendar events (VEVENT) ─▶ CalDAV
+                                         │  layouts + account config + sessions ─▶ SQLite (local file)
                                          ▼
-                       reminder scheduler ─▶ per-user SSE
+                       VALARM poller ─▶ per-user SSE
 ```
 
-The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly Postgres-backed session, owns the **Postgres-native task store** (tasks/projects/labels scoped by OIDC `sub`, recurrence, and a polling **reminder scheduler** that pushes per-user SSE), talks CalDAV (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), and persists per-user dashboard layouts. The **SPA** (`app/client`, React 18 + Vite) is the dashboard. Multi-tenancy is enforced in the database (every row keyed by user; composite foreign keys). See [`docs/REPLATFORM_PLAN.md`](docs/REPLATFORM_PLAN.md) for the design.
+The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly session, and is a thin layer over **CalDAV**: tasks/projects/labels/recurrence/reminders are VTODOs in the user's own CalDAV server (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), giving real multi-tenancy and device sync for free. A small **SQLite** file (WAL, on a block volume) holds only what's easy to recreate — dashboard layouts, encrypted CalDAV account config, and sessions. A **VALARM poller** pushes per-user SSE reminders. The **SPA** (`app/client`, React 18 + Vite) is the dashboard. See [`docs/CALDAV_REPLATFORM_PLAN.md`](docs/CALDAV_REPLATFORM_PLAN.md) for the design.
 
 ## Quick start (container image)
 
 The image is published to GHCR by CI:
 
 ```bash
-docker run -p 8080:8080 \
+docker run -p 8080:8080 -v reminders-data:/data \
   -e SESSION_SECRET="$(openssl rand -hex 32)" \
-  -e DATABASE_URL="postgres://user:pass@host:5432/app" \
+  -e CONFIG_DB_PATH=/data/config.db \
   -e OIDC_ISSUER="https://idp.example.com/application/o/reminders/" \
   -e OIDC_CLIENT_ID=... -e OIDC_CLIENT_SECRET=... \
   -e OIDC_REDIRECT_URI="https://reminders.example.com/auth/callback" \
@@ -74,11 +74,11 @@ docker run -p 8080:8080 \
   ghcr.io/adithya-rajendran/reminders-app:latest
 ```
 
-Needs a **Postgres** database and an **OIDC** provider. Register the OAuth2 redirect URI with your IdP. The task schema is created automatically on first boot. Optional: `REMINDER_POLL_MS` (reminder poll interval, default 30000); `CALDAV_BLOCK_PRIVATE=1` to also block RFC1918 destinations for the CalDAV egress guard.
+Needs only a writable volume for the SQLite config DB (`CONFIG_DB_PATH`) and an **OIDC** provider — no database server. Register the OAuth2 redirect URI with your IdP; each user links their own CalDAV account in-app (Settings). Optional: `REMINDER_POLL_MS` (VALARM poll interval, default 60000); `CALDAV_BLOCK_PRIVATE=1` to also block RFC1918 destinations for the CalDAV egress guard.
 
 ### Kubernetes
 
-Manifests are under [`k8s/`](k8s/) (namespace, Postgres, the app + HTTPRoute, NetworkPolicy). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. The app Deployment pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-pg` and `reminders-app-env` secrets.
+Manifests are under [`k8s/`](k8s/) (namespace, a 1Gi block-storage PVC for the SQLite config DB, the app + HTTPRoute). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. SQLite needs **block** storage (ceph-rbd / local-path), not a shared filesystem (CephFS/NFS), for safe WAL locking; the Deployment uses `Recreate` since the RWO volume can't be multi-attached. The app pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-app-env` secret.
 
 ## Development
 
@@ -99,7 +99,7 @@ The UI was generated from a reusable design prompt and ported into the app — s
 
 ## Licensing
 
-The app's own components are FOSS and permissive (MIT/Apache/MPL: React, FullCalendar, react-grid-layout, tsdav, ical.js, Express, pg…). Nextcloud (AGPL) is reached only as an external CalDAV server you run yourself. Not legal advice. Don't run this as a multi-tenant/commercial service without reviewing each component's license.
+The app's own components are FOSS and permissive (MIT/Apache/MPL: React, FullCalendar, react-grid-layout, tsdav, ical.js, Express, better-sqlite3…). Nextcloud (AGPL) is reached only as an external CalDAV server you run yourself. Not legal advice. Don't run this as a multi-tenant/commercial service without reviewing each component's license.
 
 ## Acknowledgements
 

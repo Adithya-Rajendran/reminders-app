@@ -47,14 +47,10 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            # Tasks/reminders live in the user's CalDAV server; only config +
+            # dashboard layout (+ sessions) live in this SQLite file on ceph-rbd.
             - name: CONFIG_DB_PATH
               value: /data/config.db
-            # Cutover: tasks/reminders live in CalDAV; only config + layout live
-            # in SQLite. Postgres is now unused (retired in a follow-up).
-            - name: TASK_STORE
-              value: caldav
-            - name: CONFIG_STORE
-              value: sqlite
           envFrom:
             - secretRef: { name: reminders-app-env }
           volumeMounts:
