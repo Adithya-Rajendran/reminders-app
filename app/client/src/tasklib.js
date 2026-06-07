@@ -47,19 +47,6 @@ export function parseQuickAdd(input) {
   return { title, priority, due_date: date || undefined, labels }
 }
 
-// ---- scheduler presets (used by the due-chip popover) ----
-export function schedulePreset(key) {
-  const now = new Date()
-  switch (key) {
-    case 'today': return atTime(now)
-    case 'tomorrow': { const d = new Date(now); d.setDate(d.getDate() + 1); return atTime(d) }
-    case 'weekend': { const d = new Date(now); const add = (6 - d.getDay() + 7) % 7 || 6; d.setDate(d.getDate() + add); return atTime(d) }
-    case 'nextweek': { const d = new Date(now); d.setDate(d.getDate() + (8 - d.getDay())); return atTime(d) }
-    case 'clear': return ZERO_DATE
-    default: return null
-  }
-}
-
 // ---- due chip label + urgency class ----
 export function dueChip(d) {
   if (!isRealDate(d)) return null
@@ -72,6 +59,18 @@ export function dueChip(d) {
   else if (diff < 7) label = DOW_SHORT[dt.getDay()]
   else label = `${MON[dt.getMonth()]} ${dt.getDate()}`
   return { label, cls: diff < 0 ? 'overdue' : diff <= 1 ? 'due-soon' : '' }
+}
+
+// Short local time label, e.g. "3:00 PM" (blank for all-day / midnight defaults).
+export function timeLabel(d) {
+  if (!isRealDate(d)) return ''
+  const dt = new Date(d)
+  const rawH = dt.getHours()
+  const m = dt.getMinutes()
+  if (rawH === 0 && m === 0) return '' // midnight = all-day / no meaningful time
+  const ap = rawH < 12 ? 'AM' : 'PM'
+  const h = rawH % 12 || 12
+  return `${h}:${String(m).padStart(2, '0')} ${ap}`
 }
 
 export const PRIORITIES = [

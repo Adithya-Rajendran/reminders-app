@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { updateTask, deleteTask, createTask, attachLabels, schedulePreset, isRealDate } from './tasklib.js'
+import { updateTask, deleteTask, createTask, attachLabels, isRealDate } from './tasklib.js'
 import { onTasksChanged, emitTasksChanged } from './tasksbus.js'
 
 // Shared task-list behaviour: load, optimistic priority/due edits, a
@@ -37,10 +37,12 @@ export function useTaskList(loader) {
   const dismissUndo = () => { clearTimeout(undoTimer.current); setUndo(null) }
 
   const onSetPriority = (task, priority) => { patch(task.id, { priority }); updateTask(task.id, { priority }).then(emitTasksChanged).catch(() => load()) }
-  const onSetDue = (task, key) => {
-    const due = schedulePreset(key)
-    patch(task.id, { due_date: due })
-    updateTask(task.id, { due_date: due }).then(emitTasksChanged).catch(() => load())
+  // Set due date + (optionally) a reminder at the same instant, from the picker.
+  // due_date is an ISO string or ZERO_DATE to clear; reminder is an ISO or null.
+  const onSchedule = (task, { due_date, reminder }) => {
+    const reminders = reminder ? [{ reminder }] : []
+    patch(task.id, { due_date, reminders })
+    updateTask(task.id, { due_date, reminders }).then(emitTasksChanged).catch(() => load())
   }
 
   const onToggle = async (task) => {
@@ -90,5 +92,5 @@ export function useTaskList(loader) {
     } catch { setTasks(snapshot); load() }
   }
 
-  return { tasks, state, load, setTasks, onToggle, onDelete, onSetDue, onSetPriority, undo, dismissUndo }
+  return { tasks, state, load, setTasks, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo }
 }

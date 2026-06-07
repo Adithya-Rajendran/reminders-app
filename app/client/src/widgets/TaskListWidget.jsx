@@ -13,7 +13,7 @@ export default function TaskListWidget({ projectId }) {
     return (Array.isArray(all) ? all : []).filter((t) => !t.done)
   }, [projectId])
 
-  const { tasks, state, load, onToggle, onDelete, onSetDue, onSetPriority, undo, dismissUndo } = useTaskList(loader)
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(loader)
   const [draft, setDraft] = useState('')
 
   const add = async (e) => {
@@ -49,7 +49,7 @@ export default function TaskListWidget({ projectId }) {
         ? <EmptyState title="All clear" sub="No open tasks. Add one above." />
         : <div className="task-stream">
             {tasks.map((t) => (
-              <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSetDue={onSetDue} onSetPriority={onSetPriority} />
+              <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
             ))}
           </div>)}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}

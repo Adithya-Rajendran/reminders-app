@@ -23,7 +23,7 @@ export default function UpcomingWidget() {
     return (Array.isArray(all) ? all : []).filter((t) => !t.done && isRealDate(t.due_date))
   }, [])
 
-  const { tasks, state, load, onToggle, onDelete, onSetDue, onSetPriority, undo, dismissUndo } = useTaskList(loader)
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(loader)
 
   const groups = {}
   for (const t of tasks) {
@@ -45,7 +45,7 @@ export default function UpcomingWidget() {
               </div>
               <div className="task-stream">
                 {groups[k].items.map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSetDue={onSetDue} onSetPriority={onSetPriority} />
+                  <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
                 ))}
               </div>
             </div>
