@@ -1128,3 +1128,7 @@ body {
 .dt-remind span svg { opacity: .8; }
 .dt-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
 .dt-actions .btn.sm { padding: 6px 14px; font-size: 12.5px; }
+
+/* Reminders widget — a row pulses when its reminder fires live over SSE. */
+.reminding { border-radius: 10px; box-shadow: inset 3px 0 0 var(--accent); background: var(--accent-soft); animation: remPulse 1.4s ease-in-out 3; }
+@keyframes remPulse { 0%, 100% { background: var(--accent-soft); } 50% { background: transparent; } }
