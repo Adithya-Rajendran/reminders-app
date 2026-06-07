@@ -2,16 +2,12 @@ import express from 'express'
 import session from 'express-session'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initDb } from './db.js'
 import * as config from './config.js'
 import { store as tasks } from './taskstore.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler } from './events.js'
-import { startScheduler } from './scheduler.js'
 import { startValarmPoller } from './valarm-poller.js'
 import * as caldav from './caldav.js'
-
-const TASK_STORE = process.env.TASK_STORE || 'postgres'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -32,8 +28,7 @@ app.use(express.json({ limit: '2mb' }))
 app.use(
   session({
     name: 'rsid',
-    // Persistent store (SQLite or Postgres, per CONFIG_STORE) so logins survive
-    // pod restarts / redeploys.
+    // SQLite-backed store so logins survive pod restarts / redeploys.
     store: config.createSessionStore(),
     secret: SESSION_SECRET,
     resave: false,
@@ -112,7 +107,7 @@ app.post('/api/calendar/events', requireAuth, caldav.createEventHandler)
 app.patch('/api/calendar/events', requireAuth, caldav.updateEventHandler)
 app.delete('/api/calendar/events', requireAuth, caldav.deleteEventHandler)
 
-// Tasks / projects / labels — Postgres-native store.
+// Tasks / projects / labels — CalDAV-backed store.
 app.get('/api/projects', requireAuth, tasks.listProjects)
 app.get('/api/projects/:id/tasks', requireAuth, tasks.listProjectTasks)
 app.put('/api/projects/:id/tasks', requireAuth, tasks.createTask)
@@ -142,14 +137,9 @@ app.use((err, req, res, next) => {
 })
 
 const start = async () => {
-  if (TASK_STORE === 'postgres') await initDb() // dormant pg task schema (skipped on CalDAV)
   await config.initConfigSchema()
-  await config.migrateConfigFromPostgres() // one-time PG->SQLite config copy (no-op unless CONFIG_STORE=sqlite & empty)
   await initOidc()
-  // Reminder firing -> per-user SSE. CalDAV polls VALARMs in-memory; Postgres
-  // uses the durable task_reminders scheduler. Exactly one runs, per backend.
-  if (TASK_STORE === 'caldav') startValarmPoller()
-  else startScheduler()
+  startValarmPoller() // polls CalDAV VALARMs -> per-user SSE reminders
   app.listen(PORT, () => console.log('reminders-app BFF listening on :' + PORT))
 }
 start().catch((e) => { console.error('fatal startup error:', e); process.exit(1) })

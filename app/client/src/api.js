@@ -14,5 +14,5 @@ export async function api(path, opts = {}) {
   return ct.includes('json') ? res.json() : res.text()
 }
 
-// Task / project / label API (Postgres-native), served by the BFF.
+// Task / project / label API (CalDAV-backed), served by the BFF.
 export const tk = (path, opts) => api('/api' + path, opts)

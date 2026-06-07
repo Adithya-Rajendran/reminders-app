@@ -72,7 +72,7 @@ ok((await cfg.listsWithId(U)).length === 0, 'deleting an account cascades to its
 
 // --- only config tables exist (no task/reminder data lives in the DB) ---
 const tables = cfg.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((t) => t.name).sort()
-const expected = ['_config_migrations', 'caldav_accounts', 'caldav_lists', 'user_dashboards']
+const expected = ['caldav_accounts', 'caldav_lists', 'user_dashboards']
 ok(expected.every((t) => tables.includes(t)) && !tables.some((t) => /task|reminder|project|label/i.test(t)),
   'schema holds only config/layout tables — no task/reminder/project/label tables: [' + tables.join(', ') + ']')
 

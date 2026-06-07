@@ -1,8 +1,7 @@
-// In-app reminder poller for the CalDAV task store (replaces scheduler.js when
-// TASK_STORE=caldav). Polls each connected user's VTODOs and fires per-user SSE
-// 'reminder' events for VALARMs that have come due and for tasks that have gone
-// overdue — using the SAME SSE envelope the Postgres scheduler used, so the
-// client (RemindersWidget / Dashboard) is unchanged.
+// In-app reminder poller for the CalDAV task store. Polls each connected user's
+// VTODOs and fires per-user SSE 'reminder' events for VALARMs that have come due
+// and for tasks that have gone overdue, so the client (RemindersWidget /
+// Dashboard) gets a live in-app toast.
 //
 // State is fully IN-MEMORY and reset on restart — nothing about reminders is
 // stored in our database. The authoritative reminder is the VALARM itself, which

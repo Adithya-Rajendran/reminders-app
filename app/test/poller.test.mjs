@@ -1,7 +1,12 @@
 // Unit test for the CalDAV reminder poller's seed/fire/prune state machine.
 // Pure logic with an injected `now` — no CalDAV server required. Run with:
 //   docker run --rm -v "$PWD":/app -w /app node:22 node test/poller.test.mjs
-import { evaluateUserTasks, pruneState, freshState } from '../server/valarm-poller.js'
+// Importing the poller pulls in config.js, which opens a SQLite handle at import,
+// so point it at a throwaway file (the pure functions under test never touch it).
+import { rmSync } from 'node:fs'
+process.env.CONFIG_DB_PATH = process.env.CONFIG_DB_PATH || '/tmp/poller.test.db'
+rmSync(process.env.CONFIG_DB_PATH, { force: true })
+const { evaluateUserTasks, pruneState, freshState } = await import('../server/valarm-poller.js')
 
 let pass = 0, fail = 0
 const ok = (cond, msg) => { if (cond) { pass++ } else { fail++; console.error('  ✗ ' + msg) } }
