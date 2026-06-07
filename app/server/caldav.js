@@ -110,6 +110,13 @@ export async function getAccount(userId, id) {
   return r.rows[0] || null
 }
 
+// Distinct users with at least one CalDAV account — the set the reminder poller
+// sweeps each tick.
+export async function usersWithCaldav() {
+  const r = await pool.query('SELECT DISTINCT user_id FROM caldav_accounts')
+  return r.rows.map((x) => x.user_id)
+}
+
 export function authHeader(acc) {
   return 'Basic ' + Buffer.from(acc.username + ':' + dec(acc.password_enc)).toString('base64')
 }

@@ -27,7 +27,7 @@ function readCategories(vt) {
   for (const p of vt.getAllProperties('categories')) for (const v of (p.getValues() || [])) { const s = String(v).trim(); if (s) set.add(s) }
   return [...set].map((title) => ({ id: encodeLabelId(title), title, hex_color: '' }))
 }
-function serializeVtodo(vt, listId, objectUrl) {
+export function serializeVtodo(vt, listId, objectUrl) {
   const done = String(vt.getFirstPropertyValue('status') || 'NEEDS-ACTION').toUpperCase() === 'COMPLETED'
   const dueV = vt.getFirstPropertyValue('due') || vt.getFirstPropertyValue('dtstart')
   const compV = vt.getFirstPropertyValue('completed')
@@ -60,7 +60,7 @@ async function fetchObjectsCached(sub, account, listUrl) {
   c.byUrl.set(listUrl, objs)
   return objs
 }
-async function allUserVtodos(sub) {
+export async function allUserVtodos(sub) {
   const lists = (await listsWithId(sub)).filter((l) => l.supports_vtodo && l.enabled)
   const out = []
   await Promise.allSettled(lists.map(async (l) => {

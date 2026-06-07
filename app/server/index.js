@@ -8,7 +8,10 @@ import { store as tasks } from './taskstore.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler } from './events.js'
 import { startScheduler } from './scheduler.js'
+import { startValarmPoller } from './valarm-poller.js'
 import * as caldav from './caldav.js'
+
+const TASK_STORE = process.env.TASK_STORE || 'postgres'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -142,7 +145,10 @@ const start = async () => {
   await initDb()
   await caldav.initCaldavDb()
   await initOidc()
-  startScheduler() // in-app reminder poller -> per-user SSE
+  // Reminder firing -> per-user SSE. CalDAV polls VALARMs in-memory; Postgres
+  // uses the durable task_reminders scheduler. Exactly one runs, per backend.
+  if (TASK_STORE === 'caldav') startValarmPoller()
+  else startScheduler()
   app.listen(PORT, () => console.log('reminders-app BFF listening on :' + PORT))
 }
 start().catch((e) => { console.error('fatal startup error:', e); process.exit(1) })
