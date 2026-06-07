@@ -25,3 +25,5 @@ jobs:
         run: npm run build
       - name: Server syntax check
         run: for f in server/*.js; do node --check "$f"; done
+      - name: Unit tests
+        run: for t in test/*.test.mjs; do node "$t"; done
