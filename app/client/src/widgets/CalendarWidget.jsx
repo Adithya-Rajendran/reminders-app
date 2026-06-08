@@ -5,10 +5,9 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import { api, tk } from '../api.js'
+import { ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { Calendar, X, Trash, Check, Spinner } from '../icons.jsx'
-
-const ZERO_DATE = '0001-01-01T00:00:00Z'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')

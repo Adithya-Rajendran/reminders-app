@@ -3,7 +3,8 @@ import session from 'express-session'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as config from './config.js'
-import { store as tasks } from './taskstore.js'
+// Tasks/projects/labels live as VTODOs in the user's CalDAV server.
+import * as tasks from './tasks_caldav.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler } from './events.js'
 import { startValarmPoller } from './valarm-poller.js'
@@ -99,7 +100,6 @@ app.post('/api/caldav/accounts/:id/discover', requireAuth, caldav.discoverHandle
 app.put('/api/caldav/accounts/:id/lists', requireAuth, caldav.setListsHandler)
 app.delete('/api/caldav/accounts/:id', requireAuth, caldav.deleteAccountHandler)
 app.get('/api/caldav/tasks', requireAuth, caldav.fetchTasksHandler)
-app.post('/api/caldav/tasks/toggle', requireAuth, caldav.toggleHandler)
 
 // CalDAV calendar events (VEVENT CRUD)
 app.get('/api/calendar/events', requireAuth, caldav.calendarEventsHandler)

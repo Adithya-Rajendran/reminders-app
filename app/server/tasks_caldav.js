@@ -1,17 +1,21 @@
 // CalDAV-backed task store — same /api/{projects,tasks,labels} handlers + wire
 // shape as tasks.js, but tasks live as VTODOs in the user's CalDAV server.
 // projects = VTODO lists (caldav_lists.id); task.id = encodeTaskId(listId,objectUrl);
-// labels = CATEGORIES. Selected at boot via taskstore.js (TASK_STORE=caldav).
+// labels = CATEGORIES. Wired into the API routes by index.js.
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
-import { clientFor, authHeader, safeFetch, VTODO_FILTER } from './caldav.js'
+import { clientFor, authHeader, safeFetch, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById } from './config.js'
+import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
 import { advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo, isRecurring, registerTimezones } from './recurrence_caldav.js'
 import { applyReminders, readReminders } from './valarm.js'
 
-const ZERO = '0001-01-01T00:00:00Z'
 const outTs = (d) => (d && new Date(d).getUTCFullYear() > 1) ? new Date(d).toISOString() : ZERO
+// Priority maps between our 0-5 scale (0 None … 5 DO NOW; higher = more urgent)
+// and the iCalendar 0-9 scale (RFC 5545; 1 = highest, 9 = lowest, 0 = none).
+// OUR_TO_ICAL is the exact inverse for our six values; icalToOur quantizes any
+// inbound 0-9 priority back to a bucket so foreign tasks still map sensibly.
 const OUR_TO_ICAL = { 0: 0, 1: 9, 2: 7, 3: 5, 4: 3, 5: 1 }
 function icalToOur(p) { const n = Number(p) || 0; if (n <= 0) return 0; if (n <= 2) return 5; if (n <= 4) return 4; if (n <= 6) return 3; if (n <= 8) return 2; return 1 }
 const clampPriority = (p) => { const n = Math.trunc(Number(p)); return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0 }
@@ -87,7 +91,7 @@ async function getModifyPut(resolved, objectUrl, mutate, attempt = 0) {
   return { vcal, vt }
 }
 
-function sortTasks(tasks, sortBy = 'due_date', desc = false) {
+export function sortTasks(tasks, sortBy = 'due_date', desc = false) {
   const key = ({ due_date: (t) => (t.due_date === ZERO ? '9999' : t.due_date), priority: (t) => t.priority, created_at: (t) => t.created, title: (t) => t.title.toLowerCase() }[sortBy]) || ((t) => (t.due_date === ZERO ? '9999' : t.due_date))
   tasks.sort((a, b) => { const ka = key(a), kb = key(b); const c = ka < kb ? -1 : ka > kb ? 1 : 0; return desc ? -c : c })
   return tasks
@@ -141,7 +145,7 @@ export async function createTask(req, res, next) {
   try {
     const uid2 = crypto.randomUUID()
     const vcal = new ICAL.Component('vcalendar')
-    vcal.updatePropertyWithValue('prodid', '-//reminders-app//caldav//EN')
+    vcal.updatePropertyWithValue('prodid', CALDAV_PRODID)
     vcal.updatePropertyWithValue('version', '2.0')
     const vt = new ICAL.Component('vtodo')
     vt.updatePropertyWithValue('uid', uid2)
