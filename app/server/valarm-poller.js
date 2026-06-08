@@ -11,9 +11,9 @@
 // firing, so a deploy never replays a burst of stale toasts.
 import { sendToUser } from './events.js'
 import { usersWithCaldav } from './config.js'
+import { ZERO_DATE as ZERO } from './constants.js'
 import { allUserVtodos, serializeVtodo } from './tasks_caldav.js'
 
-const ZERO = '0001-01-01T00:00:00Z'
 const isReal = (iso) => !!iso && iso !== ZERO && new Date(iso).getUTCFullYear() > 1
 
 // Envelope consumed by RemindersWidget (ev.data.event.data.task) / Dashboard.

@@ -6,7 +6,10 @@
 //   exact href for GET/PUT/DELETE. (The reminder poller encodes ids the same way
 //   so RemindersWidget complete/snooze round-trips.)
 // - label_id is "cat_" + base64url(categoryName) — CATEGORIES are free text.
-const SEP = ''
+// SEP is the ASCII Unit Separator (0x1F): a control byte that never appears in a
+// listId (digits) or a CalDAV objectUrl (an http(s) URL), so it unambiguously
+// splits the two halves after base64url-decoding.
+const SEP = '\x1f'
 const b64url = (s) => Buffer.from(String(s), 'utf8').toString('base64url')
 const unb64url = (s) => Buffer.from(String(s), 'base64url').toString('utf8')
 

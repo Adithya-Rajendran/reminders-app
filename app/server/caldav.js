@@ -19,7 +19,8 @@ import {
 // CalDAV commonly lives on a LAN/cluster IP; set CALDAV_BLOCK_PRIVATE=1 to also
 // block those on internet-facing deployments.
 const BLOCK_PRIVATE = process.env.CALDAV_BLOCK_PRIVATE === '1'
-function ipBlocked(ip) {
+// Exported for unit tests (pure classification, no I/O).
+export function ipBlocked(ip) {
   const m = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)
   const v = m ? m[1] : ip
   if (net.isIPv4(v)) {
@@ -54,6 +55,9 @@ export async function safeFetch(url, opts = {}) {
 // tasks — we must explicitly query for VTODO components.
 export const VTODO_FILTER = [{ 'comp-filter': { _attributes: { name: 'VCALENDAR' }, 'comp-filter': { _attributes: { name: 'VTODO' } } } }]
 
+// PRODID stamped on every iCalendar object this app writes (VTODO + VEVENT).
+export const CALDAV_PRODID = '-//reminders-app//caldav//EN'
+
 // ---- password encryption at rest (AES-256-GCM) ----
 const KEY = crypto.createHash('sha256')
   .update(process.env.CALDAV_ENC_KEY || process.env.SESSION_SECRET || 'dev-insecure')
@@ -73,7 +77,7 @@ function dec(b64) {
 
 // CalDAV account/list persistence lives in config.js (the only DB this app uses).
 
-function normalizeServerUrl(type, serverUrl) {
+export function normalizeServerUrl(type, serverUrl) {
   if (type === 'icloud') return 'https://caldav.icloud.com'
   const u = (serverUrl || '').trim().replace(/\/+$/, '')
   if (type === 'nextcloud' && !/\/remote\.php\/dav$/.test(u)) return u + '/remote.php/dav'
@@ -177,7 +181,8 @@ function acctPublic(a, lists) {
   return { id: a.id, name: a.name, type: a.type, serverUrl: a.server_url, username: a.username, lists: lists || [] }
 }
 
-// ---- parse a VTODO ics object into a normalized task ----
+// ---- parse a VTODO ics object into a normalized task (decorative task counts
+// for Settings, via /api/caldav/tasks). Internal to this module. ----
 function parseVtodos(icsData, ctx) {
   const out = []
   let comp
@@ -285,37 +290,6 @@ export async function fetchTasksHandler(req, res) {
   }
 }
 
-export async function toggleHandler(req, res) {
-  const { accountId, objectUrl, done } = req.body || {}
-  try {
-    const acc = await getAccount(req.session.user.sub, accountId)
-    if (!acc || !objectUrl) return res.status(400).json({ error: 'bad request' })
-    const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
-    if (!r.ok) return res.status(502).json({ error: 'fetch failed' })
-    const etag = r.headers.get('etag')
-    const comp = new ICAL.Component(ICAL.parse(await r.text()))
-    const vt = comp.getFirstSubcomponent('vtodo')
-    if (!vt) return res.status(404).json({ error: 'no vtodo' })
-    if (done) {
-      vt.updatePropertyWithValue('status', 'COMPLETED')
-      vt.updatePropertyWithValue('percent-complete', 100)
-      vt.updatePropertyWithValue('completed', ICAL.Time.now())
-    } else {
-      vt.updatePropertyWithValue('status', 'NEEDS-ACTION')
-      vt.updatePropertyWithValue('percent-complete', 0)
-      vt.removeAllProperties('completed')
-    }
-    const headers = { Authorization: authHeader(acc), 'Content-Type': 'text/calendar; charset=utf-8' }
-    if (etag) headers['If-Match'] = etag
-    const put = await safeFetch(objectUrl, { method: 'PUT', headers, body: comp.toString() })
-    if (!put.ok && put.status !== 204) return res.status(502).json({ error: 'update failed (' + put.status + ')' })
-    res.json({ ok: true })
-  } catch (e) {
-    console.error('caldav toggle failed:', e?.message || e)
-    res.status(502).json({ error: 'toggle failed' })
-  }
-}
-
 // ============================================================
 //  Calendar events (VEVENT) CRUD — RFC 4791 / RFC 5545
 // ============================================================
@@ -411,7 +385,7 @@ async function fetchEvents(userId, startISO, endISO) {
 async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
   const uid = crypto.randomUUID()
   const vcal = new ICAL.Component('vcalendar')
-  vcal.updatePropertyWithValue('prodid', '-//reminders-app//caldav//EN')
+  vcal.updatePropertyWithValue('prodid', CALDAV_PRODID)
   vcal.updatePropertyWithValue('version', '2.0')
   const ve = new ICAL.Component('vevent')
   ve.updatePropertyWithValue('uid', uid)
