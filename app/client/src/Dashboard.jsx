@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
-import TaskListWidget from './widgets/TaskListWidget.jsx'
 import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
 import CalendarWidget from './widgets/CalendarWidget.jsx'
 import {
-  IconPlus, IconChevDown, IconChevR, IconChevL,
+  IconPlus, IconChevDown,
   IconList, IconClock, IconBell, IconCalendar, IconCloud,
   IconX, IconInbox, IconRefresh,
 } from './icons.jsx'
@@ -20,7 +19,6 @@ const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 const TYPE_ICON = {
-  tasklist: IconList,
   upcoming: IconClock,
   reminders: IconBell,
   calendar: IconCalendar,
@@ -28,22 +26,22 @@ const TYPE_ICON = {
 const KNOWN_TYPES = new Set(Object.keys(TYPE_ICON))
 
 const WIDGET_MENU = [
-  { type: 'tasklist', label: 'Tasks (by project)', icon: IconList, hasSub: true },
-  { type: 'upcoming', label: 'Upcoming', icon: IconClock },
   { type: 'reminders', label: 'Reminders', icon: IconBell },
+  { type: 'upcoming', label: 'Upcoming', icon: IconClock },
   { type: 'calendar', label: 'Calendar', icon: IconCalendar },
 ]
 
 const newId = () => 'w-' + crypto.randomUUID()
 
-// A clean default dashboard: Tasks · Upcoming · Reminders, three across.
-function buildDefault(pr) {
-  const def = []
-  if (pr[0]) def.push({ i: newId(), type: 'tasklist', projectId: pr[0].id })
-  def.push({ i: newId(), type: 'upcoming' })
-  def.push({ i: newId(), type: 'reminders' })
+// A clean default dashboard: Reminders · Upcoming · Calendar.
+function buildDefault() {
+  const def = [
+    { i: newId(), type: 'reminders' },
+    { i: newId(), type: 'upcoming' },
+    { i: newId(), type: 'calendar' },
+  ]
   const lay = {}
-  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * 4) % COLS[bp], y: 0, w: 4, h: 8 }))
+  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * 4) % COLS[bp], y: 0, w: 4, h: 9 }))
   return { widgets: def, layouts: lay }
 }
 
@@ -89,32 +87,20 @@ export default function Dashboard({ user, onOpenSettings }) {
       let saved = null
       try { saved = await api('/api/layouts/' + DASH) } catch { /* none */ }
       if (saved?.layout) {
-        // Any persisted layout is authoritative — including an intentionally empty one.
-        // BUT repair tasklist widgets pinned to a project this user no longer owns
-        // (e.g. an old layout from before per-user isolation): repoint to the first
-        // available project (Inbox) so the widget loads instead of 404ing, and
-        // persist the heal so it sticks.
-        const validIds = new Set(pr.map((p) => p.id))
-        const fallback = pr[0]?.id
+        // Any persisted layout is authoritative — but drop retired widget types
+        // (e.g. the old tasklist/caldav widgets) and persist the cleanup.
         const original = saved.layout.widgets || []
-        let repaired = false
-        const sw = original.filter((w) => KNOWN_TYPES.has(w.type)).flatMap((w) => {
-          if (w.type !== 'tasklist' || validIds.has(w.projectId)) return [w]
-          if (fallback == null) return [] // nothing to fall back to → drop it
-          repaired = true
-          return [{ ...w, projectId: fallback }]
-        })
-        if (sw.length !== original.length) repaired = true // dropped a retired widget type (e.g. caldav)
+        const sw = original.filter((w) => KNOWN_TYPES.has(w.type))
         setWidgets(sw)
         setLayouts(saved.layout.layouts || {})
-        if (repaired) {
+        if (sw.length !== original.length) {
           api('/api/layouts/' + DASH, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, widgets: sw, layouts: saved.layout.layouts || {} } }),
           }).catch(() => {})
         }
       } else {
-        const { widgets: def, layouts: lay } = buildDefault(pr)
+        const { widgets: def, layouts: lay } = buildDefault()
         setWidgets(def)
         setLayouts(lay)
       }
@@ -191,7 +177,7 @@ export default function Dashboard({ user, onOpenSettings }) {
 
   // Escape hatch for a cluttered/confusing board: back to the clean default.
   const resetLayout = () => {
-    const { widgets: def, layouts: lay } = buildDefault(projects)
+    const { widgets: def, layouts: lay } = buildDefault()
     setWidgets(def)
     setLayouts(lay)
     persist(def, lay)
@@ -251,8 +237,7 @@ export default function Dashboard({ user, onOpenSettings }) {
           >
             {widgets.map((w) => (
               <div key={w.i}>
-                <WidgetFrame type={w.type} title={titleFor(w, projects)} onRemove={() => removeWidget(w.i)}>
-                  {w.type === 'tasklist' && <TaskListWidget projectId={w.projectId} />}
+                <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
                   {w.type === 'upcoming' && <UpcomingWidget />}
                   {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} />}
                   {w.type === 'calendar' && <CalendarWidget />}
@@ -304,14 +289,11 @@ function Toolbar({ projects, onAdd, onReset }) {
   )
 }
 
-/* ---------- Add-widget dropdown (with project submenu) ---------- */
-function AddWidgetMenu({ projects, onAdd, onReset }) {
+/* ---------- Add-widget dropdown ---------- */
+function AddWidgetMenu({ onAdd, onReset }) {
   const [open, setOpen] = useState(false)
-  const [sub, setSub] = useState(false)
   const ref = usePopover(open, setOpen)
-  useEffect(() => { if (!open) setSub(false) }, [open])
-
-  const pick = (type, projectId) => { onAdd(type, projectId); setOpen(false) }
+  const pick = (type) => { onAdd(type); setOpen(false) }
   const reset = () => { onReset?.(); setOpen(false) }
 
   return (
@@ -325,50 +307,21 @@ function AddWidgetMenu({ projects, onAdd, onReset }) {
           role="menu"
           style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}
         >
-          {!sub ? (
-            <>
-              <div className="menu-label">Add a widget</div>
-              {WIDGET_MENU.map((m) => {
-                const I = m.icon
-                return (
-                  <button
-                    key={m.type}
-                    className="menu-item"
-                    role="menuitem"
-                    onClick={() => (m.hasSub ? setSub(true) : pick(m.type))}
-                    aria-haspopup={m.hasSub ? 'menu' : undefined}
-                  >
-                    <I size={16} /> {m.label}
-                    {m.hasSub && <IconChevR size={15} className="chev" />}
-                  </button>
-                )
-              })}
-              {onReset && (
-                <>
-                  <div className="menu-sep" />
-                  <button className="menu-item" role="menuitem" onClick={reset} style={{ color: 'var(--muted)' }}>
-                    <IconRefresh size={15} /> Reset layout
-                  </button>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <button className="menu-item" role="menuitem" onClick={() => setSub(false)} style={{ color: 'var(--muted)' }}>
-                <IconChevL size={15} /> Tasks (by project)
+          <div className="menu-label">Add a widget</div>
+          {WIDGET_MENU.map((m) => {
+            const I = m.icon
+            return (
+              <button key={m.type} className="menu-item" role="menuitem" onClick={() => pick(m.type)}>
+                <I size={16} /> {m.label}
               </button>
+            )
+          })}
+          {onReset && (
+            <>
               <div className="menu-sep" />
-              <div className="menu-label">Choose a project</div>
-              {projects.length === 0 && (
-                <div className="menu-label" style={{ textTransform: 'none', fontWeight: 500, color: 'var(--faint)' }}>
-                  No projects yet
-                </div>
-              )}
-              {projects.map((p) => (
-                <button key={p.id} className="menu-item" role="menuitem" onClick={() => pick('tasklist', p.id)}>
-                  <span className="pdot" style={{ background: p.hex_color || 'var(--accent)', width: 9, height: 9 }} /> {p.title}
-                </button>
-              ))}
+              <button className="menu-item" role="menuitem" onClick={reset} style={{ color: 'var(--muted)' }}>
+                <IconRefresh size={15} /> Reset layout
+              </button>
             </>
           )}
         </div>
@@ -403,10 +356,8 @@ function WidgetFrame({ type, title, onRemove, children }) {
   )
 }
 
-function titleFor(w, projects) {
+function titleFor(w) {
   if (w.type === 'upcoming') return 'Upcoming'
-  if (w.type === 'reminders') return 'Reminders'
   if (w.type === 'calendar') return 'Calendar'
-  const p = projects.find((p) => p.id === w.projectId)
-  return p ? p.title : 'Tasks'
+  return 'Reminders'
 }
