@@ -5,20 +5,24 @@ import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
 import CalendarWidget from './widgets/CalendarWidget.jsx'
 import {
-  IconPlus, IconChevDown,
+  IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconClock, IconBell, IconCalendar, IconCloud,
   IconX, IconInbox, IconRefresh,
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
 const DASH = 'main'
-// Doubled columns (vs the old 12/10/6/4/2) so widgets resize in finer, ~half-column
-// steps — on wide screens the old columns were too coarse. GRID_V bumps when this
-// changes so older saved layouts get scaled to match.
-const COLS = { lg: 24, md: 20, sm: 12, xs: 8, xxs: 4 }
+// Fine-grained columns (= the original 12/10/6/4/2 × 2.5) so widgets resize in
+// small steps and don't feel too coarse on wide screens. Because every breakpoint
+// is the same multiple of the original, any older saved layout scales up by a
+// single factor (see SCALE_TO_CURRENT). GRID_V bumps when these change.
+const COLS = { lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
-const GRID_V = 2
-const W_DEFAULT = 8 // a default widget spans ~1/3 at lg (8 of 24)
+const GRID_V = 3
+const W_DEFAULT = 10 // a default widget spans ~1/3 at lg (10 of 30)
+// Multiply a saved layout's x/w by this to reach the current grid, keyed by the
+// layout's stored gridV (1 = old 12-col, 2 = 24-col, 3 = current 30-col).
+const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1 }
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -31,7 +35,7 @@ const TYPE_ICON = {
 const KNOWN_TYPES = new Set(Object.keys(TYPE_ICON))
 
 const WIDGET_MENU = [
-  { type: 'reminders', label: 'Reminders', icon: IconBell },
+  { type: 'reminders', label: 'Reminders', icon: IconBell, hasSub: true },
   { type: 'upcoming', label: 'Upcoming', icon: IconClock },
   { type: 'calendar', label: 'Calendar', icon: IconCalendar },
 ]
@@ -106,8 +110,9 @@ export default function Dashboard({ user, onOpenSettings }) {
         const original = saved.layout.widgets || []
         const sw = original.filter((w) => KNOWN_TYPES.has(w.type))
         let lay = saved.layout.layouts || {}
-        const needsGrid = saved.layout.gridV !== GRID_V
-        if (needsGrid) lay = scaleLayouts(lay, 2) // 12 → 24 columns
+        const f = SCALE_TO_CURRENT[saved.layout.gridV || 1] ?? 2.5
+        const needsGrid = f !== 1
+        if (needsGrid) lay = scaleLayouts(lay, f)
         setWidgets(sw)
         setLayouts(lay)
         if (sw.length !== original.length || needsGrid) {
@@ -168,8 +173,9 @@ export default function Dashboard({ user, onOpenSettings }) {
     persist(widgets, all)
   }
 
-  const addWidget = (type, projectId) => {
-    const w = { i: newId(), type, projectId }
+  const addWidget = (type, group) => {
+    // For a reminders widget, `group` locks it to one group (null = all groups).
+    const w = { i: newId(), type, group: group || undefined }
     const nextWidgets = [...widgets, w]
     const nextLayouts = { ...layouts }
     for (const bp of Object.keys(COLS)) {
@@ -256,7 +262,7 @@ export default function Dashboard({ user, onOpenSettings }) {
               <div key={w.i}>
                 <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
                   {w.type === 'upcoming' && <UpcomingWidget />}
-                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} />}
+                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} group={w.group || null} />}
                   {w.type === 'calendar' && <CalendarWidget />}
                 </WidgetFrame>
               </div>
@@ -306,12 +312,23 @@ function Toolbar({ projects, onAdd, onReset }) {
   )
 }
 
-/* ---------- Add-widget dropdown ---------- */
+/* ---------- Add-widget dropdown (Reminders has a group submenu) ---------- */
 function AddWidgetMenu({ onAdd, onReset }) {
   const [open, setOpen] = useState(false)
+  const [sub, setSub] = useState(false)   // false | 'reminders'
+  const [groups, setGroups] = useState([])
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
   const ref = usePopover(open, setOpen)
-  const pick = (type) => { onAdd(type); setOpen(false) }
+  useEffect(() => { if (!open) { setSub(false); setAdding(false); setNewName('') } }, [open])
+  useEffect(() => {
+    if (sub !== 'reminders') return
+    tk('/labels').then((ls) => setGroups((Array.isArray(ls) ? ls : []).map((l) => l.title).filter(Boolean))).catch(() => {})
+  }, [sub])
+
+  const add = (type, group) => { onAdd(type, group); setOpen(false) }
   const reset = () => { onReset?.(); setOpen(false) }
+  const addNew = (e) => { e.preventDefault(); const g = newName.trim(); if (g) add('reminders', g) }
 
   return (
     <div style={{ position: 'relative' }} ref={ref}>
@@ -319,26 +336,52 @@ function AddWidgetMenu({ onAdd, onReset }) {
         <IconPlus size={16} /> Add widget <IconChevDown size={14} style={{ marginLeft: -2, opacity: 0.85 }} />
       </button>
       {open && (
-        <div
-          className="menu"
-          role="menu"
-          style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}
-        >
-          <div className="menu-label">Add a widget</div>
-          {WIDGET_MENU.map((m) => {
-            const I = m.icon
-            return (
-              <button key={m.type} className="menu-item" role="menuitem" onClick={() => pick(m.type)}>
-                <I size={16} /> {m.label}
-              </button>
-            )
-          })}
-          {onReset && (
+        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+          {!sub ? (
             <>
-              <div className="menu-sep" />
-              <button className="menu-item" role="menuitem" onClick={reset} style={{ color: 'var(--muted)' }}>
-                <IconRefresh size={15} /> Reset layout
+              <div className="menu-label">Add a widget</div>
+              {WIDGET_MENU.map((m) => {
+                const I = m.icon
+                return (
+                  <button key={m.type} className="menu-item" role="menuitem" onClick={() => (m.hasSub ? setSub(m.type) : add(m.type))} aria-haspopup={m.hasSub ? 'menu' : undefined}>
+                    <I size={16} /> {m.label}{m.hasSub && <IconChevR size={15} className="chev" />}
+                  </button>
+                )
+              })}
+              {onReset && (
+                <>
+                  <div className="menu-sep" />
+                  <button className="menu-item" role="menuitem" onClick={reset} style={{ color: 'var(--muted)' }}>
+                    <IconRefresh size={15} /> Reset layout
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <button className="menu-item" role="menuitem" onClick={() => { setSub(false); setAdding(false) }} style={{ color: 'var(--muted)' }}>
+                <IconChevL size={15} /> Reminders
               </button>
+              <div className="menu-sep" />
+              <div className="menu-label">Lock to which group?</div>
+              <button className="menu-item" role="menuitem" onClick={() => add('reminders', null)}>
+                <IconBell size={15} /> All groups
+              </button>
+              {groups.map((g) => (
+                <button key={g} className="menu-item" role="menuitem" onClick={() => add('reminders', g)}>
+                  <span className="pdot" style={{ background: 'var(--accent)', width: 9, height: 9 }} /> {g}
+                </button>
+              ))}
+              {!adding ? (
+                <button className="menu-item" role="menuitem" onClick={() => setAdding(true)} style={{ color: 'var(--accent)' }}>
+                  <IconPlus size={15} /> New group…
+                </button>
+              ) : (
+                <form className="menu-newgroup" onSubmit={addNew}>
+                  <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Group name" aria-label="New group name" />
+                  <button type="submit" className="iconbtn sm" aria-label="Create group widget"><IconPlus size={15} /></button>
+                </form>
+              )}
             </>
           )}
         </div>
@@ -376,5 +419,5 @@ function WidgetFrame({ type, title, onRemove, children }) {
 function titleFor(w) {
   if (w.type === 'upcoming') return 'Upcoming'
   if (w.type === 'calendar') return 'Calendar'
-  return 'Reminders'
+  return w.group || 'Reminders' // a group-locked reminders widget shows the group name
 }

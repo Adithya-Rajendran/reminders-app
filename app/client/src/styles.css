@@ -1147,6 +1147,9 @@ button.rem-head { display: flex; align-items: center; width: 100%; border: 0; cu
 button.rem-head:hover .g-title { color: var(--accent); }
 .rem-chev { transition: transform .15s ease; opacity: .6; flex: 0 0 auto; }
 .rem-chev.open { transform: rotate(90deg); }
+/* "New group…" inline input in the add-widget submenu */
+.menu-newgroup { display: flex; gap: 6px; align-items: center; padding: 4px 6px; }
+.menu-newgroup input { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; color: var(--text); }
 
 /* Calendar: trimmed toolbar when the widget is narrow. */
 .cal-compact .fc-toolbar-title { font-size: 14px; }
