@@ -94,6 +94,22 @@ export function authHeader(acc) {
   return 'Basic ' + Buffer.from(acc.username + ':' + dec(acc.password_enc)).toString('base64')
 }
 
+// Can the current user WRITE to this collection? Read-only/system calendars
+// (e.g. Nextcloud's "Contact birthdays") must never be offered as task lists —
+// creating a VTODO there fails with 403. We check current-user-privilege-set and
+// only treat write/write-content/bind as writable. Unknown → assume writable so
+// we never hide a real list on a server that doesn't report privileges.
+async function calendarWritable(acc, url) {
+  try {
+    const body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:current-user-privilege-set/></d:prop></d:propfind>'
+    const r = await safeFetch(url, { method: 'PROPFIND', headers: { Authorization: authHeader(acc), Depth: '0', 'Content-Type': 'application/xml' }, body })
+    if (!r.ok) return true
+    const t = await r.text()
+    if (!/current-user-privilege-set/i.test(t)) return true // server didn't report it
+    return /<[a-z0-9]*:?(write|write-content|bind)\b/i.test(t)
+  } catch { return true }
+}
+
 // ---- discovery: list VTODO-capable calendars and persist them ----
 async function discover(acc) {
   const client = await clientFor(acc)
@@ -106,7 +122,11 @@ async function discover(acc) {
   for (const c of vtodo) {
     const name = typeof c.displayName === 'string' ? c.displayName : (c.displayName?.['_'] || c.url)
     const comps = (c.components || []).map((x) => String(x).toUpperCase())
-    const supportsVtodo = comps.length === 0 || comps.includes('VTODO')
+    const vtodoCapable = comps.length === 0 || comps.includes('VTODO')
+    // A task list must be VTODO-capable AND writable. Read-only calendars stay
+    // discoverable (the calendar widget can still show their events) but are not
+    // offered as task projects.
+    const supportsVtodo = vtodoCapable && await calendarWritable(acc, c.url)
     const color = String(c.calendarColor || c.color || '')
     await upsertList(acc.id, { url: c.url, displayName: name, color, supportsVtodo })
   }

@@ -158,10 +158,14 @@ export async function createTask(req, res, next) {
     const base = resolved.list.url.endsWith('/') ? resolved.list.url : resolved.list.url + '/'
     const objectUrl = base + uid2 + '.ics'
     const put = await safeFetch(objectUrl, { method: 'PUT', headers: { Authorization: authHeader(resolved.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: vcal.toString() })
-    if (!put.ok && put.status !== 201 && put.status !== 204) throw new Error('create failed (' + put.status + ')')
+    if (!put.ok && put.status !== 201 && put.status !== 204) { const e = new Error('create failed (' + put.status + ')'); e.status = put.status; throw e }
     invalidate(uid)
     res.status(201).json(serializeVtodo(vt, resolved.list.id, objectUrl))
-  } catch (e) { console.error('caldav createTask failed:', e?.message || e); res.status(502).json({ error: 'could not create task' }) }
+  } catch (e) {
+    console.error('caldav createTask failed:', e?.message || e)
+    if (e.status === 403) return res.status(403).json({ error: 'That list is read-only — choose a writable list.' })
+    res.status(502).json({ error: 'could not create task' })
+  }
 }
 
 export async function patchTask(req, res, next) {

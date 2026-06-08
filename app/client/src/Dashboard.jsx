@@ -254,7 +254,7 @@ export default function Dashboard({ user, onOpenSettings }) {
                 <WidgetFrame type={w.type} title={titleFor(w, projects)} onRemove={() => removeWidget(w.i)}>
                   {w.type === 'tasklist' && <TaskListWidget projectId={w.projectId} />}
                   {w.type === 'upcoming' && <UpcomingWidget />}
-                  {w.type === 'reminders' && <RemindersWidget events={events} />}
+                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} />}
                   {w.type === 'calendar' && <CalendarWidget />}
                 </WidgetFrame>
               </div>

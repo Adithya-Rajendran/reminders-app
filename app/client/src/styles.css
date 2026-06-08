@@ -1132,3 +1132,9 @@ body {
 /* Reminders widget — a row pulses when its reminder fires live over SSE. */
 .reminding { border-radius: 10px; box-shadow: inset 3px 0 0 var(--accent); background: var(--accent-soft); animation: remPulse 1.4s ease-in-out 3; }
 @keyframes remPulse { 0%, 100% { background: var(--accent-soft); } 50% { background: transparent; } }
+
+/* Reminders quick-add: text input + a "when" chip + add button on one row. */
+.rem-add { gap: 7px; }
+.rem-add .due-chip { flex: 0 0 auto; white-space: nowrap; }
+.rem-add .iconbtn.sm { flex: 0 0 auto; }
+.rem-err { color: var(--danger); font-size: 12px; padding: 0 10px 8px; }
