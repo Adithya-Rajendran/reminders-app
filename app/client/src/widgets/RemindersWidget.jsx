@@ -6,7 +6,10 @@ import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import TaskRow from './TaskRow.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
-import { IconBell, IconClock, IconPlus } from '../icons.jsx'
+import { IconBell, IconClock, IconPlus, IconChevR } from '../icons.jsx'
+
+const COLLAPSE_KEY = 'reminders-collapsed-groups'
+const loadCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')) } catch { return new Set() } }
 
 function nextRemind(t) {
   const times = (t.reminders || []).map((r) => new Date(r.reminder).getTime()).filter((n) => !isNaN(n))
@@ -40,7 +43,15 @@ export default function RemindersWidget({ events, projects }) {
   const [pickOpen, setPickOpen] = useState(false)
   const [err, setErr] = useState('')
   const [knownGroups, setKnownGroups] = useState([])
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   const whenRef = useRef(null)
+
+  const toggleGroup = (key) => setCollapsed((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next])) } catch { /* ignore */ }
+    return next
+  })
 
   // Existing groups (CATEGORIES) for the autocomplete list.
   const loadGroups = useCallback(() => {
@@ -117,21 +128,28 @@ export default function RemindersWidget({ events, projects }) {
       {state === 'error' && <ErrorState onRetry={load} />}
       {state === 'ready' && (tasks.length === 0
         ? <EmptyState icon={IconBell} title="No reminders yet" sub={inboxId ? 'Type one above, add a group like “Work”, pick a time, and hit +.' : 'Connect a CalDAV account in Settings to add reminders.'} />
-        : groupKeys.map((g) => (
-            <div key={g || '__none'} className="rem-group-sec">
-              <div className="group-head">
+        : groupKeys.map((g) => {
+          const key = g || '__none'
+          const isCol = collapsed.has(key)
+          return (
+            <div key={key} className="rem-group-sec">
+              <button type="button" className="group-head rem-head" aria-expanded={!isCol} title={isCol ? 'Expand group' : 'Minimize group'} onClick={() => toggleGroup(key)}>
+                <IconChevR size={13} className={`rem-chev${isCol ? '' : ' open'}`} />
                 <span className="g-title">{g || 'No group'}</span>
                 <span className="g-count">{groups[g].length}</span>
-              </div>
-              <div className="task-stream">
-                {groups[g].map((task) => (
-                  <div key={task.id} className={fired.has(task.id) ? 'reminding' : ''}>
-                    <TaskRow task={task} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
-                  </div>
-                ))}
-              </div>
+              </button>
+              {!isCol && (
+                <div className="task-stream">
+                  {groups[g].map((task) => (
+                    <div key={task.id} className={fired.has(task.id) ? 'reminding' : ''}>
+                      <TaskRow task={task} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )))}
+          )
+        }))}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>
   )

@@ -36,6 +36,7 @@ export default function CalendarWidget() {
   const wrapRef = useRef(null)
   const [accounts, setAccounts] = useState([])
   const [modal, setModal] = useState(null) // null | { mode, key, initial }
+  const [compact, setCompact] = useState(false) // narrow widget → trim the toolbar
 
   // Enabled CalDAV lists, flattened, for the create-modal <select>.
   const calendars = useMemo(() => {
@@ -53,14 +54,25 @@ export default function CalendarWidget() {
     api('/api/caldav/accounts').then((r) => setAccounts(r.accounts || [])).catch(() => {})
   }, [])
 
-  // Keep FullCalendar's internal sizing in sync with the resizable widget frame.
+  // Keep FullCalendar's internal sizing in sync with the resizable widget frame,
+  // and collapse the header toolbar (view switcher) when the widget gets narrow.
   useEffect(() => {
     const el = wrapRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(() => calRef.current?.getApi().updateSize())
+    const ro = new ResizeObserver((entries) => {
+      calRef.current?.getApi().updateSize()
+      const w = entries[0]?.contentRect?.width || el.clientWidth
+      setCompact(w < 480)
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // Below ~480px the four view buttons wrap and crowd the calendar — drop them
+  // (and "today") so only prev/next + the month title remain.
+  const headerToolbar = compact
+    ? { left: 'prev,next', center: 'title', right: 'today' }
+    : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
 
   const refetch = () => calRef.current?.getApi().refetchEvents()
 
@@ -181,12 +193,12 @@ export default function CalendarWidget() {
   }
 
   return (
-    <div className="cal-wrap" ref={wrapRef}>
+    <div className={`cal-wrap${compact ? ' cal-compact' : ''}`} ref={wrapRef}>
       <FullCalendar
         ref={calRef}
         plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }}
+        headerToolbar={headerToolbar}
         buttonText={{ today: 'Today', month: 'Month', week: 'Week', day: 'Day', list: 'Agenda' }}
         height="100%"
         selectable
