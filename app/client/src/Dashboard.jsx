@@ -12,8 +12,13 @@ import {
 
 const Grid = WidthProvider(Responsive)
 const DASH = 'main'
-const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }
+// Doubled columns (vs the old 12/10/6/4/2) so widgets resize in finer, ~half-column
+// steps — on wide screens the old columns were too coarse. GRID_V bumps when this
+// changes so older saved layouts get scaled to match.
+const COLS = { lg: 24, md: 20, sm: 12, xs: 8, xxs: 4 }
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
+const GRID_V = 2
+const W_DEFAULT = 8 // a default widget spans ~1/3 at lg (8 of 24)
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -41,8 +46,16 @@ function buildDefault() {
     { i: newId(), type: 'calendar' },
   ]
   const lay = {}
-  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * 4) % COLS[bp], y: 0, w: 4, h: 9 }))
+  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * W_DEFAULT) % COLS[bp], y: 0, w: W_DEFAULT, h: 9 }))
   return { widgets: def, layouts: lay }
+}
+
+// Scale a saved layout's x/w by a factor when the column count changes (heights
+// are left alone). Used to upgrade old 12-column layouts to the new 24-column grid.
+function scaleLayouts(layouts, f) {
+  const out = {}
+  for (const bp of Object.keys(layouts || {})) out[bp] = (layouts[bp] || []).map((it) => ({ ...it, x: Math.round((it.x || 0) * f), w: Math.max(2, Math.round((it.w || 1) * f)) }))
+  return out
 }
 
 /* close a popover on outside-click + Esc */
@@ -88,15 +101,19 @@ export default function Dashboard({ user, onOpenSettings }) {
       try { saved = await api('/api/layouts/' + DASH) } catch { /* none */ }
       if (saved?.layout) {
         // Any persisted layout is authoritative — but drop retired widget types
-        // (e.g. the old tasklist/caldav widgets) and persist the cleanup.
+        // (e.g. the old tasklist/caldav widgets), and scale a pre-24-column layout
+        // up to the new grid. Persist whichever cleanup happened so it sticks.
         const original = saved.layout.widgets || []
         const sw = original.filter((w) => KNOWN_TYPES.has(w.type))
+        let lay = saved.layout.layouts || {}
+        const needsGrid = saved.layout.gridV !== GRID_V
+        if (needsGrid) lay = scaleLayouts(lay, 2) // 12 → 24 columns
         setWidgets(sw)
-        setLayouts(saved.layout.layouts || {})
-        if (sw.length !== original.length) {
+        setLayouts(lay)
+        if (sw.length !== original.length || needsGrid) {
           api('/api/layouts/' + DASH, {
             method: 'PUT',
-            body: JSON.stringify({ layout: { version: 1, widgets: sw, layouts: saved.layout.layouts || {} } }),
+            body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),
           }).catch(() => {})
         }
       } else {
@@ -140,7 +157,7 @@ export default function Dashboard({ user, onOpenSettings }) {
     saveTimer.current = setTimeout(() => {
       api('/api/layouts/' + DASH, {
         method: 'PUT',
-        body: JSON.stringify({ layout: { version: 1, widgets: nextWidgets, layouts: nextLayouts } }),
+        body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: nextLayouts } }),
       }).catch(() => {})
     }, 600)
   }, [loaded])
@@ -159,7 +176,7 @@ export default function Dashboard({ user, onOpenSettings }) {
       const items = nextLayouts[bp] || []
       // Place below existing items with a finite y (avoid persisting Infinity -> null).
       const y = items.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0)
-      nextLayouts[bp] = [...items, { i: w.i, x: 0, y, w: 4, h: 8 }]
+      nextLayouts[bp] = [...items, { i: w.i, x: 0, y, w: W_DEFAULT, h: 9 }]
     }
     setWidgets(nextWidgets)
     setLayouts(nextLayouts)

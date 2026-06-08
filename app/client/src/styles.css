@@ -1152,3 +1152,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cal-compact .fc-toolbar-title { font-size: 14px; }
 .cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
 .cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
+
+/* Cap + center the dashboard so the grid columns don't stretch absurdly wide on
+   ultra-wide (1440p+) screens. The grid measures .grid-wrap, so this also keeps
+   per-column widths sane and resizing usefully fine. */
+.toolbar, .grid-wrap { width: 100%; max-width: 1800px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
