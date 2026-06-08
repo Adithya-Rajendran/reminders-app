@@ -1142,3 +1142,13 @@ body {
 .rem-add .iconbtn.sm { flex: 0 0 auto; }
 .rem-err { color: var(--danger); font-size: 12px; padding: 0 10px 8px; }
 .rem-group-sec + .rem-group-sec { margin-top: 6px; }
+/* collapsible group header (minimize tab) */
+button.rem-head { display: flex; align-items: center; width: 100%; border: 0; cursor: pointer; font: inherit; z-index: 1; }
+button.rem-head:hover .g-title { color: var(--accent); }
+.rem-chev { transition: transform .15s ease; opacity: .6; flex: 0 0 auto; }
+.rem-chev.open { transform: rotate(90deg); }
+
+/* Calendar: trimmed toolbar when the widget is narrow. */
+.cal-compact .fc-toolbar-title { font-size: 14px; }
+.cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
+.cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
