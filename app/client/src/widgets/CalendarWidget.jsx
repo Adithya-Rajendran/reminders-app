@@ -67,19 +67,19 @@ export default function CalendarWidget() {
   // Refetch when any other widget mutates a task, so the calendar stays in sync.
   useEffect(() => onTasksChanged(() => calRef.current?.getApi().refetchEvents()), [])
 
-  // ---- merged event source: local tasks + CalDAV VTODOs + CalDAV events ----
+  // ---- merged event source: reminders/tasks (once) + CalDAV events ----
   const loadEvents = useCallback((info, success, failure) => {
     const start = info.startStr, end = info.endStr
     Promise.allSettled([
       tk('/tasks?sort_by=due_date&order_by=asc&per_page=100'),
-      api('/api/caldav/tasks'),
       api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
-    ]).then(([taskRes, ctRes, evRes]) => {
+    ]).then(([taskRes, evRes]) => {
       const out = []
-      // (a) local tasks — green, draggable to reschedule
+      // (a) reminders/tasks with a date — shown once, draggable to reschedule.
+      // (Single source: /api/tasks IS the CalDAV store, so no separate VTODO feed.)
       if (taskRes.status === 'fulfilled') {
         for (const t of (Array.isArray(taskRes.value) ? taskRes.value : [])) {
-          if (!t.due_date || t.due_date === ZERO_DATE) continue
+          if (t.done || !t.due_date || t.due_date === ZERO_DATE) continue
           out.push({
             id: 'task-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: true,
             classNames: ['cal-task', 'cal-task-local'],
@@ -87,18 +87,7 @@ export default function CalendarWidget() {
           })
         }
       }
-      // (b) CalDAV VTODOs — amber, read-only
-      if (ctRes.status === 'fulfilled') {
-        for (const t of (ctRes.value?.tasks || [])) {
-          if (!t.due) continue
-          out.push({
-            id: 'ct-' + t.objectUrl, title: t.summary, start: t.due, allDay: false, editable: false,
-            classNames: ['cal-task', 'cal-task-caldav'],
-            extendedProps: { kind: 'task', source: 'caldav', objectUrl: t.objectUrl, accountId: t.accountId, done: !!t.done },
-          })
-        }
-      }
-      // (c) CalDAV events — indigo, editable
+      // (b) CalDAV events — indigo, editable
       if (evRes.status === 'fulfilled') {
         for (const e of (evRes.value?.events || [])) {
           out.push({

@@ -1133,8 +1133,12 @@ body {
 .reminding { border-radius: 10px; box-shadow: inset 3px 0 0 var(--accent); background: var(--accent-soft); animation: remPulse 1.4s ease-in-out 3; }
 @keyframes remPulse { 0%, 100% { background: var(--accent-soft); } 50% { background: transparent; } }
 
-/* Reminders quick-add: text input + a "when" chip + add button on one row. */
-.rem-add { gap: 7px; }
+/* Reminders quick-add: text + group + "when" chip + add button (wraps if narrow). */
+.rem-add { gap: 7px; flex-wrap: wrap; }
+.rem-add .rem-text { flex: 1 1 130px; min-width: 0; }
+.rem-add input.rem-group { flex: 0 1 94px; min-width: 60px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
+.rem-add input.rem-group::placeholder { color: var(--faint); }
 .rem-add .due-chip { flex: 0 0 auto; white-space: nowrap; }
 .rem-add .iconbtn.sm { flex: 0 0 auto; }
 .rem-err { color: var(--danger); font-size: 12px; padding: 0 10px 8px; }
+.rem-group-sec + .rem-group-sec { margin-top: 6px; }

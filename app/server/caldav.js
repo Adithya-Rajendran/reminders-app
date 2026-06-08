@@ -121,14 +121,13 @@ function calendarHome(calendars) {
   return u ? u.replace(/\/[^/]+\/?$/, '/') : null
 }
 
-// Create a dedicated VTODO "Tasks" calendar via MKCALENDAR. Used when an account
-// has no writable task list of its own (e.g. only event-only calendars), so the
-// task app has somewhere to put tasks. Idempotent (405 = already exists).
-async function createTaskCalendar(acc, home) {
-  const url = home + 'reminders-tasks/'
+// Create the app's dedicated VTODO "Reminders" calendar via MKCALENDAR — the
+// single default list reminders go to. Idempotent (405 = already exists).
+async function createRemindersCalendar(acc, home) {
+  const url = home + 'reminders/'
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + '<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop>'
-    + '<D:displayname>Tasks</D:displayname>'
+    + '<D:displayname>Reminders</D:displayname>'
     + '<C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set>'
     + '</D:prop></D:set></C:mkcalendar>'
   try {
@@ -138,6 +137,7 @@ async function createTaskCalendar(acc, home) {
     return null
   } catch (e) { console.error('MKCALENDAR error:', e?.message || e); return null }
 }
+const isRemindersList = (name) => /^reminders$/i.test(String(name || '').trim())
 
 // ---- discovery: list VTODO-capable calendars and persist them ----
 async function discover(acc) {
@@ -148,7 +148,7 @@ async function discover(acc) {
     // Keep task (VTODO) AND event (VEVENT) calendars, so the calendar widget can use them.
     return comps.length === 0 || comps.includes('VTODO') || comps.includes('VEVENT')
   })
-  let anyVtodo = false
+  let remindersExists = false
   for (const c of vtodo) {
     const name = typeof c.displayName === 'string' ? c.displayName : (c.displayName?.['_'] || c.url)
     const comps = (c.components || []).map((x) => String(x).toUpperCase())
@@ -157,17 +157,17 @@ async function discover(acc) {
     // calendar). Read-only calendars stay discoverable (the calendar widget can
     // still show their events) but are not offered as task projects.
     const supportsVtodo = vtodoCapable && !isReadOnlySystemCalendar(c.url) && await calendarWritable(acc, c.url)
-    if (supportsVtodo) anyVtodo = true
+    if (supportsVtodo && isRemindersList(name)) remindersExists = true
     const color = String(c.calendarColor || c.color || '')
     await upsertList(acc.id, { url: c.url, displayName: name, color, supportsVtodo })
   }
   await pruneLists(acc.id, vtodo.map((c) => c.url)) // drop lists that no longer exist
-  // No writable task list? Create a "Tasks" (VTODO) calendar so the app works.
-  if (!anyVtodo) {
+  // Ensure the app's single default "Reminders" (VTODO) calendar exists.
+  if (!remindersExists) {
     const home = calendarHome(calendars)
     if (home) {
-      const url = await createTaskCalendar(acc, home)
-      if (url) await upsertList(acc.id, { url, displayName: 'Tasks', color: '', supportsVtodo: true })
+      const url = await createRemindersCalendar(acc, home)
+      if (url) await upsertList(acc.id, { url, displayName: 'Reminders', color: '', supportsVtodo: true })
     }
   }
   return listsForAccount(acc.id)

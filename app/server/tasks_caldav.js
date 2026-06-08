@@ -98,7 +98,8 @@ export async function listProjects(req, res, next) {
   try {
     const uid = req.session.user.sub
     const lists = (await listsWithId(uid)).filter((l) => l.supports_vtodo && l.enabled)
-    const inboxId = lists.length ? lists[0].id : null // lowest id (ORDER BY l.id)
+    // The "Reminders" calendar is the default; else the first list.
+    const inboxId = (lists.find((l) => /^reminders$/i.test(String(l.display_name || '').trim())) || lists[0])?.id ?? null
     res.json(lists.map((l) => ({ id: l.id, title: l.display_name || l.url, hex_color: l.color || '', is_inbox: l.id === inboxId, description: '', parent_project_id: 0 })))
   } catch (e) { next(e) }
 }
