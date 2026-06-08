@@ -36,7 +36,7 @@ export default function CalendarWidget() {
   const wrapRef = useRef(null)
   const [accounts, setAccounts] = useState([])
   const [modal, setModal] = useState(null) // null | { mode, key, initial }
-  const [compact, setCompact] = useState(false) // narrow widget → trim the toolbar
+  const [size, setSize] = useState('full') // 'full' | 'compact' | 'mini' — by widget width
 
   // Enabled CalDAV lists, flattened, for the create-modal <select>.
   const calendars = useMemo(() => {
@@ -62,15 +62,16 @@ export default function CalendarWidget() {
     const ro = new ResizeObserver((entries) => {
       calRef.current?.getApi().updateSize()
       const w = entries[0]?.contentRect?.width || el.clientWidth
-      setCompact(w < 480)
+      setSize(w < 360 ? 'mini' : w < 540 ? 'compact' : 'full')
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
-  // Below ~480px the four view buttons wrap and crowd the calendar — drop them
-  // (and "today") so only prev/next + the month title remain.
-  const headerToolbar = compact
+  // As the widget narrows, first shrink the toolbar (compact CSS) so the view
+  // buttons fit on one row and stay out of the way; only when it's really small
+  // (<360px) drop the view switcher entirely, leaving prev/next + the title.
+  const headerToolbar = size === 'mini'
     ? { left: 'prev,next', center: 'title', right: 'today' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
 
@@ -193,7 +194,7 @@ export default function CalendarWidget() {
   }
 
   return (
-    <div className={`cal-wrap${compact ? ' cal-compact' : ''}`} ref={wrapRef}>
+    <div className={`cal-wrap${size !== 'full' ? ' cal-compact' : ''}`} ref={wrapRef}>
       <FullCalendar
         ref={calRef}
         plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
