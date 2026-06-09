@@ -29,25 +29,38 @@ const folderKids = (node) => Object.values(node.children).sort((a, b) => a.name.
 const noteKids = (node) => (node.notes || []).slice().sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
 const countNotes = (node) => (node.notes || []).length + folderKids(node).reduce((s, c) => s + countNotes(c), 0)
 
-function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onOpen }) {
+function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onOpen, dnd }) {
   return (
     <>
       {folderKids(node).map((f) => {
         const isOpen = expanded.has(f.path)
         return (
           <React.Fragment key={f.path}>
-            <div className={`tree-row${sel === f.path ? ' sel' : ''}`} style={{ paddingLeft: 6 + depth * 13 }} onClick={() => { onSelect(f.path); onToggle(f.path) }} title={f.path}>
+            <div
+              className={`tree-row${sel === f.path ? ' sel' : ''}${dnd.over === f.path ? ' drag-over' : ''}`}
+              style={{ paddingLeft: 6 + depth * 13 }}
+              draggable onDragStart={dnd.folderStart(f)} onDragEnd={dnd.end}
+              onDragOver={dnd.folderOver(f.path)} onDrop={dnd.folderDrop(f.path)}
+              onClick={() => { onSelect(f.path); onToggle(f.path) }} title={f.path}
+            >
               <IconChevR size={12} className={`tree-chev${isOpen ? ' open' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(f.path) }} />
               <IconFolder size={13} />
               <span className="tree-name">{f.name}</span>
               <span className="tree-count">{countNotes(f)}</span>
             </div>
-            {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} />}
+            {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} dnd={dnd} />}
           </React.Fragment>
         )
       })}
       {noteKids(node).map((n) => (
-        <div key={n.path} className={`tree-row tree-note${active === n.path ? ' active' : ''}`} style={{ paddingLeft: 6 + depth * 13 + 16 }} onClick={() => onOpen(n.path)} title={n.title}>
+        <div
+          key={n.path}
+          className={`tree-row tree-note${active === n.path ? ' active' : ''}`}
+          style={{ paddingLeft: 6 + depth * 13 + 16 }}
+          draggable onDragStart={dnd.noteStart(n)} onDragEnd={dnd.end}
+          onDragOver={dnd.noteOver} onDrop={dnd.noteDrop}
+          onClick={() => onOpen(n.path)} title={n.title}
+        >
           <IconNote size={13} />
           <span className="tree-name">{n.title}</span>
           {(n.tags || []).slice(0, 2).map((t) => <span key={t} className="note-tag mini">#{t}</span>)}
@@ -71,6 +84,8 @@ export default function NotesWidget({ onOpenSettings }) {
   const [openPath, setOpenPath] = useState(null)
   const [folderPrompt, setFolderPrompt] = useState(false)
   const [narrow, setNarrow] = useState(false)
+  const [dragItem, setDragItem] = useState(null) // { type:'note'|'folder', path, folder? }
+  const [overTarget, setOverTarget] = useState(null) // destination folder rel path ('' = root) | null
 
   // Track widget width so the layout can collapse to one column when small.
   const roRef = useRef(null)
@@ -103,6 +118,43 @@ export default function NotesWidget({ onOpenSettings }) {
 
   const newNote = async () => {
     try { const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
+  }
+
+  // ---- drag & drop: move a note (or folder) into a folder, or out to the root ----
+  const folderParent = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
+  const canDrop = (target) => { // target = destination folder rel path ('' = root)
+    const d = dragItem; if (!d) return false
+    if (d.type === 'note') return (d.folder || '') !== target
+    return target !== d.path && !target.startsWith(d.path + '/') && folderParent(d.path) !== target
+  }
+  const doDrop = async (target) => {
+    const d = dragItem; setDragItem(null); setOverTarget(null)
+    if (!d || !canDrop(target)) return
+    try {
+      if (d.type === 'note') {
+        const r = await notesApi.move(d.path, target)
+        if (openPath === d.path && r?.path) setOpenPath(r.path)
+      } else {
+        const openNote = notes.find((n) => n.path === openPath)
+        const insideMoved = openNote && ((openNote.folder || '') === d.path || (openNote.folder || '').startsWith(d.path + '/'))
+        await notesApi.moveFolder(d.path, target)
+        if (insideMoved) setOpenPath(null) // the note's path changed — reopen it from the tree
+      }
+      if (target) expandAncestors(target)
+      await load()
+    } catch { /* ignore */ }
+  }
+  const dnd = {
+    over: overTarget,
+    noteStart: (n) => (e) => { setDragItem({ type: 'note', path: n.path, folder: n.folder || '' }); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', n.path) } catch { /* ignore */ } },
+    folderStart: (f) => (e) => { e.stopPropagation(); setDragItem({ type: 'folder', path: f.path }); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', f.path) } catch { /* ignore */ } },
+    folderOver: (path) => (e) => { if (canDrop(path)) { e.preventDefault(); e.stopPropagation(); if (overTarget !== path) setOverTarget(path) } },
+    folderDrop: (path) => (e) => { e.preventDefault(); e.stopPropagation(); doDrop(path) },
+    noteOver: (e) => { e.stopPropagation() }, // notes aren't drop targets — don't bubble to the root zone
+    noteDrop: (e) => { e.preventDefault(); e.stopPropagation() },
+    rootOver: (e) => { if (canDrop('')) { e.preventDefault(); if (overTarget !== '') setOverTarget('') } },
+    rootDrop: (e) => { e.preventDefault(); doDrop('') },
+    end: () => { setDragItem(null); setOverTarget(null) },
   }
   const createFolder = async (name) => {
     setFolderPrompt(false)
@@ -150,20 +202,28 @@ export default function NotesWidget({ onOpenSettings }) {
                 : allTags.slice(0, 12).map((t) => <button key={t} className="note-tag" onClick={() => setTag(t)}>#{t}</button>)}
             </div>
           )}
-          <div className="notes-tree">
+          <div
+            className={`notes-tree${overTarget === '' && dragItem ? ' drag-over-root' : ''}`}
+            onDragOver={dnd.rootOver} onDrop={dnd.rootDrop}
+          >
             {notes.length === 0
               ? <EmptyState icon={IconNote} title="No notes yet" sub="Create your first note with the ＋ above." />
               : searching
                 ? (matches.length === 0
                     ? <div className="note-empty-q">No matching notes.</div>
                     : matches.map((n) => (
-                        <div key={n.path} className={`tree-row tree-note${openPath === n.path ? ' active' : ''}`} style={{ paddingLeft: 8 }} onClick={() => setOpenPath(n.path)} title={n.title}>
+                        <div
+                          key={n.path} className={`tree-row tree-note${openPath === n.path ? ' active' : ''}`} style={{ paddingLeft: 8 }}
+                          draggable onDragStart={dnd.noteStart(n)} onDragEnd={dnd.end}
+                          onDragOver={dnd.noteOver} onDrop={dnd.noteDrop}
+                          onClick={() => setOpenPath(n.path)} title={n.title}
+                        >
                           <IconNote size={13} />
                           <span className="tree-name">{n.title}</span>
                           {n.folder && <span className="tree-note-folder">{n.folder}</span>}
                         </div>
                       )))
-                : <TreeLevel node={tree} depth={0} sel={sel} active={openPath} expanded={expanded} onSelect={setSel} onToggle={toggleExpand} onOpen={setOpenPath} />}
+                : <TreeLevel node={tree} depth={0} sel={sel} active={openPath} expanded={expanded} onSelect={setSel} onToggle={toggleExpand} onOpen={setOpenPath} dnd={dnd} />}
           </div>
         </aside>
       )}

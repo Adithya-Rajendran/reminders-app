@@ -203,6 +203,11 @@ app.post('/api/notes/move', requireAuth, async (req, res, next) => {
   if (!path) return res.status(400).json({ error: 'path required' })
   try { res.json(await notes.moveNote(req.session.user.sub, path, folder || '')) } catch (e) { next(e) }
 })
+app.post('/api/notes/move-folder', requireAuth, async (req, res, next) => {
+  const { from, to } = req.body || {}
+  if (!from) return res.status(400).json({ error: 'from required' })
+  try { res.json(await notes.moveFolder(req.session.user.sub, from, to || '')) } catch (e) { next(e) }
+})
 app.delete('/api/notes/item', requireAuth, async (req, res, next) => {
   const path = req.query.path || req.body?.path
   if (!path) return res.status(400).json({ error: 'path required' })
