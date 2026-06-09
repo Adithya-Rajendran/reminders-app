@@ -1,20 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
+import { usePopover } from '../usePopover.js'
 import { IconTrash, IconBell } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
-
-function usePopover(open, setOpen) {
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
-  }, [open, setOpen])
-  return ref
-}
 
 const ClockMini = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

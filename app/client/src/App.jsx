@@ -1,29 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
+import { usePopover } from './usePopover.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette,
 } from './icons.jsx'
 import { ACCENTS, applyAccent } from './accents.js'
-
-/* close a popover on outside-click + Esc */
-function usePopover(open, setOpen) {
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open, setOpen])
-  return ref
-}
 
 function initialsFor(user) {
   const name = (user?.name || '').trim()

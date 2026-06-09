@@ -25,8 +25,10 @@ tests. Keep all four green. Lint is warning-free — don't add new warnings.
 app/client/src/
   main.jsx, App.jsx        # bootstrap, auth gate, top bar, dashboard tabs
   Dashboard.jsx            # generic widget grid (react-grid-layout) — widget-agnostic
-  widgets/registry.jsx     # THE widget registry: every widget is declared here
+  dashlayout.js            # pure grid math (cols, scaling, placement) — node-tested
+  widgets/registry.jsx     # THE widget registry: every widget is declared here (lazy chunks)
   widgets/*.jsx            # one file per widget + shared parts (TaskRow, parts.jsx)
+  usePopover.js            # shared outside-click/Esc popover hook
   api.js                   # fetch helpers (api/tk/notesApi), 401 -> login redirect
   useTasks.js, tasklib.js  # task-list hook (optimistic updates + undo), task utils
   tasksbus.js              # cross-widget "tasks changed" event bus

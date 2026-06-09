@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
+import { SkeletonRows } from './widgets/parts.jsx'
+import {
+  COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
+  scaleLayouts, defaultLayouts, appendToLayouts,
+} from './dashlayout.js'
+import { usePopover } from './usePopover.js'
 import { GroupList } from './GroupPicker.jsx'
 import { recentGroups } from './groups.js'
 import {
@@ -11,21 +17,10 @@ import {
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
-// Fine-grained columns (= the original 12/10/6/4/2 × 2.5) so widgets resize in
-// small steps and don't feel too coarse on wide screens. Because every breakpoint
-// is the same multiple of the original, any older saved layout scales up by a
-// single factor (see SCALE_TO_CURRENT). GRID_V bumps when these change.
-const COLS = { lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
-const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
-const GRID_V = 3
-// Multiply a saved layout's x/w by this to reach the current grid, keyed by the
-// layout's stored gridV (1 = old 12-col, 2 = 24-col, 3 = current 30-col).
-const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1 }
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-const DEFAULT_SIZE = { w: 10, h: 9 } // a default widget spans ~1/3 at lg (10 of 30)
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
 const newId = () => 'w-' + crypto.randomUUID()
@@ -33,42 +28,7 @@ const newId = () => 'w-' + crypto.randomUUID()
 // A clean default dashboard (DEFAULT_BOARD in the registry), placed left to right.
 function buildDefault() {
   const def = DEFAULT_BOARD.map((type) => ({ i: newId(), type }))
-  const lay = {}
-  for (const bp of Object.keys(COLS)) {
-    let x = 0
-    lay[bp] = def.map((w) => {
-      const s = sizeFor(w.type)
-      const item = { i: w.i, x: x % COLS[bp], y: 0, w: s.w, h: s.h }
-      x += s.w
-      return item
-    })
-  }
-  return { widgets: def, layouts: lay }
-}
-
-// Scale a saved layout's x/w by a factor when the column count changes (heights
-// are left alone). Used to upgrade old 12-column layouts to the new 24-column grid.
-function scaleLayouts(layouts, f) {
-  const out = {}
-  for (const bp of Object.keys(layouts || {})) out[bp] = (layouts[bp] || []).map((it) => ({ ...it, x: Math.round((it.x || 0) * f), w: Math.max(2, Math.round((it.w || 1) * f)) }))
-  return out
-}
-
-/* close a popover on outside-click + Esc */
-function usePopover(open, setOpen) {
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open, setOpen])
-  return ref
+  return { widgets: def, layouts: defaultLayouts(def, sizeFor) }
 }
 
 export default function Dashboard({ onOpenSettings, dashboardId = 'main', title }) {
@@ -169,15 +129,8 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     // For a group-aware widget (registry pickGroup), `group` locks it to one
     // group (null = all groups).
     const w = { i: newId(), type, group: group || undefined }
-    const s = sizeFor(type)
     const nextWidgets = [...widgets, w]
-    const nextLayouts = { ...layouts }
-    for (const bp of Object.keys(COLS)) {
-      const items = nextLayouts[bp] || []
-      // Place below existing items with a finite y (avoid persisting Infinity -> null).
-      const y = items.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0)
-      nextLayouts[bp] = [...items, { i: w.i, x: 0, y, w: s.w, h: s.h }]
-    }
+    const nextLayouts = appendToLayouts(layouts, w.i, sizeFor(type))
     setWidgets(nextWidgets)
     setLayouts(nextLayouts)
     persist(nextWidgets, nextLayouts)
@@ -396,7 +349,10 @@ function WidgetFrame({ type, title, onRemove, children }) {
           </button>
         </span>
       </div>
-      <div className="widget-body">{children}</div>
+      <div className="widget-body">
+        {/* widgets are lazy (see registry.jsx) — show a skeleton while a chunk loads */}
+        <Suspense fallback={<SkeletonRows n={4} />}>{children}</Suspense>
+      </div>
     </div>
   )
 }

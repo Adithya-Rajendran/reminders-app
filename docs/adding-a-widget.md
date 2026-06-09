@@ -45,7 +45,7 @@ Conventions worth reusing:
 Append an entry to `WIDGETS` in `app/client/src/widgets/registry.jsx`:
 
 ```jsx
-import ClockWidget from './ClockWidget.jsx'
+const ClockWidget = lazy(() => import('./ClockWidget.jsx')) // next to the other lazy() lines
 // ...
 {
   type: 'clock',            // stable id, persisted in layouts — never rename/reuse
@@ -61,6 +61,11 @@ import ClockWidget from './ClockWidget.jsx'
 
 That's it — the widget appears in the "Add widget" menu, renders in the grid,
 persists in saved layouts, and gets a frame with your icon and title.
+
+The `lazy()` import makes the widget its own build chunk, fetched the first
+time it's on a board — heavy dependencies don't bloat the initial bundle. The
+widget frame provides the `<Suspense>` boundary (a skeleton shows while the
+chunk loads), so there's nothing extra to do.
 
 Notes on the entry:
 
