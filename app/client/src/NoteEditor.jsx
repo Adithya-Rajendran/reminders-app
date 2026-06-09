@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import ModalFrame from './ModalFrame.jsx'
 import { notesApi } from './api.js'
 import { IconX, IconTrash, IconSpinner, IconCheck } from './icons.jsx'
 
@@ -74,10 +74,9 @@ export default function NoteEditor({ path: initialPath, onClose }) {
     try { await notesApi.del(path); onClose?.() } catch { setSaving('error') } // keep open on failure
   }
 
-  return createPortal(
-    <div className="overlay note-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
-      <div className="note-editor" role="dialog" aria-modal="true" aria-label="Note editor">
-        <div className="note-edit-head">
+  return (
+    <ModalFrame overlayClass="note-overlay" modalClass="note-editor" ariaLabel="Note editor" onBackdrop={close}>
+      <div className="note-edit-head">
           <input
             className="note-title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={commitTitle}
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} placeholder="Untitled" aria-label="Note title"
@@ -97,8 +96,6 @@ export default function NoteEditor({ path: initialPath, onClose }) {
                 </Suspense>
               )}
         </div>
-      </div>
-    </div>,
-    document.body,
+    </ModalFrame>
   )
 }
