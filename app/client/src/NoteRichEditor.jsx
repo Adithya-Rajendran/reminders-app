@@ -69,7 +69,7 @@ export default function NoteRichEditor({ value, onChange }) {
   const onDrawingSave = async ({ json, png }) => {
     const ed = editorRef.current
     const id = drawing.id || crypto.randomUUID()
-    await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/json' }), 'application/json')
+    await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/octet-stream' }), 'application/octet-stream')
     await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
     const src = RES_PREFIX + id + '.excalidraw.png'
     if (drawing.id) {
