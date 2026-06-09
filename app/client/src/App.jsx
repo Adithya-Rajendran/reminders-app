@@ -208,7 +208,10 @@ export default function App() {
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
   const [theme, setTheme] = useState(() => localStorage.getItem('reminders-theme') || 'dark')
   const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || 'indigo')
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settings, setSettings] = useState(null) // null = closed | { createGroup? }
+  // Accepts an optional { createGroup } to open Settings with the group create form
+  // prefilled; called as a plain onClick handler elsewhere, so ignore event args.
+  const openSettings = (opts) => setSettings({ createGroup: opts && opts.createGroup ? String(opts.createGroup) : undefined })
   const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
   const [activeDash, setActiveDash] = useState('main')
 
@@ -291,7 +294,7 @@ export default function App() {
             onToggleTheme={toggleTheme}
             accent={accent}
             onAccent={setAccent}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={openSettings}
           />
           <DashboardTabs
             dashboards={dashboards}
@@ -306,12 +309,12 @@ export default function App() {
             dashboardId={activeDash}
             title={(dashboards.find((d) => d.id === activeDash) || {}).name}
             user={user}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={openSettings}
           />
         </div>
       )}
 
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => setSettings(null)} />}
     </>
   )
 }

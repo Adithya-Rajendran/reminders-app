@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { tk } from '../api.js'
+import { tk, reminderGroups } from '../api.js'
 import { useTaskList } from '../useTasks.js'
 import { createTask, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
+import { recentGroups, pushRecentGroup } from '../groups.js'
+import GroupPicker from '../GroupPicker.jsx'
 import TaskRow from './TaskRow.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
@@ -24,7 +26,7 @@ const hasGroup = (t, g) => (t.labels || []).some((l) => (l.title || '') === g)
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
-export default function RemindersWidget({ events, projects, group }) {
+export default function RemindersWidget({ events, projects, group, onNewGroup }) {
   const inboxId = projects?.[0]?.id
   const loader = useCallback(async () => {
     const all = await tk('/tasks?per_page=200')
@@ -50,9 +52,10 @@ export default function RemindersWidget({ events, projects, group }) {
     return next
   })
 
-  // Existing groups for the quick-add autocomplete (only the all-groups view).
+  // Existing groups for the quick-add picker (only the all-groups view). Sourced
+  // from /api/reminder-groups so groups created in Settings (incl. empty ones) show.
   const loadGroups = useCallback(() => {
-    tk('/labels').then((ls) => setKnownGroups((Array.isArray(ls) ? ls : []).map((l) => l.title).filter(Boolean))).catch(() => {})
+    reminderGroups().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
   }, [])
   useEffect(() => { if (!group) loadGroups() }, [group, loadGroups])
   useEffect(() => (group ? undefined : onTasksChanged(loadGroups)), [group, loadGroups])
@@ -65,6 +68,7 @@ export default function RemindersWidget({ events, projects, group }) {
     const g = group || qaGroup.trim() // locked widget forces its group
     try {
       await createTask(inboxId, { title, due_date: when, reminders: [{ reminder: when }], ...(g ? { labels: [g] } : {}) })
+      if (g) pushRecentGroup(g)
       setWhen(defaultWhen()); emitTasksChanged(); load()
     } catch (e2) {
       setDraft(title)
@@ -79,6 +83,7 @@ export default function RemindersWidget({ events, projects, group }) {
 
   const chip = dueChip(when); const t = timeLabel(when)
   const allGroups = [...new Set([...knownGroups, ...tasks.map(groupOf).filter(Boolean)])].sort()
+  const recent = recentGroups().filter((g) => allGroups.includes(g))
 
   const row = (task) => (
     <div key={task.id} className={fired.has(task.id) ? 'reminding' : ''}>
@@ -90,7 +95,7 @@ export default function RemindersWidget({ events, projects, group }) {
   if (state === 'loading') body = <SkeletonRows />
   else if (state === 'error') body = <ErrorState onRetry={load} />
   else if (tasks.length === 0) {
-    body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, add a group like “Work”, pick a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
+    body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, pick a group and a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
   } else if (group) {
     body = <div className="task-stream">{tasks.map(row)}</div> // locked → flat list
   } else {
@@ -118,8 +123,16 @@ export default function RemindersWidget({ events, projects, group }) {
         <form className="add-row qa rem-add" onSubmit={add}>
           <IconBell size={16} />
           <input className="rem-text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={group ? `Add to ${group}…` : 'Remind me to…'} aria-label="Add a reminder" />
-          {!group && <input className="rem-group" list="rem-groups" value={qaGroup} onChange={(e) => setQaGroup(e.target.value)} placeholder="Group" aria-label="Group (optional)" />}
-          {!group && <datalist id="rem-groups">{allGroups.map((g) => <option key={g} value={g} />)}</datalist>}
+          {!group && (
+            <GroupPicker
+              value={qaGroup}
+              groups={allGroups}
+              recent={recent}
+              onChange={setQaGroup}
+              onNew={(name) => onNewGroup?.(name)}
+              neutral={{ label: 'No group', value: '' }}
+            />
+          )}
           <span className="inline-ctl">
             <button type="button" ref={whenRef} className="chip due-chip due-soon" aria-haspopup="dialog" title="When to remind me" onClick={() => setPickOpen((o) => !o)}>
               <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}
