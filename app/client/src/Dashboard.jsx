@@ -4,10 +4,11 @@ import { api, tk } from './api.js'
 import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
 import CalendarWidget from './widgets/CalendarWidget.jsx'
+import NotesWidget from './widgets/NotesWidget.jsx'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconClock, IconBell, IconCalendar, IconCloud,
-  IconX, IconInbox, IconRefresh,
+  IconX, IconInbox, IconRefresh, IconNote,
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
@@ -30,6 +31,7 @@ const TYPE_ICON = {
   upcoming: IconClock,
   reminders: IconBell,
   calendar: IconCalendar,
+  notes: IconNote,
 }
 const KNOWN_TYPES = new Set(Object.keys(TYPE_ICON))
 
@@ -37,6 +39,7 @@ const WIDGET_MENU = [
   { type: 'reminders', label: 'Reminders', icon: IconBell, hasSub: true },
   { type: 'upcoming', label: 'Upcoming', icon: IconClock },
   { type: 'calendar', label: 'Calendar', icon: IconCalendar },
+  { type: 'notes', label: 'Notes', icon: IconNote },
 ]
 
 const newId = () => 'w-' + crypto.randomUUID()
@@ -263,6 +266,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
                   {w.type === 'upcoming' && <UpcomingWidget />}
                   {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} group={w.group || null} />}
                   {w.type === 'calendar' && <CalendarWidget />}
+                  {w.type === 'notes' && <NotesWidget onOpenSettings={onOpenSettings} />}
                 </WidgetFrame>
               </div>
             ))}
@@ -418,5 +422,6 @@ function WidgetFrame({ type, title, onRemove, children }) {
 function titleFor(w) {
   if (w.type === 'upcoming') return 'Upcoming'
   if (w.type === 'calendar') return 'Calendar'
+  if (w.type === 'notes') return 'Notes'
   return w.group || 'Reminders' // a group-locked reminders widget shows the group name
 }

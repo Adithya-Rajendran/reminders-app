@@ -1173,3 +1173,37 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 18px; line-height: 1; cursor: pointer; transition: color .15s, border-color .15s; }
 .dash-tab-add:hover { color: var(--text); border-color: var(--accent); }
 @media (max-width: 720px) { .dash-tabs { padding-left: 16px; padding-right: 16px; } }
+
+/* ---------- Notes widget + editor ---------- */
+.notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.note-toolbar { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
+.note-search { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); font-size: 13px; outline: none; }
+.note-search:focus { border-color: var(--accent); }
+.note-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; min-height: 0; flex: 1; }
+.note-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; border-radius: 8px; padding: 8px; color: var(--text); cursor: pointer; }
+.note-row:hover { background: var(--accent-soft); }
+.note-row > .ic { color: var(--muted); flex: none; }
+.note-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.note-row-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-row-folder { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; }
+.note-row-date { font-size: 11px; color: var(--muted); flex: none; }
+.note-empty-q { color: var(--muted); font-size: 12px; padding: 12px; text-align: center; }
+
+.note-overlay { align-items: stretch; }
+.note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }
+.note-edit-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.note-title-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 18px; font-weight: 700; padding: 4px 2px; }
+.note-save-state { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.note-edit-body { flex: 1; min-height: 0; display: flex; }
+.note-textarea { flex: 1; width: 100%; resize: none; border: none; outline: none; background: var(--bg); color: var(--text); padding: 22px 26px; font-size: 15px; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.note-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+
+/* Notes-folder selector in Settings */
+.notes-cfg { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.notes-cfg-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; }
+.notes-cfg-sub { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+.notes-cfg-row { display: flex; gap: 8px; align-items: center; }
+.notes-cfg-row .input { flex: 1; }
+.notes-cfg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.notes-chip { background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.notes-chip.on, .notes-chip:hover { color: var(--text); border-color: var(--accent); }

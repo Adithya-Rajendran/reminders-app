@@ -84,6 +84,17 @@ export const IconList = (p) => (
     <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
   </Icon>
 )
+export const IconNote = (p) => (
+  <Icon {...p}>
+    <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V8z" />
+    <path d="M14 3v5h5M9 13h6M9 17h4" />
+  </Icon>
+)
+export const IconFolder = (p) => (
+  <Icon {...p}>
+    <path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+  </Icon>
+)
 export const IconSun = (p) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="4" />
