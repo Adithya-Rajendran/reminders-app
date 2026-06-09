@@ -12,6 +12,14 @@ export const RES = '_resources'
 const MD = 'text/markdown; charset=utf-8'
 const DEFAULT_ROOT = 'Notes'
 const VALID_RES_NAME_RE = /^[\w.-]{1,160}$/ // safe resource filename (no slashes / traversal)
+const MAX_TAGS = 30
+const cleanTags = (t) => [...new Set((Array.isArray(t) ? t : []).map((x) => String(x).trim().replace(/[#,]/g, '')).filter(Boolean))].slice(0, MAX_TAGS)
+
+// Short per-user cache for the (PROPFIND + read-per-note) listing, invalidated
+// on any write — same pattern as the CalDAV task store.
+const LIST_TTL = 15000
+const listCache = new Map() // userId -> { at, notes }
+const invalidate = (userId) => listCache.delete(userId)
 
 const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
 const join = (...p) => p.map(trimSlashes).filter(Boolean).join('/')
@@ -116,11 +124,14 @@ export async function createFolder(userId, folder) {
 }
 
 // ---- notes ----
-// Fast list via PROPFIND only (no file reads): title = filename, updated = mtime.
+// Walk the tree (PROPFIND) then read each note's front-matter for its tags, so
+// the widget can group by folder + filter by tag. Cached briefly per user.
 export async function listNotes(userId) {
   const c = await ctx(userId)
   if (!c) return null
-  const files = [] // PROPFIND-only; a missing root just yields an empty list (created on first write)
+  const cached = listCache.get(userId)
+  if (cached && Date.now() - cached.at < LIST_TTL) return cached.notes
+  const files = [] // a missing root just yields an empty list (created on first write)
   let folderCount = 0
   const walk = async (dir, depth) => {
     if (depth > 8 || folderCount > 400) return // bound a pathological tree
@@ -136,10 +147,15 @@ export async function listNotes(userId) {
     await Promise.all(subdirs.slice(0, 400).map((d) => walk(d, depth + 1))) // siblings in parallel
   }
   await walk(c.root, 0)
-  return files.map((f) => {
+  const notes = await Promise.all(files.map(async (f) => {
     const rel = trimSlashes(f.path).slice(c.root.length + 1)
-    return { path: trimSlashes(f.path), title: titleOf(f.path), folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', updated: f.mtime, etag: f.etag, size: f.size }
-  }).sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
+    let tags = []
+    try { tags = cleanTags(parseNote(await dav.readText(c.account, trimSlashes(f.path))).meta.tags) } catch { /* skip a failing read */ }
+    return { path: trimSlashes(f.path), title: titleOf(f.path), folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', tags, updated: f.mtime, etag: f.etag, size: f.size }
+  }))
+  notes.sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
+  listCache.set(userId, { at: Date.now(), notes })
+  return notes
 }
 
 export async function getNote(userId, path) {
@@ -149,7 +165,9 @@ export async function getNote(userId, path) {
   const f = await dav.read(c.account, trimSlashes(path))
   if (!f) return null
   const { meta, body } = parseNote(f.buffer.toString('utf8'))
-  return { path: trimSlashes(path), title: titleOf(path), meta, body, etag: f.etag }
+  const rel = trimSlashes(path).slice(c.root.length + 1)
+  const folder = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : ''
+  return { path: trimSlashes(path), title: titleOf(path), folder, meta, body, etag: f.etag }
 }
 
 export async function createNote(userId, { folder = '', title = 'Untitled' } = {}) {
@@ -164,10 +182,11 @@ export async function createNote(userId, { folder = '', title = 'Untitled' } = {
   const now = new Date().toISOString()
   const meta = { id: crypto.randomUUID(), created: now, updated: now }
   const w = await dav.write(c.account, path, serializeNote(meta, ''), { contentType: MD, ifNoneMatch: '*' })
+  invalidate(userId)
   return { path, title: name, meta, body: '', etag: w.etag }
 }
 
-export async function saveNote(userId, path, { body = '', etag } = {}) {
+export async function saveNote(userId, path, { body = '', etag, tags } = {}) {
   const c = await ctx(userId)
   if (!c) throw err('notes not configured', 409)
   if (!inRoot(c.root, path)) throw err('bad path', 400)
@@ -176,8 +195,10 @@ export async function saveNote(userId, path, { body = '', etag } = {}) {
   let meta = { id: crypto.randomUUID(), created: new Date().toISOString() }
   if (existing) meta = { ...meta, ...parseNote(existing.buffer.toString('utf8')).meta }
   meta.updated = new Date().toISOString()
+  if (tags !== undefined) { const t = cleanTags(tags); if (t.length) meta.tags = t; else delete meta.tags }
   try {
     const w = await dav.write(c.account, rel, serializeNote(meta, body), { contentType: MD, ifMatch: etag || existing?.etag || undefined })
+    invalidate(userId)
     return { path: rel, meta, etag: w.etag }
   } catch (e) {
     if (e.status === 412) throw err('This note changed elsewhere — reload before saving.', 409)
@@ -195,7 +216,25 @@ export async function renameNote(userId, path, newTitle) {
   let target = join(dir, base + '.md')
   for (let n = 2; target !== rel && await dav.exists(c.account, target); n++) target = join(dir, `${base} ${n}.md`)
   if (target !== rel) await dav.move(c.account, rel, target)
+  invalidate(userId)
   return { path: target, title: titleOf(target) }
+}
+
+// Move a note into a different folder (creating it). Keeps the filename/id.
+export async function moveNote(userId, path, folder) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  if (!inRoot(c.root, path)) throw err('bad path', 400)
+  const rel = trimSlashes(path)
+  const name = rel.split('/').pop()
+  const dir = join(c.root, sanitizeFolder(folder))
+  if (!inRoot(c.root, dir)) throw err('bad path', 400)
+  await dav.ensureCollection(c.account, dir)
+  let target = join(dir, name)
+  for (let n = 2; target !== rel && await dav.exists(c.account, target); n++) target = join(dir, `${name.replace(/\.md$/i, '')} ${n}.md`)
+  if (target !== rel) await dav.move(c.account, rel, target)
+  invalidate(userId)
+  return { path: target, title: titleOf(target), folder: sanitizeFolder(folder) }
 }
 
 export async function deleteNote(userId, path) {
@@ -203,6 +242,7 @@ export async function deleteNote(userId, path) {
   if (!c) throw err('notes not configured', 409)
   if (!inRoot(c.root, path)) throw err('bad path', 400)
   await dav.del(c.account, trimSlashes(path))
+  invalidate(userId)
   return { ok: true }
 }
 

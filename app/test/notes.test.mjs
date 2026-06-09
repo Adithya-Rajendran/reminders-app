@@ -41,6 +41,13 @@ const ACC = { server_url: 'https://nc.example.com/remote.php/dav', username: 'al
   ok(typeof meta === 'object' && !Array.isArray(meta), 'malformed YAML front-matter degrades to an empty object, not a throw')
 }
 
+{
+  const md = serializeNote({ id: 'x', tags: ['work', 'ideas'] }, '# T\n')
+  const { meta, body } = parseNote(md)
+  ok(Array.isArray(meta.tags) && meta.tags.join(',') === 'work,ideas', 'front-matter tags round-trip as a YAML list')
+  ok(meta.id === 'x' && body === '# T\n', 'tags coexist with id + body')
+}
+
 // ---- path-traversal guards (security) ----
 ok(sanitizeFolder('../Evil') === 'Evil', 'sanitizeFolder strips a leading .. segment')
 ok(sanitizeFolder('a/../../b') === 'a/b', 'sanitizeFolder drops every .. segment')

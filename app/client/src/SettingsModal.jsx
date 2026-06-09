@@ -22,7 +22,7 @@ function NotesFolderSection({ accounts }) {
   return (
     <div className="notes-cfg">
       <div className="notes-cfg-head"><IconNote size={16} /> <span>Notes folder</span></div>
-      <div className="notes-cfg-sub">Where your notes &amp; drawings are stored in your cloud — created if it doesn’t exist.</div>
+      <div className="notes-cfg-sub">Notes &amp; drawings are saved as files in the Nextcloud account above (over WebDAV) — pick which folder. Created if it doesn’t exist.</div>
       {accounts.length > 1 && (
         <select className="input" value={acct} onChange={(e) => setAcct(e.target.value)} aria-label="Notes account" style={{ marginBottom: 8 }}>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -268,7 +268,7 @@ export default function SettingsModal({ onClose }) {
 
   const backToList = () => { setMode('list'); setProvider(null); setForm({}); setError(null) }
 
-  const headSub = mode === 'list' ? 'Connect calendar & task accounts to sync.'
+  const headSub = mode === 'list' ? 'Calendar & tasks (CalDAV) + notes (Nextcloud) — one account.'
     : mode === 'pick' ? 'Choose a provider to connect.'
       : mode === 'form' ? `Connect your ${preset ? preset.name : ''} account.`
         : 'Choose which lists to sync.'
@@ -279,7 +279,7 @@ export default function SettingsModal({ onClose }) {
         <div className="modal-head">
           <IconCloud size={20} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="settings-title">CalDAV Sync</h2>
+            <h2 id="settings-title">Sync &amp; Storage</h2>
             <div className="sub">{headSub}</div>
           </div>
           <button className="iconbtn" aria-label="Close settings" onClick={onClose}><IconX size={18} /></button>

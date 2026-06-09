@@ -1189,6 +1189,27 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-row-date { font-size: 11px; color: var(--muted); flex: none; }
 .note-empty-q { color: var(--muted); font-size: 12px; padding: 12px; text-align: center; }
 
+/* notes: folders + tags */
+.note-new { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
+.note-new .note-search { flex: 2; }
+.note-folder-in { flex: 1; min-width: 90px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); font-size: 12px; outline: none; }
+.note-folder-in:focus { border-color: var(--accent); }
+.note-tags-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px 8px; }
+.note-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--accent-soft); color: var(--accent); border: none; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; line-height: 1.6; }
+.note-tag.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.note-tag-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 10px; padding: 0 0 0 2px; opacity: .8; }
+.note-tag-x:hover { opacity: 1; }
+.note-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.note-folder-sec { margin-bottom: 2px; }
+.note-folder-head { width: 100%; }
+/* editor meta bar (folder + tags) */
+.note-edit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.note-folder-pick { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.note-folder-pick select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; color: var(--text); font-size: 12px; outline: none; cursor: pointer; }
+.note-tags-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; flex: 1; }
+.note-tag-in { background: none; border: none; outline: none; color: var(--text); font-size: 12px; min-width: 80px; flex: 1; }
+.note-tag-in::placeholder { color: var(--muted); }
+
 .note-overlay { align-items: stretch; }
 .note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }
 .note-edit-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
