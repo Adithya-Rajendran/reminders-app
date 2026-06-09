@@ -33,7 +33,8 @@ app/client/src/
   useTasks.js, tasklib.js  # task-list hook (optimistic updates + undo), task utils
   tasksbus.js              # cross-widget "tasks changed" event bus
   icons.jsx, styles.css    # inline SVG icons; theme tokens (light/dark + accents)
-  SettingsModal.jsx        # CalDAV accounts, notes config, reminder groups
+  SettingsModal.jsx        # modal shell + CalDAV account flow
+  settings/*.jsx           # one file per settings section (notes folder, groups, providers)
 app/server/
   index.js                 # Express app: session, auth guard, route mounting
   config.js                # SQLite (layouts, dashboards, encrypted account config)
