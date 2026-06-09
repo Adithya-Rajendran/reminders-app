@@ -6,6 +6,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   root: 'client',
   plugins: [react()],
+  // @excalidraw/excalidraw's entry branches on process.env.IS_PREACT, which is
+  // undefined in the browser — define it so the bundle doesn't reference `process`.
+  define: {
+    'process.env.IS_PREACT': JSON.stringify('false'),
+  },
   build: {
     outDir: '../public',
     emptyOutDir: true,
