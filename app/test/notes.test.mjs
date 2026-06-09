@@ -11,7 +11,7 @@ rmSync(process.env.CONFIG_DB_PATH + '-wal', { force: true })
 rmSync(process.env.CONFIG_DB_PATH + '-shm', { force: true })
 
 const { parseNote, serializeNote, sanitizeFolder, inRoot } = await import('../server/notes.js')
-const { filesBase, davUrl, parsePropfind } = await import('../server/webdav.js')
+const { filesBase, davUrl, parsePropfind, asMatch } = await import('../server/webdav.js')
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -57,6 +57,13 @@ ok(davUrl(ACC, 'Notes/My note.md') === 'https://nc.example.com/remote.php/dav/fi
 ok(davUrl(ACC, '/Notes/', true).endsWith('/Notes/'), 'collection URLs keep a single trailing slash')
 ok(davUrl(ACC, 'Notes/file.md', false) === davUrl(ACC, 'Notes/file.md'), 'file URLs have no trailing slash by default')
 ok(davUrl(ACC, 'a/b c/d&e.md').includes('b%20c/d%26e.md'), 'special chars (& and space) are encoded, path separators are not')
+
+// ---- If-Match quoting (Nextcloud rejects unquoted conditional headers) ----
+ok(asMatch('abc123') === '"abc123"', 'asMatch quotes a bare etag for If-Match')
+ok(asMatch('*') === '*', 'asMatch leaves * verbatim (If-None-Match: *)')
+ok(asMatch('"already"') === '"already"', 'asMatch leaves an already-quoted etag alone')
+ok(asMatch('W/"weak"') === 'W/"weak"', 'asMatch leaves a weak etag alone')
+ok(asMatch(undefined) === undefined && asMatch('') === '', 'asMatch passes through empty/undefined')
 
 // ---- PROPFIND parse (sample Nextcloud multistatus) ----
 {

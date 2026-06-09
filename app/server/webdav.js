@@ -29,6 +29,9 @@ export function davUrl(account, path, isDir = false) {
 const hdr = (account, extra = {}) => ({ Authorization: authHeader(account), ...extra })
 function httpErr(op, status) { const e = new Error(`webdav ${op} failed (${status})`); e.status = status >= 500 ? 502 : status; return e }
 const cleanEtag = (e) => (e ? String(e).replace(/^W\//, '').replace(/"/g, '') : null)
+// We store bare etags, but If-Match / If-None-Match must be QUOTED on the wire
+// (Nextcloud rejects an unquoted If-Match with 412). '*' is sent verbatim.
+export const asMatch = (e) => (!e || e === '*' || /^(W\/)?"/.test(e)) ? e : `"${e}"`
 
 // PROPFIND a collection (Depth 1 default) → [{ path, name, isDir, etag, mtime, size, contentType }].
 // `path` is relative to the files base (e.g. "Notes/My note.md"). Returns null on 404.
@@ -83,8 +86,8 @@ export async function readText(account, path) { const f = await read(account, pa
 // PUT a file. body = string | Buffer | Uint8Array. Returns the new etag.
 export async function write(account, path, body, { contentType = 'application/octet-stream', ifMatch, ifNoneMatch } = {}) {
   const h = hdr(account, { 'Content-Type': contentType })
-  if (ifMatch) h['If-Match'] = ifMatch
-  if (ifNoneMatch) h['If-None-Match'] = ifNoneMatch
+  if (ifMatch) h['If-Match'] = asMatch(ifMatch)
+  if (ifNoneMatch) h['If-None-Match'] = asMatch(ifNoneMatch)
   const r = await safeFetch(davUrl(account, path), { method: 'PUT', headers: h, body })
   if (!r.ok && r.status !== 201 && r.status !== 204) throw httpErr('write', r.status)
   return { etag: cleanEtag(r.headers.get('etag')) }
@@ -92,7 +95,7 @@ export async function write(account, path, body, { contentType = 'application/oc
 
 export async function del(account, path, { ifMatch } = {}) {
   const h = hdr(account)
-  if (ifMatch) h['If-Match'] = ifMatch
+  if (ifMatch) h['If-Match'] = asMatch(ifMatch)
   const r = await safeFetch(davUrl(account, path), { method: 'DELETE', headers: h })
   if (!r.ok && r.status !== 204 && r.status !== 404) throw httpErr('delete', r.status)
 }
