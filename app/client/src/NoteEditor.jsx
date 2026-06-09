@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { notesApi } from './api.js'
 import { IconX, IconTrash, IconSpinner, IconCheck } from './icons.jsx'
+
+// Tiptap is heavy (~loaded only when a note is open) — code-split it out.
+const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
 
 // Full-screen note editor overlay. Phase 2 uses a plain Markdown textarea with
 // debounced autosave to the user's Nextcloud (over WebDAV); Phase 3 swaps the
@@ -88,7 +91,11 @@ export default function NoteEditor({ path: initialPath, onClose }) {
         <div className="note-edit-body">
           {state === 'loading' ? <div className="note-loading"><IconSpinner size={20} /></div>
             : state === 'error' ? <div className="note-loading">Couldn’t load this note.</div>
-              : <textarea className="note-textarea" value={body} onChange={(e) => onBody(e.target.value)} placeholder="Start writing… (Markdown supported)" autoFocus />}
+              : (
+                <Suspense fallback={<div className="note-loading"><IconSpinner size={20} /></div>}>
+                  <NoteRichEditor value={body} onChange={onBody} />
+                </Suspense>
+              )}
         </div>
       </div>
     </div>,
