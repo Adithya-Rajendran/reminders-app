@@ -1196,6 +1196,15 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .tree-chev-pad { width: 12px; flex: none; }
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
 .tree-empty { color: var(--muted); font-size: 11px; padding: 6px; }
+/* Obsidian-style explorer: single-pane file tree (folders + notes) */
+.notes-explorer { flex-direction: column; }
+.notes-explorer .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.tree-count { margin-left: auto; font-size: 10px; color: var(--muted); opacity: .8; padding-left: 6px; }
+.tree-row.tree-note { color: var(--text); }
+.tree-row.tree-note .ic { opacity: .6; }
+.tree-row.tree-note:hover { background: var(--accent-soft); }
+.tree-note-folder { margin-left: auto; font-size: 10px; color: var(--muted); padding-left: 6px; white-space: nowrap; }
+.note-tag.mini { font-size: 9.5px; padding: 0 5px; line-height: 1.5; }
 .note-toolbar { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
 .note-search { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); font-size: 13px; outline: none; }
 .note-search:focus { border-color: var(--accent); }
