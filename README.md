@@ -1,6 +1,8 @@
 # Reminders
 
-A self-hosted, customizable **task + calendar dashboard** — a personal "command center" you actually own. Drag-and-drop resizable widgets over a [Vikunja](https://vikunja.io) backend, with **CalDAV sync** (Nextcloud / Apple iCloud / generic), a multi-view calendar, **OIDC single sign-on**, and a light/dark theme — all running on your own Kubernetes.
+A self-hosted, customizable **task + calendar dashboard** — a personal "command center" you actually own. Drag-and-drop resizable widgets backed by **CalDAV** (Nextcloud / Apple iCloud / generic) — your tasks, reminders and events live in your own server — with a multi-view calendar, **OIDC single sign-on**, and a light/dark theme, all running on your own infrastructure.
+
+> 📖 **Full documentation is in the [project wiki](https://github.com/Adithya-Rajendran/reminders-app/wiki)** — architecture, deployment (Kubernetes / Docker), configuration, OIDC, CalDAV, and development.
 
 [![ci](https://github.com/Adithya-Rajendran/reminders-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Adithya-Rajendran/reminders-app/actions/workflows/ci.yml)
 [![docker](https://github.com/Adithya-Rajendran/reminders-app/actions/workflows/docker.yml/badge.svg)](https://github.com/Adithya-Rajendran/reminders-app/actions/workflows/docker.yml)
@@ -17,7 +19,7 @@ A self-hosted, customizable **task + calendar dashboard** — a personal "comman
 | **Dashboard — dark** | **Dashboard — light** |
 | ![dashboard dark](docs/screenshots/dashboard-dark.png) | ![dashboard light](docs/screenshots/dashboard-light.png) |
 
-**Multi-view calendar** (month / week / agenda — events + tasks merged from Vikunja & CalDAV)
+**Multi-view calendar** (month / week / agenda — your CalDAV events and reminders in one place)
 
 | Month | Week | Agenda |
 |---|---|---|
@@ -78,7 +80,7 @@ Needs only a writable volume for the SQLite config DB (`CONFIG_DB_PATH`) and an 
 
 ### Kubernetes
 
-Manifests are under [`k8s/`](k8s/) (namespace, a 1Gi block-storage PVC for the SQLite config DB, the app + HTTPRoute). They were written for an K8s 1.35 + Cilium Gateway API + cert-manager cluster with PodSecurity `restricted` enforced — adapt the ingress/StorageClass/hostnames for yours. SQLite needs **block** storage (ceph-rbd / local-path), not a shared filesystem (CephFS/NFS), for safe WAL locking; the Deployment uses `Recreate` since the RWO volume can't be multi-attached. The app pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI) — `kubectl apply -f k8s/` after creating the `reminders-app-env` secret.
+Example manifests are under [`k8s/`](k8s/) (namespace, a 1Gi PVC for the SQLite config DB, the app, and a route). They run on **any conformant cluster** — set your own StorageClass, ingress/Gateway, and hostname. SQLite needs **block** storage (not a shared filesystem like NFS/CephFS) for safe WAL locking, and the Deployment uses `Recreate` since the `ReadWriteOnce` volume can't be multi-attached. Create the `reminders-app-env` secret, then `kubectl apply -f k8s/`. The app pulls **`ghcr.io/adithya-rajendran/reminders-app:latest`** (built & pushed by CI). See the **[wiki → Deployment on Kubernetes](https://github.com/Adithya-Rajendran/reminders-app/wiki/Deployment-on-Kubernetes)** for a full, generic walkthrough.
 
 ## Development
 
@@ -95,7 +97,7 @@ CI (`.github/workflows/ci.yml`) runs lint + build on every push/PR; `docker.yml`
 
 ## Design
 
-The UI was generated from a reusable design prompt and ported into the app — see [`DESIGN_PROMPT.md`](DESIGN_PROMPT.md) and the handoff under [`design_handoff_reminders/`](design_handoff_reminders/). Theme tokens (both themes) live in `app/client/src/styles.css`.
+Theme tokens for both light and dark themes live in `app/client/src/styles.css`; icons are inline SVG in `app/client/src/icons.jsx`.
 
 ## Licensing
 
