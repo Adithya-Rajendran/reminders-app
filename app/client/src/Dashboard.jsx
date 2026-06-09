@@ -8,6 +8,7 @@ import {
   scaleLayouts, defaultLayouts, appendToLayouts,
 } from './dashlayout.js'
 import { usePopover } from './usePopover.js'
+import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './GroupPicker.jsx'
 import { recentGroups } from './groups.js'
 import {
@@ -350,8 +351,11 @@ function WidgetFrame({ type, title, onRemove, children }) {
         </span>
       </div>
       <div className="widget-body">
-        {/* widgets are lazy (see registry.jsx) — show a skeleton while a chunk loads */}
-        <Suspense fallback={<SkeletonRows n={4} />}>{children}</Suspense>
+        {/* widgets are lazy (see registry.jsx) — skeleton while a chunk loads, and a
+            boundary so a failed chunk/render can't blank the whole board */}
+        <WidgetBoundary>
+          <Suspense fallback={<SkeletonRows n={4} />}>{children}</Suspense>
+        </WidgetBoundary>
       </div>
     </div>
   )
