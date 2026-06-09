@@ -38,6 +38,9 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS notes_config (
     user_id TEXT PRIMARY KEY, account_id TEXT, root_path TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+  CREATE TABLE IF NOT EXISTS group_calendars (
+    user_id TEXT NOT NULL, group_name TEXT NOT NULL, list_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, group_name));
 `)
 console.log('sqlite config db ready at', path, '(journal_mode=' + sqlite.pragma('journal_mode', { simple: true }) + ')')
 
@@ -99,6 +102,28 @@ export async function setNotesConfig(userId, accountId, rootPath) {
   sqlite.prepare(`INSERT INTO notes_config (user_id, account_id, root_path, updated_at) VALUES (?,?,?,datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET account_id=excluded.account_id, root_path=excluded.root_path, updated_at=datetime('now')`)
     .run(userId, accountId, rootPath)
+}
+
+// Reminder group -> calendar (caldav_lists.id) mapping: a group's reminders are
+// stored in its mapped calendar. (The reminders live in CalDAV; only the small
+// name->calendar map lives here.)
+export async function getGroupMap(userId) {
+  const out = {}
+  for (const r of sqlite.prepare('SELECT group_name, list_id FROM group_calendars WHERE user_id=?').all(userId)) out[r.group_name] = r.list_id
+  return out
+}
+export async function getGroupListId(userId, groupName) {
+  const r = sqlite.prepare('SELECT list_id FROM group_calendars WHERE user_id=? AND group_name=?').get(userId, groupName)
+  return r ? r.list_id : null
+}
+export async function setGroupMapping(userId, groupName, listId) {
+  sqlite.prepare('INSERT INTO group_calendars (user_id, group_name, list_id) VALUES (?,?,?) ON CONFLICT(user_id, group_name) DO UPDATE SET list_id=excluded.list_id').run(userId, groupName, listId)
+}
+export async function deleteGroupMapping(userId, groupName) {
+  sqlite.prepare('DELETE FROM group_calendars WHERE user_id=? AND group_name=?').run(userId, groupName)
+}
+export async function deleteListRow(accountId, url) {
+  sqlite.prepare('DELETE FROM caldav_lists WHERE account_id=? AND url=?').run(accountId, url)
 }
 
 // ============================================================

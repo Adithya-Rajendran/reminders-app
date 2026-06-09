@@ -2,8 +2,74 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api, notesApi } from './api.js'
 import {
   IconCloud, IconX, IconPlus, IconTrash, IconRefresh, IconSpinner,
-  IconCheck, IconKey, IconLink, IconNextcloud, IconApple, IconNote,
+  IconCheck, IconKey, IconLink, IconNextcloud, IconApple, IconNote, IconBell,
 } from './icons.jsx'
+
+/* ---------- Reminder groups → calendars ---------- */
+function ReminderGroupsSection() {
+  const [data, setData] = useState(null) // { groups, calendars }
+  const [busy, setBusy] = useState(null) // group name in flight
+  const [confirmDel, setConfirmDel] = useState(null)
+  const [delCal, setDelCal] = useState(false)
+  const load = useCallback(() => { api('/api/reminder-groups').then(setData).catch(() => setData({ groups: [], calendars: [] })) }, [])
+  useEffect(() => { load() }, [load])
+
+  const remap = async (group, value) => {
+    setBusy(group)
+    try {
+      if (value === '__new') await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify({ group, createNew: true }) })
+      else {
+        let id = value
+        if (value === '') { const rem = data.calendars.find((c) => /^reminders$/i.test(c.name)); id = rem ? rem.id : null }
+        if (id) await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify({ group, listId: Number(id) }) })
+      }
+      await load()
+    } catch { /* ignore */ } finally { setBusy(null) }
+  }
+  const del = async (group) => {
+    setBusy(group)
+    try { await api('/api/reminder-groups?group=' + encodeURIComponent(group) + '&deleteCalendar=' + (delCal ? '1' : '0'), { method: 'DELETE' }); setConfirmDel(null); setDelCal(false); await load() } catch { /* ignore */ } finally { setBusy(null) }
+  }
+
+  if (!data || !data.groups.length) {
+    return (
+      <div className="notes-cfg">
+        <div className="notes-cfg-head"><IconBell size={16} /> <span>Reminder groups</span></div>
+        <div className="notes-cfg-sub">Add a group in the Reminders widget, then map it to its own calendar here.</div>
+      </div>
+    )
+  }
+  return (
+    <div className="notes-cfg">
+      <div className="notes-cfg-head"><IconBell size={16} /> <span>Reminder groups → calendars</span></div>
+      <div className="notes-cfg-sub">Each group’s reminders are stored in its calendar (synced as its own task list). Changing the calendar moves existing reminders into it.</div>
+      <div className="rg-list">
+        {data.groups.map((g) => (
+          <div className="rg-row" key={g.name}>
+            <span className="rg-name">{g.name}<span className="rg-count">{g.count}</span></span>
+            {confirmDel === g.name ? (
+              <span className="rg-confirm">
+                <label className="rg-delcal"><input type="checkbox" checked={delCal} onChange={(e) => setDelCal(e.target.checked)} /> also delete the calendar</label>
+                <button className="btn sm danger" onClick={() => del(g.name)} disabled={busy === g.name}>Delete</button>
+                <button className="btn sm ghost" onClick={() => { setConfirmDel(null); setDelCal(false) }}>Cancel</button>
+              </span>
+            ) : (
+              <span className="rg-actions">
+                <select className="input rg-cal" value={g.listId || ''} onChange={(e) => remap(g.name, e.target.value)} disabled={busy === g.name} aria-label={`Calendar for ${g.name}`}>
+                  <option value="">Default (Reminders)</option>
+                  {data.calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="__new">＋ Create new calendar</option>
+                </select>
+                {busy === g.name && <IconSpinner size={14} />}
+                <button className="iconbtn sm danger-hover" title="Delete group" aria-label={`Delete group ${g.name}`} onClick={() => { setConfirmDel(g.name); setDelCal(false) }}><IconTrash size={14} /></button>
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /* ---------- Notes folder selector (where notes live in the cloud) ---------- */
 function NotesFolderSection({ accounts }) {
@@ -340,6 +406,7 @@ export default function SettingsModal({ onClose }) {
                   <IconPlus size={15} /> Add account
                 </button>
                 {accounts.length > 0 && <NotesFolderSection accounts={accounts} />}
+                {accounts.length > 0 && <ReminderGroupsSection />}
               </div>
             )
           )}

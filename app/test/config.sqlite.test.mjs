@@ -77,6 +77,16 @@ await cfg.deleteDashboardLayout(U, 'd-2')
 ok((await cfg.getLayout(U, 'd-2')).layout === null, 'deleteDashboardLayout removes that dashboard layout')
 ok((await cfg.getDashboards(U)).length === 2, 'deleting a layout leaves the registry row untouched')
 
+// --- reminder group -> calendar mapping ---
+ok((await cfg.getGroupListId(U, 'Work')) === null, 'getGroupListId is null before mapping')
+await cfg.setGroupMapping(U, 'Work', tasksList.id)
+await cfg.setGroupMapping(U, 'Work', tasksList.id) // idempotent on (user, group)
+ok((await cfg.getGroupListId(U, 'Work')) === tasksList.id, 'setGroupMapping maps a group to a calendar')
+ok((await cfg.getGroupMap(U)).Work === tasksList.id, 'getGroupMap returns the mapping')
+ok((await cfg.getGroupListId(U2, 'Work')) === null, 'group mapping is per-user')
+await cfg.deleteGroupMapping(U, 'Work')
+ok((await cfg.getGroupListId(U, 'Work')) === null, 'deleteGroupMapping removes the mapping')
+
 // --- cascade delete (FK ON DELETE CASCADE) ---
 await cfg.deleteAccount(U, 'ca-1')
 ok((await cfg.getAccount(U, 'ca-1')) === null, 'deleteAccount removes the account')

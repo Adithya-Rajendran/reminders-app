@@ -142,6 +142,36 @@ async function createRemindersCalendar(acc, home) {
   } catch (e) { console.error('MKCALENDAR error:', e?.message || e); return null }
 }
 const isRemindersList = (name) => /^reminders$/i.test(String(name || '').trim())
+const escapeXml = (s) => String(s).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]))
+
+// Create a dedicated VTODO calendar for a reminder group and persist it as a
+// list. Returns the new calendar URL. (MKCALENDAR; collision-safe slug.)
+export async function createGroupCalendar(acc, name) {
+  const lists = await listsForAccount(acc.id)
+  const home = calendarHome(lists)
+  if (!home) { const e = new Error('cannot locate the CalDAV calendar home'); e.status = 502; throw e }
+  const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('g-' + crypto.randomUUID().slice(0, 8))
+  const taken = new Set(lists.map((l) => (l.url.endsWith('/') ? l.url : l.url + '/')))
+  let url = home + slug + '/'
+  for (let n = 2; taken.has(url); n++) url = home + slug + '-' + n + '/'
+  const body = '<?xml version="1.0" encoding="utf-8"?>'
+    + '<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop>'
+    + '<D:displayname>' + escapeXml(name) + '</D:displayname>'
+    + '<C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set>'
+    + '</D:prop></D:set></C:mkcalendar>'
+  const r = await safeFetch(url, { method: 'MKCALENDAR', headers: { Authorization: authHeader(acc), 'Content-Type': 'application/xml; charset=utf-8' }, body })
+  if (!r.ok && r.status !== 201 && r.status !== 405) { const e = new Error('MKCALENDAR failed (' + r.status + ')'); e.status = 502; throw e }
+  await upsertList(acc.id, { url, displayName: name, color: '', supportsVtodo: true })
+  return url
+}
+
+// Delete a calendar collection (removes its VTODOs). Used when a group is deleted
+// with "also delete the calendar".
+export async function deleteCalendar(acc, url) {
+  const u = url.endsWith('/') ? url : url + '/'
+  const r = await safeFetch(u, { method: 'DELETE', headers: { Authorization: authHeader(acc) } })
+  if (!r.ok && r.status !== 204 && r.status !== 404) { const e = new Error('delete calendar failed (' + r.status + ')'); e.status = 502; throw e }
+}
 
 // ---- discovery: list VTODO-capable calendars and persist them ----
 async function discover(acc) {

@@ -10,6 +10,7 @@ import { sseHandler } from './events.js'
 import { startValarmPoller } from './valarm-poller.js'
 import * as caldav from './caldav.js'
 import * as notes from './notes.js'
+import * as groups from './reminder_groups.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -145,6 +146,22 @@ app.delete('/api/tasks/:id', requireAuth, tasks.deleteTask)
 app.get('/api/labels', requireAuth, tasks.listLabels)
 app.put('/api/labels', requireAuth, tasks.createLabel)
 app.put('/api/tasks/:id/labels', requireAuth, tasks.attachLabel)
+
+// ---- Reminder groups <-> calendars ----
+app.get('/api/reminder-groups', requireAuth, async (req, res, next) => {
+  try { res.json(await groups.listGroups(req.session.user.sub)) } catch (e) { next(e) }
+})
+app.put('/api/reminder-groups', requireAuth, async (req, res, next) => {
+  const { group, listId, createNew } = req.body || {}
+  if (!group) return res.status(400).json({ error: 'group is required' })
+  try { res.json(await groups.mapGroup(req.session.user.sub, group, { listId, createNew })) } catch (e) { next(e) }
+})
+app.delete('/api/reminder-groups', requireAuth, async (req, res, next) => {
+  const group = req.query.group || req.body?.group
+  const del = req.query.deleteCalendar === '1' || req.body?.deleteCalendar === true
+  if (!group) return res.status(400).json({ error: 'group is required' })
+  try { res.json(await groups.deleteGroup(req.session.user.sub, group, del)) } catch (e) { next(e) }
+})
 
 // ---- Notes (Markdown files in the user's Nextcloud, over WebDAV) ----
 app.get('/api/notes', requireAuth, async (req, res, next) => {
