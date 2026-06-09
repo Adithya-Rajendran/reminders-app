@@ -22,6 +22,11 @@ function setCats(vt, names) {
   vt.removeAllProperties('categories')
   if (names.length) { const p = new ICAL.Property('categories'); p.setValues(names); vt.addProperty(p) }
 }
+// Give a relocated copy a fresh UID. Nextcloud keeps DELETEd objects in a trashbin
+// whose rows still occupy the (calendarid, uid) unique index, so re-creating an
+// object with a UID that previously lived in the destination calendar 500s. A new
+// UID on every cross-calendar move sidesteps that (the copy is a fresh resource).
+const reuid = (vt) => vt.updatePropertyWithValue('uid', crypto.randomUUID())
 async function fetchVcal(account, objectUrl) {
   const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(account) } })
   if (!r.ok) return null
@@ -68,6 +73,7 @@ async function migrateInto(userId, groupName, targetListId) {
     if (!src) continue
     const f = await fetchVcal(src.account, objectUrl)
     if (!f || !catsOf(f.vt).includes(groupName)) continue
+    reuid(f.vt) // fresh UID so the destination's trashbin can't collide on (calendarid, uid)
     const put = await safeFetch(tbase + crypto.randomUUID() + '.ics', { method: 'PUT', headers: { Authorization: authHeader(target.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: f.vcal.toString() })
     if (okPut(put)) { await safeFetch(objectUrl, { method: 'DELETE', headers: { Authorization: authHeader(src.account), ...(f.etag ? { 'If-Match': asMatch(f.etag) } : {}) } }); moved++ }
   }
@@ -122,6 +128,7 @@ export async function deleteGroup(userId, groupName, deleteCalendarFlag) {
     if (!f || !catsOf(f.vt).includes(name)) continue
     setCats(f.vt, catsOf(f.vt).filter((c) => c !== name))
     if (defResolved && lid !== def.id) {
+      reuid(f.vt) // fresh UID so the default calendar's trashbin can't collide on (calendarid, uid)
       const put = await safeFetch(tbase + crypto.randomUUID() + '.ics', { method: 'PUT', headers: { Authorization: authHeader(defResolved.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: f.vcal.toString() })
       if (okPut(put)) { await safeFetch(objectUrl, { method: 'DELETE', headers: { Authorization: authHeader(src.account), ...(f.etag ? { 'If-Match': asMatch(f.etag) } : {}) } }); moved++ }
     } else {
