@@ -26,7 +26,13 @@ const app = express()
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
-app.use(express.json({ limit: '10mb' })) // headroom for note bodies + layouts
+// JSON for everything EXCEPT raw resource uploads (images/drawings), which their
+// own route streams as binary — JSON-parsing them would corrupt the bytes.
+const jsonParser = express.json({ limit: '10mb' }) // headroom for note bodies + layouts
+app.use((req, res, next) => {
+  if (req.method === 'PUT' && req.path.startsWith('/api/notes/resources/')) return next()
+  return jsonParser(req, res, next)
+})
 app.use(
   session({
     name: 'rsid',
