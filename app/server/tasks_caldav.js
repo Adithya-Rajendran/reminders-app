@@ -5,7 +5,7 @@
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
-import { listsWithId, getListById } from './config.js'
+import { listsWithId, getListById, getGroupListId } from './config.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
 import { advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo, isRecurring, registerTimezones } from './recurrence_caldav.js'
@@ -141,6 +141,12 @@ export async function createTask(req, res, next) {
     const lists = (await listsWithId(uid)).filter((l) => l.supports_vtodo && l.enabled)
     if (!lists.length) return res.status(409).json({ error: 'no task list — connect a CalDAV account in Settings' })
     resolved = await getListById(uid, lists[0].id)
+  }
+  // Route by reminder group: a mapped group's reminders live in its own calendar.
+  const groupName = (Array.isArray(b.labels) && b.labels.length) ? String((b.labels[0] && (b.labels[0].title || b.labels[0])) || '').trim() : ''
+  if (groupName) {
+    const mapped = await getGroupListId(uid, groupName)
+    if (mapped) { const r2 = await getListById(uid, mapped); if (r2 && r2.list.supportsVtodo) resolved = r2 }
   }
   try {
     const uid2 = crypto.randomUUID()

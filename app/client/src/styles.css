@@ -1239,6 +1239,16 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-tag-in { background: none; border: none; outline: none; color: var(--text); font-size: 12px; min-width: 80px; flex: 1; }
 .note-tag-in::placeholder { color: var(--muted); }
 
+/* Reminder groups -> calendars (Settings) */
+.rg-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.rg-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.rg-name { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.rg-count { font-size: 10px; color: var(--muted); background: var(--accent-soft); border-radius: 999px; padding: 1px 7px; font-weight: 700; }
+.rg-actions { display: inline-flex; align-items: center; gap: 6px; }
+.rg-cal { font-size: 12px; padding: 5px 8px; max-width: 190px; }
+.rg-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rg-delcal { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+
 .note-overlay { align-items: stretch; }
 .note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }
 .note-edit-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
