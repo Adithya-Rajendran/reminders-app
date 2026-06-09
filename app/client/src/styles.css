@@ -1176,6 +1176,26 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* ---------- Notes widget + editor ---------- */
 .notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* folder-tree sidebar layout */
+.notes-widget.tree { flex-direction: row; gap: 0; }
+.notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.notes-widget.tree .notes-main { padding-left: 10px; }
+.notes-main .iconbtn.on { color: var(--accent); background: var(--accent-soft); }
+.notes-tree { width: 175px; flex: none; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); padding-right: 4px; }
+.notes-widget.tree.compact { flex-direction: column; }
+.notes-widget.tree.compact .notes-main { padding-left: 0; }
+.notes-widget.tree.compact .notes-tree { width: auto; border-right: none; border-bottom: 1px solid var(--line); max-height: 45%; margin-bottom: 6px; padding-right: 0; }
+.tree-head { display: flex; align-items: center; gap: 4px; padding: 2px 6px 6px; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.tree-head-actions { margin-left: auto; display: flex; }
+.tree-row { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); white-space: nowrap; }
+.tree-row:hover { background: var(--accent-soft); }
+.tree-row.sel { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree-row .ic { flex: none; opacity: .85; }
+.tree-chev { flex: none; opacity: .65; transition: transform .12s; }
+.tree-chev.open { transform: rotate(90deg); }
+.tree-chev-pad { width: 12px; flex: none; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.tree-empty { color: var(--muted); font-size: 11px; padding: 6px; }
 .note-toolbar { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
 .note-search { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); font-size: 13px; outline: none; }
 .note-search:focus { border-color: var(--accent); }
