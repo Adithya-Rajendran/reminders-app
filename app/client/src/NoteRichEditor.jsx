@@ -2,24 +2,15 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
-import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
+import { ResizableImage } from './NoteImage.jsx'
+import { RES_PREFIX, isDrawing, drawingId, toDisplay, toDisk, EXT } from './notepaths.js'
 import { notesApi } from './api.js'
 import { IconSpinner } from './icons.jsx'
 
 const ExcalidrawModal = lazy(() => import('./ExcalidrawModal.jsx'))
-
-const RES_PREFIX = '/api/notes/resources/'
-// A drawing is an image whose file is "<id>.excalidraw.png" (its editable scene
-// lives next to it as "<id>.excalidraw"). Portable: other tools just see a PNG.
-const isDrawing = (src) => /\.excalidraw\.png(\?|$)/.test(src || '')
-const drawingId = (src) => { const m = /([^/]+)\.excalidraw\.png/.exec(src || ''); return m ? m[1] : null }
-// On disk, image/link refs are relative (_resources/…). The editor needs a
-// loadable URL; we rewrite at the boundary so the stored markdown stays portable.
-const toDisplay = (md) => String(md || '').replace(/\]\(_resources\//g, '](' + RES_PREFIX)
-const toDisk = (md) => String(md || '').replace(/\]\(\/api\/notes\/resources\/([^)?\s]+)(\?[^)\s]*)?\)/g, '](_resources/$1)')
 
 // Live WYSIWYG editor that reads/writes GitHub-flavored Markdown (notes stay
 // plain .md on disk). Supports inserting + re-editing Excalidraw drawings.
@@ -31,7 +22,7 @@ export default function NoteRichEditor({ value, onChange }) {
     extensions: [
       StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'cb' } } }),
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }),
-      Image.configure({ inline: false, allowBase64: false, HTMLAttributes: { class: 'note-img' } }),
+      ResizableImage.configure({ inline: false, allowBase64: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({ html: false, tightLists: true, linkify: true, transformPastedText: true, transformCopiedText: true }),
@@ -41,6 +32,14 @@ export default function NoteRichEditor({ value, onChange }) {
     onUpdate: ({ editor: ed }) => onChange?.(toDisk(ed.storage.markdown.getMarkdown())),
     editorProps: {
       attributes: { class: 'tiptap-content', spellcheck: 'true' },
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData && event.clipboardData.items
+        if (!items) return false
+        for (const it of items) {
+          if (it.type && it.type.startsWith('image/')) { const f = it.getAsFile(); if (f) { event.preventDefault(); uploadAndInsert(f); return true } }
+        }
+        return false
+      },
       handleDOMEvents: {
         dblclick: (_view, event) => {
           const t = event.target
@@ -66,6 +65,14 @@ export default function NoteRichEditor({ value, onChange }) {
   }
   const newDrawing = () => setDrawing({ scene: null, id: null })
 
+  // Paste an image straight into the note → upload to _resources → embed.
+  const uploadAndInsert = async (file) => {
+    const ed = editorRef.current
+    if (!ed) return
+    const name = crypto.randomUUID() + '.' + (EXT[file.type] || 'png')
+    try { await notesApi.uploadResource(name, file, file.type); ed.chain().focus().setImage({ src: RES_PREFIX + name, alt: file.name || 'image' }).run() } catch { /* ignore */ }
+  }
+
   const onDrawingSave = async ({ json, png }) => {
     const ed = editorRef.current
     const id = drawing.id || crypto.randomUUID()
@@ -73,10 +80,13 @@ export default function NoteRichEditor({ value, onChange }) {
     await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
     const src = RES_PREFIX + id + '.excalidraw.png'
     if (drawing.id) {
-      // edit: find the existing node by id and refresh its preview (cache-bust)
-      let pos = null
-      ed.state.doc.descendants((node, p) => { if (node.type.name === 'image' && drawingId(node.attrs.src) === drawing.id) { pos = p; return false } return true })
-      if (pos != null) ed.chain().focus().command(({ tr }) => { tr.setNodeAttribute(pos, 'src', src + '?v=' + Date.now()); return true }).run()
+      // edit: refresh the existing node's preview (cache-bust), preserving its width
+      let pos = null, oldSrc = ''
+      ed.state.doc.descendants((node, p) => { if (node.type.name === 'image' && drawingId(node.attrs.src) === drawing.id) { pos = p; oldSrc = node.attrs.src || ''; return false } return true })
+      if (pos != null) {
+        const frag = (/#.*$/.exec(oldSrc) || [''])[0]
+        ed.chain().focus().command(({ tr }) => { tr.setNodeAttribute(pos, 'src', src + '?v=' + Date.now() + frag); return true }).run()
+      }
     } else {
       ed.chain().focus().setImage({ src, alt: 'drawing' }).run()
     }
