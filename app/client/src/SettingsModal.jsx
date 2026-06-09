@@ -1,9 +1,47 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from './api.js'
+import { api, notesApi } from './api.js'
 import {
   IconCloud, IconX, IconPlus, IconTrash, IconRefresh, IconSpinner,
-  IconCheck, IconKey, IconLink, IconNextcloud, IconApple,
+  IconCheck, IconKey, IconLink, IconNextcloud, IconApple, IconNote,
 } from './icons.jsx'
+
+/* ---------- Notes folder selector (where notes live in the cloud) ---------- */
+function NotesFolderSection({ accounts }) {
+  const [folders, setFolders] = useState([])
+  const [val, setVal] = useState('Notes')
+  const [acct, setAcct] = useState('')
+  const [saving, setSaving] = useState('idle') // idle | saving | saved | err
+  useEffect(() => {
+    notesApi.config().then((c) => { setVal(c.rootPath || 'Notes'); setAcct(c.accountId || (accounts[0] && accounts[0].id) || '') }).catch(() => {})
+  }, [])
+  useEffect(() => { notesApi.browse('').then((b) => setFolders((b.folders || []).map((f) => f.name))).catch(() => {}) }, [acct])
+  const save = async () => {
+    setSaving('saving')
+    try { const r = await notesApi.setConfig(acct, val.trim() || 'Notes'); setVal(r.rootPath); setSaving('saved'); setTimeout(() => setSaving('idle'), 1500) } catch { setSaving('err') }
+  }
+  return (
+    <div className="notes-cfg">
+      <div className="notes-cfg-head"><IconNote size={16} /> <span>Notes folder</span></div>
+      <div className="notes-cfg-sub">Where your notes &amp; drawings are stored in your cloud — created if it doesn’t exist.</div>
+      {accounts.length > 1 && (
+        <select className="input" value={acct} onChange={(e) => setAcct(e.target.value)} aria-label="Notes account" style={{ marginBottom: 8 }}>
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      )}
+      <div className="notes-cfg-row">
+        <input className="input" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Notes" aria-label="Notes folder path" />
+        <button className="btn primary sm" onClick={save} disabled={saving === 'saving'}>
+          {saving === 'saving' ? <IconSpinner size={14} /> : saving === 'saved' ? <IconCheck size={14} /> : 'Save'}
+        </button>
+      </div>
+      {folders.length > 0 && (
+        <div className="notes-cfg-chips">
+          {folders.slice(0, 12).map((f) => <button key={f} className={`chip notes-chip${val === f ? ' on' : ''}`} onClick={() => setVal(f)}>{f}</button>)}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /* Provider presets — keys are the REAL backend `type` values
    ('nextcloud' | 'icloud' | 'generic'). Field keys map straight onto the
@@ -301,6 +339,7 @@ export default function SettingsModal({ onClose }) {
                 <button className="btn ghost block" style={{ marginTop: 14 }} onClick={startAdd}>
                   <IconPlus size={15} /> Add account
                 </button>
+                {accounts.length > 0 && <NotesFolderSection accounts={accounts} />}
               </div>
             )
           )}

@@ -9,6 +9,7 @@ import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from '.
 import { sseHandler } from './events.js'
 import { startValarmPoller } from './valarm-poller.js'
 import * as caldav from './caldav.js'
+import * as notes from './notes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -25,7 +26,7 @@ const app = express()
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
-app.use(express.json({ limit: '2mb' }))
+app.use(express.json({ limit: '10mb' })) // headroom for note bodies + layouts
 app.use(
   session({
     name: 'rsid',
@@ -138,6 +139,60 @@ app.delete('/api/tasks/:id', requireAuth, tasks.deleteTask)
 app.get('/api/labels', requireAuth, tasks.listLabels)
 app.put('/api/labels', requireAuth, tasks.createLabel)
 app.put('/api/tasks/:id/labels', requireAuth, tasks.attachLabel)
+
+// ---- Notes (Markdown files in the user's Nextcloud, over WebDAV) ----
+app.get('/api/notes', requireAuth, async (req, res, next) => {
+  try { const list = await notes.listNotes(req.session.user.sub); res.json({ configured: list !== null, notes: list || [] }) } catch (e) { next(e) }
+})
+app.get('/api/notes/config', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.getConfig(req.session.user.sub)) } catch (e) { next(e) }
+})
+app.put('/api/notes/config', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.setConfig(req.session.user.sub, req.body?.accountId, req.body?.rootPath)) } catch (e) { next(e) }
+})
+app.get('/api/notes/browse', requireAuth, async (req, res, next) => {
+  try { res.json((await notes.browse(req.session.user.sub, req.query.path || '')) || { path: '', folders: [] }) } catch (e) { next(e) }
+})
+app.get('/api/notes/folders', requireAuth, async (req, res, next) => {
+  try { res.json({ folders: (await notes.listFolders(req.session.user.sub)) || [] }) } catch (e) { next(e) }
+})
+app.post('/api/notes/folders', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.createFolder(req.session.user.sub, req.body?.folder)) } catch (e) { next(e) }
+})
+app.post('/api/notes', requireAuth, async (req, res, next) => {
+  try { res.status(201).json(await notes.createNote(req.session.user.sub, req.body || {})) } catch (e) { next(e) }
+})
+app.get('/api/notes/item', requireAuth, async (req, res, next) => {
+  try { const n = await notes.getNote(req.session.user.sub, req.query.path); if (!n) return res.status(404).json({ error: 'not found' }); res.json(n) } catch (e) { next(e) }
+})
+app.put('/api/notes/item', requireAuth, async (req, res, next) => {
+  const { path, body, etag } = req.body || {}
+  if (!path) return res.status(400).json({ error: 'path required' })
+  try { res.json(await notes.saveNote(req.session.user.sub, path, { body, etag })) } catch (e) { next(e) }
+})
+app.post('/api/notes/rename', requireAuth, async (req, res, next) => {
+  const { path, title } = req.body || {}
+  if (!path || !title) return res.status(400).json({ error: 'path and title required' })
+  try { res.json(await notes.renameNote(req.session.user.sub, path, title)) } catch (e) { next(e) }
+})
+app.delete('/api/notes/item', requireAuth, async (req, res, next) => {
+  const path = req.query.path || req.body?.path
+  if (!path) return res.status(400).json({ error: 'path required' })
+  try { res.json(await notes.deleteNote(req.session.user.sub, path)) } catch (e) { next(e) }
+})
+app.get('/api/notes/resources/:name', requireAuth, async (req, res, next) => {
+  try {
+    const f = await notes.getResource(req.session.user.sub, req.params.name)
+    if (!f) return res.status(404).json({ error: 'not found' })
+    res.set('Content-Type', f.contentType || 'application/octet-stream')
+    res.set('Cache-Control', 'private, max-age=86400')
+    res.send(f.buffer)
+  } catch (e) { next(e) }
+})
+app.put('/api/notes/resources/:name', requireAuth, express.raw({ type: '*/*', limit: '25mb' }), async (req, res, next) => {
+  try { res.json(await notes.putResource(req.session.user.sub, req.params.name, req.body, req.get('content-type'))) } catch (e) { next(e) }
+})
+
 // Any other /api/* is a real 404 (JSON, so the SPA doesn't get an HTML page).
 app.all('/api/*', (_q, r) => r.status(404).json({ error: 'not found' }))
 

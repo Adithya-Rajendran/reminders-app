@@ -35,6 +35,9 @@ sqlite.exec(`
     url TEXT NOT NULL, display_name TEXT, color TEXT,
     supports_vtodo INTEGER NOT NULL DEFAULT 1, enabled INTEGER NOT NULL DEFAULT 1,
     UNIQUE (account_id, url));
+  CREATE TABLE IF NOT EXISTS notes_config (
+    user_id TEXT PRIMARY KEY, account_id TEXT, root_path TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')));
 `)
 console.log('sqlite config db ready at', path, '(journal_mode=' + sqlite.pragma('journal_mode', { simple: true }) + ')')
 
@@ -84,6 +87,18 @@ export async function saveDashboards(userId, dashboards) {
 // Drop a dashboard's saved layout (the registry row is updated separately).
 export async function deleteDashboardLayout(userId, dashboardId) {
   sqlite.prepare('DELETE FROM user_dashboards WHERE user_id=? AND dashboard_id=?').run(userId, dashboardId)
+}
+
+// Where the user's notes live: which CalDAV account + the folder path. (Notes
+// themselves live in that Nextcloud folder, never in this DB.)
+export async function getNotesConfig(userId) {
+  const r = sqlite.prepare('SELECT account_id, root_path FROM notes_config WHERE user_id=?').get(userId)
+  return r ? { accountId: r.account_id, rootPath: r.root_path } : null
+}
+export async function setNotesConfig(userId, accountId, rootPath) {
+  sqlite.prepare(`INSERT INTO notes_config (user_id, account_id, root_path, updated_at) VALUES (?,?,?,datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET account_id=excluded.account_id, root_path=excluded.root_path, updated_at=datetime('now')`)
+    .run(userId, accountId, rootPath)
 }
 
 // ============================================================
