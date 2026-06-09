@@ -11,6 +11,7 @@ import * as dav from './webdav.js'
 export const RES = '_resources'
 const MD = 'text/markdown; charset=utf-8'
 const DEFAULT_ROOT = 'Notes'
+const VALID_RES_NAME_RE = /^[\w.-]{1,160}$/ // safe resource filename (no slashes / traversal)
 
 const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
 const join = (...p) => p.map(trimSlashes).filter(Boolean).join('/')
@@ -92,7 +93,6 @@ export async function browse(userId, path = '') {
 export async function listFolders(userId) {
   const c = await ctx(userId)
   if (!c) return null
-  await dav.ensureCollection(c.account, c.root)
   const out = ['']
   const walk = async (dir, prefix) => {
     const entries = await dav.propfind(c.account, dir, 1)
@@ -120,8 +120,7 @@ export async function createFolder(userId, folder) {
 export async function listNotes(userId) {
   const c = await ctx(userId)
   if (!c) return null
-  await dav.ensureCollection(c.account, c.root)
-  const files = []
+  const files = [] // PROPFIND-only; a missing root just yields an empty list (created on first write)
   let folderCount = 0
   const walk = async (dir, depth) => {
     if (depth > 8 || folderCount > 400) return // bound a pathological tree
@@ -211,7 +210,7 @@ export async function deleteNote(userId, path) {
 export async function putResource(userId, name, buffer, contentType) {
   const c = await ctx(userId)
   if (!c) throw err('notes not configured', 409)
-  if (!/^[\w.-]{1,160}$/.test(name)) throw err('bad resource name', 400)
+  if (!VALID_RES_NAME_RE.test(name)) throw err('bad resource name', 400)
   const dir = join(c.root, RES)
   await dav.ensureCollection(c.account, dir)
   await dav.write(c.account, join(dir, name), buffer, { contentType: contentType || 'application/octet-stream' })
@@ -220,6 +219,6 @@ export async function putResource(userId, name, buffer, contentType) {
 export async function getResource(userId, name) {
   const c = await ctx(userId)
   if (!c) return null
-  if (!/^[\w.-]{1,160}$/.test(name)) return null
+  if (!VALID_RES_NAME_RE.test(name)) return null
   return dav.read(c.account, join(c.root, RES, name))
 }

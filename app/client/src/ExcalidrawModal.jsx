@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Excalidraw, serializeAsJSON, exportToBlob } from '@excalidraw/excalidraw'
+import ModalFrame from './ModalFrame.jsx'
 import { IconX, IconCheck, IconSpinner } from './icons.jsx'
 
 // Full Excalidraw editor in a modal. Loaded lazily (the package is ~heavy), so
@@ -31,10 +31,9 @@ export default function ExcalidrawModal({ initialScene, onSave, onClose }) {
     } catch (e) { console.error('drawing save failed', e); setSaving(false) }
   }
 
-  return createPortal(
-    <div className="overlay excali-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="excali-modal" role="dialog" aria-modal="true" aria-label="Drawing editor">
-        <div className="excali-head">
+  return (
+    <ModalFrame overlayClass="excali-overlay" modalClass="excali-modal" ariaLabel="Drawing editor" onBackdrop={onClose}>
+      <div className="excali-head">
           <span className="excali-title">✏️ Drawing</span>
           <span style={{ flex: 1 }} />
           <button className="btn primary" onClick={save} disabled={saving}>
@@ -42,11 +41,9 @@ export default function ExcalidrawModal({ initialScene, onSave, onClose }) {
           </button>
           <button className="iconbtn sm" aria-label="Close drawing" title="Close" onClick={onClose}><IconX size={16} /></button>
         </div>
-        <div className="excali-canvas">
-          <Excalidraw excalidrawAPI={(api) => { apiRef.current = api }} initialData={initialData} />
-        </div>
+      <div className="excali-canvas">
+        <Excalidraw excalidrawAPI={(api) => { apiRef.current = api }} initialData={initialData} />
       </div>
-    </div>,
-    document.body,
+    </ModalFrame>
   )
 }

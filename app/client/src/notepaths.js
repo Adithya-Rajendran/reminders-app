@@ -14,7 +14,8 @@ export const toDisk = (md) => String(md || '').replace(
   (_m, p, _q, frag) => '](_resources/' + p + (frag || '') + ')',
 )
 
-export const fragOf = (src) => (/#(.*)$/.exec(src || '') || ['', ''])[1]
+// The URL #fragment (carries the image width, e.g. "w640").
+const fragOf = (src) => (/#(.*)$/.exec(src || '') || ['', ''])[1]
 export const widthOf = (src) => { const m = /(?:^|;)w(\d+)/.exec(fragOf(src)); return m ? +m[1] : null }
 export const withWidth = (src, w) => { const f = /#.*$/.exec(src || ''); const head = f ? src.slice(0, f.index) : (src || ''); return head + (w ? '#w' + w : '') }
 
