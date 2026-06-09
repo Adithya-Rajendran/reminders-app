@@ -6,7 +6,7 @@ import ICAL from 'ical.js'
 import { safeFetch, authHeader, createGroupCalendar, deleteCalendar } from './caldav.js'
 import { asMatch } from './webdav.js'
 import { listsWithId, getListById, getGroupMap, setGroupMapping, deleteGroupMapping, deleteListRow } from './config.js'
-import { allUserVtodos } from './tasks_caldav.js'
+import { allUserVtodos, invalidateUserCache } from './tasks_caldav.js'
 
 const err = (msg, status) => { const e = new Error(msg); e.status = status; return e }
 const accountOf = (row) => ({ id: row.account_id, type: row.account_type, server_url: row.account_server_url, username: row.account_username, password_enc: row.account_password_enc })
@@ -88,13 +88,16 @@ export async function mapGroup(userId, groupName, { listId, createNew } = {}) {
   }
   if (!targetId) throw err('listId or createNew required', 400)
   await setGroupMapping(userId, name, targetId)
+  invalidateUserCache(userId) // migrate off a FRESH CalDAV read, not the 12s widget cache
   const moved = await migrateInto(userId, name, targetId)
+  invalidateUserCache(userId) // reflect the moves immediately in the next read
   return { name, listId: targetId, moved }
 }
 
 export async function deleteGroup(userId, groupName, deleteCalendarFlag) {
   const name = String(groupName || '').trim()
   if (!name) throw err('group name required', 400)
+  invalidateUserCache(userId) // decide off a FRESH read, not the 12s widget cache
   const listId = (await getGroupMap(userId))[name] || null
 
   if (deleteCalendarFlag) {
@@ -103,6 +106,7 @@ export async function deleteGroup(userId, groupName, deleteCalendarFlag) {
       if (resolved) { await deleteCalendar(resolved.account, resolved.list.url); await deleteListRow(resolved.account.id, resolved.list.url) }
     }
     await deleteGroupMapping(userId, name)
+    invalidateUserCache(userId)
     return { deletedCalendar: !!listId }
   }
 
@@ -129,5 +133,6 @@ export async function deleteGroup(userId, groupName, deleteCalendarFlag) {
     }
   }
   await deleteGroupMapping(userId, name)
+  invalidateUserCache(userId) // reflect the tag-strip + moves immediately
   return { ungrouped: moved }
 }

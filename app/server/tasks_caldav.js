@@ -56,7 +56,8 @@ export function serializeVtodo(vt, listId, objectUrl) {
 const TTL = 12000
 const cache = new Map() // sub -> { at, byUrl: Map<url, objects[]> }
 function getCache(sub) { let c = cache.get(sub); if (!c || Date.now() - c.at > TTL) { c = { at: Date.now(), byUrl: new Map() }; cache.set(sub, c) } return c }
-const invalidate = (sub) => cache.delete(sub)
+export const invalidateUserCache = (sub) => cache.delete(sub)
+const invalidate = invalidateUserCache
 async function fetchObjectsCached(sub, account, listUrl) {
   const c = getCache(sub)
   if (c.byUrl.has(listUrl)) return c.byUrl.get(listUrl)
