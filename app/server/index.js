@@ -172,14 +172,19 @@ app.get('/api/notes/item', requireAuth, async (req, res, next) => {
   try { const n = await notes.getNote(req.session.user.sub, req.query.path); if (!n) return res.status(404).json({ error: 'not found' }); res.json(n) } catch (e) { next(e) }
 })
 app.put('/api/notes/item', requireAuth, async (req, res, next) => {
-  const { path, body, etag } = req.body || {}
+  const { path, body, etag, tags } = req.body || {}
   if (!path) return res.status(400).json({ error: 'path required' })
-  try { res.json(await notes.saveNote(req.session.user.sub, path, { body, etag })) } catch (e) { next(e) }
+  try { res.json(await notes.saveNote(req.session.user.sub, path, { body, etag, tags })) } catch (e) { next(e) }
 })
 app.post('/api/notes/rename', requireAuth, async (req, res, next) => {
   const { path, title } = req.body || {}
   if (!path || !title) return res.status(400).json({ error: 'path and title required' })
   try { res.json(await notes.renameNote(req.session.user.sub, path, title)) } catch (e) { next(e) }
+})
+app.post('/api/notes/move', requireAuth, async (req, res, next) => {
+  const { path, folder } = req.body || {}
+  if (!path) return res.status(400).json({ error: 'path required' })
+  try { res.json(await notes.moveNote(req.session.user.sub, path, folder || '')) } catch (e) { next(e) }
 })
 app.delete('/api/notes/item', requireAuth, async (req, res, next) => {
   const path = req.query.path || req.body?.path
