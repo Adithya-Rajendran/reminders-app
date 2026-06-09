@@ -19,8 +19,8 @@ metadata:
   labels: { app: reminders-app }
 spec:
   replicas: 1
-  # RWO ceph-rbd volume can't be multi-attached, so a rolling update would
-  # deadlock — recreate the pod instead (brief downtime on deploy is fine).
+  # The RWO volume can't be multi-attached, so a rolling update would deadlock —
+  # recreate the pod instead (brief downtime on deploy is fine).
   strategy: { type: Recreate }
   selector:
     matchLabels: { app: reminders-app }
@@ -48,7 +48,7 @@ spec:
             - name: NODE_ENV
               value: production
             # Tasks/reminders live in the user's CalDAV server; only config +
-            # dashboard layout (+ sessions) live in this SQLite file on ceph-rbd.
+            # dashboard layout (+ sessions) live in this SQLite file on the volume.
             - name: CONFIG_DB_PATH
               value: /data/config.db
           envFrom:

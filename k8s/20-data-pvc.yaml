@@ -1,7 +1,7 @@
-# Small block volume for the SQLite config DB (CalDAV re-platform). ceph-rbd is
-# block storage (real ext4/xfs), so SQLite's POSIX file locking + WAL are safe
-# here — never put SQLite on CephFS/NFS. RWO + single replica + Recreate means
-# exactly one process ever opens the file.
+# Small block volume for the SQLite config DB. Use a ReadWriteOnce block-storage
+# class (real ext4/xfs) so SQLite's POSIX file locking + WAL are safe — never put
+# SQLite on a shared filesystem (NFS/CephFS). RWO + single replica + Recreate
+# means exactly one process ever opens the file.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -10,7 +10,8 @@ metadata:
   labels: { app: reminders-app }
 spec:
   accessModes: ["ReadWriteOnce"]
-  storageClassName: ceph-rbd
+  storageClassName: standard   # set to your cluster's RWO block-storage class
+
   resources:
     requests:
       storage: 1Gi

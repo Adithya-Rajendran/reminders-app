@@ -12,7 +12,7 @@ Here is the consolidated plan.
 
 ## 0. Summary
 
-Replace the Vikunja reverse-proxy (`vikunja.js`) with a Postgres-native task/project/label store and an in-app reminder scheduler, fixing the shared-service-account cross-user data leak and the "POST = full-object replace" footgun. The defining constraint is **continuity**: the live single-pod app at `tasks.rke.alaras.net` must never break, and the cutover must be reversible by flipping one env var. To get that, the new backend is built to be **byte-compatible with Vikunja's wire contract** so it can be served under the *same* `/api/vikunja/*` routes the client already calls — a `TASKS_BACKEND` flag selects proxy vs native. **The cutover therefore needs zero client changes.** A later, optional cleanup phase modernizes routes/verbs/SSE and removes the "vikunja" naming.
+Replace the Vikunja reverse-proxy (`vikunja.js`) with a Postgres-native task/project/label store and an in-app reminder scheduler, fixing the shared-service-account cross-user data leak and the "POST = full-object replace" footgun. The defining constraint is **continuity**: the live single-pod app at `tasks.example.com` must never break, and the cutover must be reversible by flipping one env var. To get that, the new backend is built to be **byte-compatible with Vikunja's wire contract** so it can be served under the *same* `/api/vikunja/*` routes the client already calls — a `TASKS_BACKEND` flag selects proxy vs native. **The cutover therefore needs zero client changes.** A later, optional cleanup phase modernizes routes/verbs/SSE and removes the "vikunja" naming.
 
 ### Conflicts resolved across the component designs (deliberate decisions)
 
