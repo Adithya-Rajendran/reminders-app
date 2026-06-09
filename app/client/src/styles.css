@@ -1147,9 +1147,6 @@ button.rem-head { display: flex; align-items: center; width: 100%; border: 0; cu
 button.rem-head:hover .g-title { color: var(--accent); }
 .rem-chev { transition: transform .15s ease; opacity: .6; flex: 0 0 auto; }
 .rem-chev.open { transform: rotate(90deg); }
-/* "New group…" inline input in the add-widget submenu */
-.menu-newgroup { display: flex; gap: 6px; align-items: center; padding: 4px 6px; }
-.menu-newgroup input { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; color: var(--text); }
 
 /* Calendar: trimmed toolbar when the widget is narrow. */
 .cal-compact .fc-toolbar-title { font-size: 14px; }
@@ -1248,6 +1245,37 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rg-cal { font-size: 12px; padding: 5px 8px; max-width: 190px; }
 .rg-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rg-delcal { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.rg-new { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.rg-newname { flex: 1 1 auto; min-width: 0; font-size: 13px; padding: 6px 9px; }
+.rg-newcal { flex: 0 0 auto; font-size: 12px; padding: 6px 8px; max-width: 150px; }
+
+/* ---- searchable group picker (quick-add + add-widget submenu) ---- */
+.gp-trigger {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
+  flex: 0 1 120px; min-width: 78px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 8px; font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.gp-trigger:hover { border-color: var(--line-strong); }
+.gp-trigger .gp-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-trigger .gp-ph { color: var(--faint); }
+.gp-pop { padding: 6px; }            /* .gp-pop also carries .menu for the surface */
+.gp-panel { display: flex; flex-direction: column; gap: 6px; }
+.gp-search { width: 100%; font-size: 13px; padding: 7px 9px; }
+.gp-list { display: flex; flex-direction: column; max-height: 252px; overflow-y: auto; }
+.gp-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  font: inherit; font-size: 13px; color: var(--text);
+  padding: 8px 9px; border-radius: 8px; border: none; background: transparent; cursor: pointer;
+  transition: background 120ms ease;
+}
+.gp-item:hover { background: var(--accent-soft); }
+.gp-item.on { background: var(--accent-soft); font-weight: 600; }
+.gp-item .gp-dot-sp { width: 14px; height: 1px; flex: 0 0 auto; }
+.gp-new { color: var(--accent); font-weight: 600; }
+.gp-sec { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 6px 9px 2px; }
+.gp-sep { height: 1px; background: var(--line); margin: 5px 4px; }
+.gp-empty { font-size: 12px; color: var(--muted); padding: 8px 9px; }
 
 .note-overlay { align-items: stretch; }
 .note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }

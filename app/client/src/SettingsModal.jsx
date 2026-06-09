@@ -1,18 +1,32 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api, notesApi } from './api.js'
+import { emitTasksChanged } from './tasksbus.js'
 import {
   IconCloud, IconX, IconPlus, IconTrash, IconRefresh, IconSpinner,
   IconCheck, IconKey, IconLink, IconNextcloud, IconApple, IconNote, IconBell,
 } from './icons.jsx'
 
 /* ---------- Reminder groups → calendars ---------- */
-function ReminderGroupsSection() {
+function ReminderGroupsSection({ initialCreate }) {
   const [data, setData] = useState(null) // { groups, calendars }
   const [busy, setBusy] = useState(null) // group name in flight
   const [confirmDel, setConfirmDel] = useState(null)
   const [delCal, setDelCal] = useState(false)
+  const [newName, setNewName] = useState(initialCreate || '')
+  const [newCal, setNewCal] = useState('__new') // '__new' = create a calendar named after the group
+  const [creating, setCreating] = useState(false)
+  const rootRef = useRef(null)
+  const nameRef = useRef(null)
   const load = useCallback(() => { api('/api/reminder-groups').then(setData).catch(() => setData({ groups: [], calendars: [] })) }, [])
   useEffect(() => { load() }, [load])
+
+  // Opened via "＋ New group…" from a picker — prefill, scroll into view, focus.
+  useEffect(() => {
+    if (!initialCreate) return undefined
+    setNewName(initialCreate)
+    const t = setTimeout(() => { rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); nameRef.current?.focus() }, 80)
+    return () => clearTimeout(t)
+  }, [initialCreate])
 
   const remap = async (group, value) => {
     setBusy(group)
@@ -23,26 +37,39 @@ function ReminderGroupsSection() {
         if (value === '') { const rem = data.calendars.find((c) => /^reminders$/i.test(c.name)); id = rem ? rem.id : null }
         if (id) await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify({ group, listId: Number(id) }) })
       }
-      await load()
+      await load(); emitTasksChanged()
     } catch { /* ignore */ } finally { setBusy(null) }
   }
   const del = async (group) => {
     setBusy(group)
-    try { await api('/api/reminder-groups?group=' + encodeURIComponent(group) + '&deleteCalendar=' + (delCal ? '1' : '0'), { method: 'DELETE' }); setConfirmDel(null); setDelCal(false); await load() } catch { /* ignore */ } finally { setBusy(null) }
+    try { await api('/api/reminder-groups?group=' + encodeURIComponent(group) + '&deleteCalendar=' + (delCal ? '1' : '0'), { method: 'DELETE' }); setConfirmDel(null); setDelCal(false); await load(); emitTasksChanged() } catch { /* ignore */ } finally { setBusy(null) }
+  }
+  const create = async (e) => {
+    e?.preventDefault()
+    const name = newName.trim()
+    if (!name || creating) return
+    setCreating(true)
+    try {
+      const body = newCal === '__new' ? { group: name, createNew: true } : { group: name, listId: Number(newCal) }
+      await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify(body) })
+      setNewName(''); setNewCal('__new'); await load(); emitTasksChanged() // refresh widget group pickers
+    } catch { /* ignore */ } finally { setCreating(false) }
   }
 
-  if (!data || !data.groups.length) {
-    return (
-      <div className="notes-cfg">
-        <div className="notes-cfg-head"><IconBell size={16} /> <span>Reminder groups</span></div>
-        <div className="notes-cfg-sub">Add a group in the Reminders widget, then map it to its own calendar here.</div>
-      </div>
-    )
-  }
+  const calendars = (data && data.calendars) || []
   return (
-    <div className="notes-cfg">
+    <div className="notes-cfg" ref={rootRef}>
       <div className="notes-cfg-head"><IconBell size={16} /> <span>Reminder groups → calendars</span></div>
-      <div className="notes-cfg-sub">Each group’s reminders are stored in its calendar (synced as its own task list). Changing the calendar moves existing reminders into it.</div>
+      <div className="notes-cfg-sub">Create a group here and it gets its own calendar (synced as its own task list). Each group’s reminders live in its calendar; changing the calendar moves them.</div>
+      <form className="rg-new" onSubmit={create}>
+        <input ref={nameRef} className="input rg-newname" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New group name" aria-label="New group name" />
+        <select className="input rg-newcal" value={newCal} onChange={(e) => setNewCal(e.target.value)} aria-label="Calendar for the new group">
+          <option value="__new">＋ New calendar</option>
+          {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <button type="submit" className="btn primary sm" disabled={creating || !newName.trim()}>{creating ? <IconSpinner size={14} /> : 'Add'}</button>
+      </form>
+      {data && data.groups.length > 0 && (
       <div className="rg-list">
         {data.groups.map((g) => (
           <div className="rg-row" key={g.name}>
@@ -67,6 +94,7 @@ function ReminderGroupsSection() {
           </div>
         ))}
       </div>
+      )}
     </div>
   )
 }
@@ -203,7 +231,7 @@ function useModalRef(onClose) {
   return ref
 }
 
-export default function SettingsModal({ onClose }) {
+export default function SettingsModal({ onClose, initialCreateGroup }) {
   const ref = useModalRef(onClose)
 
   const [accounts, setAccounts] = useState([])
@@ -406,7 +434,7 @@ export default function SettingsModal({ onClose }) {
                   <IconPlus size={15} /> Add account
                 </button>
                 {accounts.length > 0 && <NotesFolderSection accounts={accounts} />}
-                {accounts.length > 0 && <ReminderGroupsSection />}
+                {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
               </div>
             )
           )}

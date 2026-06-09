@@ -5,6 +5,8 @@ import UpcomingWidget from './widgets/UpcomingWidget.jsx'
 import RemindersWidget from './widgets/RemindersWidget.jsx'
 import CalendarWidget from './widgets/CalendarWidget.jsx'
 import NotesWidget from './widgets/NotesWidget.jsx'
+import { GroupList } from './GroupPicker.jsx'
+import { recentGroups } from './groups.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconClock, IconBell, IconCalendar, IconCloud,
@@ -208,6 +210,9 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
     persist(def, lay)
   }
 
+  // Group creation happens only in Settings now — open it with the typed name.
+  const onNewGroup = (name) => onOpenSettings?.({ createGroup: name })
+
   if (!loaded) {
     return (
       <div className="grid-wrap">
@@ -227,7 +232,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
   if (projects.length === 0 && caldavAccounts === 0) {
     return (
       <>
-        <Toolbar projects={projects} onAdd={addWidget} title={title} />
+        <Toolbar projects={projects} onAdd={addWidget} onNewGroup={onNewGroup} title={title} />
         <OnboardingCard onOpenSettings={onOpenSettings} />
       </>
     )
@@ -235,7 +240,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
 
   return (
     <>
-      <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} title={title} />
+      <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} onNewGroup={onNewGroup} title={title} />
       <div className="grid-wrap">
         {widgets.length === 0 ? (
           <div
@@ -245,7 +250,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
             <div className="state-ic" style={{ margin: '0 auto 12px' }}><IconInbox size={22} /></div>
             <div className="state-title" style={{ fontSize: 16 }}>Your dashboard is empty</div>
             <div className="state-sub" style={{ margin: '6px auto 18px' }}>Add a widget to start assembling your workspace.</div>
-            <AddWidgetMenu projects={projects} onAdd={addWidget} />
+            <AddWidgetMenu projects={projects} onAdd={addWidget} onNewGroup={onNewGroup} />
           </div>
         ) : (
           <Grid
@@ -264,7 +269,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
               <div key={w.i}>
                 <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
                   {w.type === 'upcoming' && <UpcomingWidget />}
-                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} group={w.group || null} />}
+                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} group={w.group || null} onNewGroup={onNewGroup} />}
                   {w.type === 'calendar' && <CalendarWidget />}
                   {w.type === 'notes' && <NotesWidget onOpenSettings={onOpenSettings} />}
                 </WidgetFrame>
@@ -300,7 +305,7 @@ function OnboardingCard({ onOpenSettings }) {
 }
 
 /* ---------- Toolbar ---------- */
-function Toolbar({ projects, onAdd, onReset, title }) {
+function Toolbar({ projects, onAdd, onReset, onNewGroup, title }) {
   const now = new Date()
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
   return (
@@ -310,28 +315,26 @@ function Toolbar({ projects, onAdd, onReset, title }) {
         <div className="sub">{dateLabel}</div>
       </div>
       <div className="toolbar-spacer" />
-      <AddWidgetMenu projects={projects} onAdd={onAdd} onReset={onReset} />
+      <AddWidgetMenu projects={projects} onAdd={onAdd} onReset={onReset} onNewGroup={onNewGroup} />
     </div>
   )
 }
 
 /* ---------- Add-widget dropdown (Reminders has a group submenu) ---------- */
-function AddWidgetMenu({ onAdd, onReset }) {
+function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
   const [open, setOpen] = useState(false)
   const [sub, setSub] = useState(false)   // false | 'reminders'
   const [groups, setGroups] = useState([])
-  const [adding, setAdding] = useState(false)
-  const [newName, setNewName] = useState('')
   const ref = usePopover(open, setOpen)
-  useEffect(() => { if (!open) { setSub(false); setAdding(false); setNewName('') } }, [open])
+  useEffect(() => { if (!open) setSub(false) }, [open])
   useEffect(() => {
     if (sub !== 'reminders') return
-    tk('/labels').then((ls) => setGroups((Array.isArray(ls) ? ls : []).map((l) => l.title).filter(Boolean))).catch(() => {})
+    api('/api/reminder-groups').then((d) => setGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
   }, [sub])
 
   const add = (type, group) => { onAdd(type, group); setOpen(false) }
   const reset = () => { onReset?.(); setOpen(false) }
-  const addNew = (e) => { e.preventDefault(); const g = newName.trim(); if (g) add('reminders', g) }
+  const recent = recentGroups().filter((g) => groups.includes(g))
 
   return (
     <div style={{ position: 'relative' }} ref={ref}>
@@ -362,29 +365,18 @@ function AddWidgetMenu({ onAdd, onReset }) {
             </>
           ) : (
             <>
-              <button className="menu-item" role="menuitem" onClick={() => { setSub(false); setAdding(false) }} style={{ color: 'var(--muted)' }}>
+              <button className="menu-item" role="menuitem" onClick={() => setSub(false)} style={{ color: 'var(--muted)' }}>
                 <IconChevL size={15} /> Reminders
               </button>
               <div className="menu-sep" />
               <div className="menu-label">Lock to which group?</div>
-              <button className="menu-item" role="menuitem" onClick={() => add('reminders', null)}>
-                <IconBell size={15} /> All groups
-              </button>
-              {groups.map((g) => (
-                <button key={g} className="menu-item" role="menuitem" onClick={() => add('reminders', g)}>
-                  <span className="pdot" style={{ background: 'var(--accent)', width: 9, height: 9 }} /> {g}
-                </button>
-              ))}
-              {!adding ? (
-                <button className="menu-item" role="menuitem" onClick={() => setAdding(true)} style={{ color: 'var(--accent)' }}>
-                  <IconPlus size={15} /> New group…
-                </button>
-              ) : (
-                <form className="menu-newgroup" onSubmit={addNew}>
-                  <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Group name" aria-label="New group name" />
-                  <button type="submit" className="iconbtn sm" aria-label="Create group widget"><IconPlus size={15} /></button>
-                </form>
-              )}
+              <GroupList
+                groups={groups}
+                recent={recent}
+                neutral={{ label: 'All groups', value: '', icon: IconBell }}
+                onPick={(v) => add('reminders', v || null)}
+                onNew={(name) => { setOpen(false); onNewGroup?.(name) }}
+              />
             </>
           )}
         </div>

@@ -17,6 +17,9 @@ export async function api(path, opts = {}) {
 // Task / project / label API (CalDAV-backed), served by the BFF.
 export const tk = (path, opts) => api('/api' + path, opts)
 
+// Reminder groups ↔ calendars: { groups:[{name,count,listId,calendar}], calendars:[{id,name}] }.
+export const reminderGroups = () => api('/api/reminder-groups')
+
 // Notes (Markdown files in the user's Nextcloud, via WebDAV) + binary resources.
 const qp = (p) => '?path=' + encodeURIComponent(p)
 export const notesApi = {
