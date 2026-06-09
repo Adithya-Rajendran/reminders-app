@@ -1160,3 +1160,16 @@ button.rem-head:hover .g-title { color: var(--accent); }
    ultra-wide (1440p+) screens. The grid measures .grid-wrap, so this also keeps
    per-column widths sane and resizing usefully fine. */
 .toolbar, .grid-wrap { width: 100%; max-width: 1800px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+
+/* ---------- Dashboard switcher (multiple dashboards) ---------- */
+.dash-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; max-width: 1800px; margin: 0 auto; padding: 14px 24px 0; box-sizing: border-box; }
+.dash-tab { display: inline-flex; align-items: center; }
+.dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.dash-tab-btn:hover { color: var(--text); }
+.dash-tab.on .dash-tab-btn { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
+.dash-tab-x { margin-left: -4px; background: none; border: none; color: rgba(255, 255, 255, .85); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 8px 0 2px; }
+.dash-tab-x:hover { color: #fff; }
+.dash-tab-edit { background: var(--panel); border: 1px solid var(--accent); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text); width: 150px; outline: none; }
+.dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 18px; line-height: 1; cursor: pointer; transition: color .15s, border-color .15s; }
+.dash-tab-add:hover { color: var(--text); border-color: var(--accent); }
+@media (max-width: 720px) { .dash-tabs { padding-left: 16px; padding-right: 16px; } }

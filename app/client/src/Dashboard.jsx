@@ -11,7 +11,6 @@ import {
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
-const DASH = 'main'
 // Fine-grained columns (= the original 12/10/6/4/2 × 2.5) so widgets resize in
 // small steps and don't feel too coarse on wide screens. Because every breakpoint
 // is the same multiple of the original, any older saved layout scales up by a
@@ -79,7 +78,7 @@ function usePopover(open, setOpen) {
   return ref
 }
 
-export default function Dashboard({ user, onOpenSettings }) {
+export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', title }) {
   const [projects, setProjects] = useState([])
   const [caldavAccounts, setCaldavAccounts] = useState(null) // null until loaded
   const [widgets, setWidgets] = useState([])
@@ -102,7 +101,7 @@ export default function Dashboard({ user, onOpenSettings }) {
       setCaldavAccounts(acctCount)
 
       let saved = null
-      try { saved = await api('/api/layouts/' + DASH) } catch { /* none */ }
+      try { saved = await api('/api/layouts/' + dashboardId) } catch { /* none */ }
       if (saved?.layout) {
         // Any persisted layout is authoritative — but drop retired widget types
         // (e.g. the old tasklist/caldav widgets), and scale a pre-24-column layout
@@ -116,7 +115,7 @@ export default function Dashboard({ user, onOpenSettings }) {
         setWidgets(sw)
         setLayouts(lay)
         if (sw.length !== original.length || needsGrid) {
-          api('/api/layouts/' + DASH, {
+          api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),
           }).catch(() => {})
@@ -160,7 +159,7 @@ export default function Dashboard({ user, onOpenSettings }) {
     if (!loaded) return // gate saves until after hydration (RGL footgun)
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      api('/api/layouts/' + DASH, {
+      api('/api/layouts/' + dashboardId, {
         method: 'PUT',
         body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: nextLayouts } }),
       }).catch(() => {})
@@ -225,7 +224,7 @@ export default function Dashboard({ user, onOpenSettings }) {
   if (projects.length === 0 && caldavAccounts === 0) {
     return (
       <>
-        <Toolbar projects={projects} onAdd={addWidget} />
+        <Toolbar projects={projects} onAdd={addWidget} title={title} />
         <OnboardingCard onOpenSettings={onOpenSettings} />
       </>
     )
@@ -233,7 +232,7 @@ export default function Dashboard({ user, onOpenSettings }) {
 
   return (
     <>
-      <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} />
+      <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} title={title} />
       <div className="grid-wrap">
         {widgets.length === 0 ? (
           <div
@@ -297,13 +296,13 @@ function OnboardingCard({ onOpenSettings }) {
 }
 
 /* ---------- Toolbar ---------- */
-function Toolbar({ projects, onAdd, onReset }) {
+function Toolbar({ projects, onAdd, onReset, title }) {
   const now = new Date()
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
   return (
     <div className="toolbar">
       <div>
-        <h1>Dashboard</h1>
+        <h1>{title || 'Dashboard'}</h1>
         <div className="sub">{dateLabel}</div>
       </div>
       <div className="toolbar-spacer" />

@@ -93,6 +93,27 @@ app.put('/api/layouts/:id', requireAuth, async (req, res, next) => {
   }
   try { await config.saveLayout(req.session.user.sub, req.params.id, req.body); res.json({ ok: true }) } catch (e) { next(e) }
 })
+// Dashboard registry (names + order for the multi-dashboard switcher).
+app.get('/api/dashboards', requireAuth, async (req, res, next) => {
+  try { res.json({ dashboards: await config.getDashboards(req.session.user.sub) }) } catch (e) { next(e) }
+})
+app.put('/api/dashboards', requireAuth, async (req, res, next) => {
+  const list = req.body?.dashboards
+  if (!Array.isArray(list) || list.length === 0 || list.length > 24) {
+    return res.status(400).json({ error: 'dashboards must be a non-empty array (max 24)' })
+  }
+  const clean = []
+  for (const d of list) {
+    const id = String(d?.id || '')
+    if (!/^[\w-]{1,64}$/.test(id) || id === config.DASH_INDEX) return res.status(400).json({ error: 'invalid dashboard id' })
+    clean.push({ id, name: (String(d?.name || '').trim().slice(0, 64)) || 'Dashboard' })
+  }
+  try { await config.saveDashboards(req.session.user.sub, clean); res.json({ ok: true }) } catch (e) { next(e) }
+})
+app.delete('/api/dashboards/:id', requireAuth, async (req, res, next) => {
+  if (req.params.id === config.DASH_INDEX) return res.status(400).json({ error: 'bad id' })
+  try { await config.deleteDashboardLayout(req.session.user.sub, req.params.id); res.json({ ok: true }) } catch (e) { next(e) }
+})
 // CalDAV settings + tasks
 app.get('/api/caldav/accounts', requireAuth, caldav.listAccountsHandler)
 app.post('/api/caldav/accounts', requireAuth, caldav.addAccountHandler)
