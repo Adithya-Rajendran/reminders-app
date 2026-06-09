@@ -1,45 +1,102 @@
-import React, { useEffect } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
+import { notesApi } from './api.js'
+import { IconSpinner } from './icons.jsx'
 
-// Live WYSIWYG editor that reads/writes GitHub-flavored Markdown. The note's
-// canonical form on disk stays plain .md; this only changes how it's edited.
-// Lazy-loaded by NoteEditor so Tiptap is code-split out of the main bundle.
+const ExcalidrawModal = lazy(() => import('./ExcalidrawModal.jsx'))
+
+const RES_PREFIX = '/api/notes/resources/'
+// A drawing is an image whose file is "<id>.excalidraw.png" (its editable scene
+// lives next to it as "<id>.excalidraw"). Portable: other tools just see a PNG.
+const isDrawing = (src) => /\.excalidraw\.png(\?|$)/.test(src || '')
+const drawingId = (src) => { const m = /([^/]+)\.excalidraw\.png/.exec(src || ''); return m ? m[1] : null }
+// On disk, image/link refs are relative (_resources/…). The editor needs a
+// loadable URL; we rewrite at the boundary so the stored markdown stays portable.
+const toDisplay = (md) => String(md || '').replace(/\]\(_resources\//g, '](' + RES_PREFIX)
+const toDisk = (md) => String(md || '').replace(/\]\(\/api\/notes\/resources\/([^)?\s]+)(\?[^)\s]*)?\)/g, '](_resources/$1)')
+
+// Live WYSIWYG editor that reads/writes GitHub-flavored Markdown (notes stay
+// plain .md on disk). Supports inserting + re-editing Excalidraw drawings.
 export default function NoteRichEditor({ value, onChange }) {
+  const [drawing, setDrawing] = useState(null) // null | { scene, id }
+  const editorRef = useRef(null)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'cb' } } }),
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }),
+      Image.configure({ inline: false, allowBase64: false, HTMLAttributes: { class: 'note-img' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({ html: false, tightLists: true, linkify: true, transformPastedText: true, transformCopiedText: true }),
     ],
-    content: value || '',
+    content: toDisplay(value),
     autofocus: 'end',
-    onUpdate: ({ editor: ed }) => onChange?.(ed.storage.markdown.getMarkdown()),
-    editorProps: { attributes: { class: 'tiptap-content', spellcheck: 'true' } },
+    onUpdate: ({ editor: ed }) => onChange?.(toDisk(ed.storage.markdown.getMarkdown())),
+    editorProps: {
+      attributes: { class: 'tiptap-content', spellcheck: 'true' },
+      handleDOMEvents: {
+        dblclick: (_view, event) => {
+          const t = event.target
+          if (t && t.tagName === 'IMG' && isDrawing(t.getAttribute('src'))) { openForEdit(t.getAttribute('src')); return true }
+          return false
+        },
+      },
+    },
   })
+  editorRef.current = editor
 
-  // Re-sync only when the markdown actually differs (e.g. switching notes),
-  // never on our own edits — avoids an update loop.
   useEffect(() => {
     if (!editor || value == null) return
-    if (editor.storage.markdown.getMarkdown() !== value) editor.commands.setContent(value || '', false)
+    if (toDisk(editor.storage.markdown.getMarkdown()) !== value) editor.commands.setContent(toDisplay(value), false)
   }, [value, editor])
+
+  const openForEdit = async (src) => {
+    const id = drawingId(src)
+    if (!id) return
+    let scene = null
+    try { const r = await fetch(RES_PREFIX + encodeURIComponent(id + '.excalidraw')); if (r.ok) scene = await r.text() } catch { /* fall back to a fresh canvas */ }
+    setDrawing({ scene, id })
+  }
+  const newDrawing = () => setDrawing({ scene: null, id: null })
+
+  const onDrawingSave = async ({ json, png }) => {
+    const ed = editorRef.current
+    const id = drawing.id || crypto.randomUUID()
+    await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/json' }), 'application/json')
+    await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
+    const src = RES_PREFIX + id + '.excalidraw.png'
+    if (drawing.id) {
+      // edit: find the existing node by id and refresh its preview (cache-bust)
+      let pos = null
+      ed.state.doc.descendants((node, p) => { if (node.type.name === 'image' && drawingId(node.attrs.src) === drawing.id) { pos = p; return false } return true })
+      if (pos != null) ed.chain().focus().command(({ tr }) => { tr.setNodeAttribute(pos, 'src', src + '?v=' + Date.now()); return true }).run()
+    } else {
+      ed.chain().focus().setImage({ src, alt: 'drawing' }).run()
+    }
+    setDrawing(null)
+  }
 
   return (
     <div className="tiptap-wrap">
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} onDraw={newDrawing} />
       <EditorContent editor={editor} className="tiptap-editor" />
+      {drawing && (
+        <Suspense fallback={<div className="overlay"><IconSpinner size={26} /></div>}>
+          <ExcalidrawModal initialScene={drawing.scene} onSave={onDrawingSave} onClose={() => setDrawing(null)} />
+        </Suspense>
+      )}
     </div>
   )
 }
 
-function Toolbar({ editor }) {
+function Toolbar({ editor, onDraw }) {
   if (!editor) return null
   const c = () => editor.chain().focus()
   const Btn = ({ active, on, label, title }) => (
@@ -71,6 +128,8 @@ function Toolbar({ editor }) {
       <Btn active={editor.isActive('code')} on={() => c().toggleCode().run()} label="‹›" title="Inline code" />
       <Btn active={editor.isActive('codeBlock')} on={() => c().toggleCodeBlock().run()} label="{ }" title="Code block" />
       <Btn active={editor.isActive('link')} on={link} label="↗" title="Link" />
+      <span className="tiptap-tb-sep" />
+      <Btn active={false} on={onDraw} label="✏️" title="Insert drawing (double-click a drawing to edit)" />
     </div>
   )
 }

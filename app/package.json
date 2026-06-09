@@ -25,11 +25,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@excalidraw/excalidraw": "^0.17.6",
     "@fullcalendar/daygrid": "^6.1.15",
     "@fullcalendar/interaction": "^6.1.15",
     "@fullcalendar/list": "^6.1.15",
     "@fullcalendar/react": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
+    "@tiptap/extension-image": "^2.27.2",
     "@tiptap/extension-link": "^2.27.2",
     "@tiptap/extension-task-item": "^2.27.2",
     "@tiptap/extension-task-list": "^2.27.2",
