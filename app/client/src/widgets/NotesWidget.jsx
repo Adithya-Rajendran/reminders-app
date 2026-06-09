@@ -1,24 +1,59 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { notesApi } from '../api.js'
 import NoteEditor from '../NoteEditor.jsx'
 import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
 import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR } from '../icons.jsx'
 
-const COLLAPSE_KEY = 'notes-collapsed-folders'
-const loadCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')) } catch { return new Set() } }
+const EXPAND_KEY = 'notes-expanded-folders'
+const loadSet = (k) => { try { return new Set(JSON.parse(localStorage.getItem(k) || '[]')) } catch { return new Set() } }
+const TREE_HIDE_W = 440 // below this widget width the tree collapses behind a toggle
 
-// Notes widget: Markdown notes from the user's Nextcloud, grouped by folder and
-// filterable by tag. Opening a note launches the full-screen NoteEditor.
+// Build a nested folder tree from a flat list of folder paths (e.g. "Work/Projects").
+function buildTree(paths) {
+  const root = { name: '', path: '', children: {} }
+  for (const fp of paths) {
+    let node = root, acc = ''
+    for (const seg of String(fp).split('/').filter(Boolean)) {
+      acc = acc ? acc + '/' + seg : seg
+      node.children[seg] = node.children[seg] || { name: seg, path: acc, children: {} }
+      node = node.children[seg]
+    }
+  }
+  return root
+}
+const childrenOf = (node) => Object.values(node.children).sort((a, b) => a.name.localeCompare(b.name))
+
+function FolderNode({ node, depth, sel, expanded, onSelect, onToggle }) {
+  const kids = childrenOf(node)
+  const isOpen = expanded.has(node.path)
+  return (
+    <>
+      <div className={`tree-row${sel === node.path ? ' sel' : ''}`} style={{ paddingLeft: 6 + depth * 13 }} onClick={() => onSelect(node.path)} title={node.path}>
+        {kids.length
+          ? <IconChevR size={12} className={`tree-chev${isOpen ? ' open' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(node.path) }} />
+          : <span className="tree-chev-pad" />}
+        <IconFolder size={13} />
+        <span className="tree-name">{node.name}</span>
+      </div>
+      {isOpen && kids.map((k) => <FolderNode key={k.path} node={k} depth={depth + 1} sel={sel} expanded={expanded} onSelect={onSelect} onToggle={onToggle} />)}
+    </>
+  )
+}
+
+// Notes widget: a folder tree sidebar (VSCode/Obsidian-style) + the notes of the
+// selected folder, filterable by tag. The tree collapses on narrow widgets.
 export default function NotesWidget({ onOpenSettings }) {
   const [state, setState] = useState('loading') // loading | ready | error | unconfigured
   const [notes, setNotes] = useState([])
+  const [folders, setFolders] = useState([])
+  const [sel, setSel] = useState('')      // selected folder path ('' = all notes)
+  const [expanded, setExpanded] = useState(() => loadSet(EXPAND_KEY))
   const [q, setQ] = useState('')
   const [tag, setTag] = useState(null)
-  const [collapsed, setCollapsed] = useState(loadCollapsed)
-  const [adding, setAdding] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newFolder, setNewFolder] = useState('')
   const [openPath, setOpenPath] = useState(null)
+  const [compact, setCompact] = useState(false)
+  const [treeOpen, setTreeOpen] = useState(false)
+  const wrapRef = useRef(null)
 
   const load = useCallback(async () => {
     setState((s) => (s === 'ready' ? s : 'loading'))
@@ -26,29 +61,45 @@ export default function NotesWidget({ onOpenSettings }) {
       const r = await notesApi.list()
       if (!r.configured) { setState('unconfigured'); return }
       setNotes(Array.isArray(r.notes) ? r.notes : [])
+      try { const fr = await notesApi.folders(); setFolders((fr.folders || []).filter(Boolean)) } catch { /* keep */ }
       setState('ready')
     } catch { setState('error') }
   }, [])
   useEffect(() => { load() }, [load])
 
-  const toggleFolder = (key) => setCollapsed((prev) => {
-    const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key)
-    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...n])) } catch { /* ignore */ }
+  // Collapse the tree on small widget sizes.
+  useEffect(() => {
+    if (!wrapRef.current || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver((entries) => setCompact((entries[0].contentRect.width || 999) < TREE_HIDE_W))
+    ro.observe(wrapRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const toggleExpand = (path) => setExpanded((prev) => {
+    const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path)
+    try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...n])) } catch { /* ignore */ }
     return n
   })
 
-  const submitNew = async (e) => {
-    e?.preventDefault()
-    try { const n = await notesApi.create(newFolder.trim(), newTitle.trim() || 'Untitled'); setAdding(false); setNewTitle(''); setNewFolder(''); setOpenPath(n.path) } catch { /* ignore */ }
+  const newNote = async () => {
+    try { const n = await notesApi.create(sel, 'Untitled'); setOpenPath(n.path) } catch { /* ignore */ }
+  }
+  const newFolder = async () => {
+    const name = window.prompt(sel ? `New folder inside “${sel}”` : 'New folder name')
+    if (!name) return
+    const path = sel ? sel + '/' + name.trim() : name.trim()
+    try { await notesApi.createFolder(path); setExpanded((p) => new Set([...p, ...path.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))])); setSel(path); await load() } catch { /* ignore */ }
   }
 
+  // folder tree from every folder (incl. empty ones) + folders that only exist via a note path
+  const tree = buildTree([...new Set([...folders, ...notes.map((n) => n.folder).filter(Boolean)])])
+  const topFolders = childrenOf(tree)
   const allTags = [...new Set(notes.flatMap((n) => n.tags || []))].sort()
-  const folders = [...new Set(notes.map((n) => n.folder).filter(Boolean))].sort()
   const ql = q.trim().toLowerCase()
-  const filtered = notes.filter((n) =>
-    (!ql || n.title.toLowerCase().includes(ql) || (n.folder || '').toLowerCase().includes(ql) || (n.tags || []).some((t) => t.toLowerCase().includes(ql)))
+  const inSel = (n) => !sel || n.folder === sel || (n.folder || '').startsWith(sel + '/')
+  const filtered = notes.filter((n) => inSel(n)
+    && (!ql || n.title.toLowerCase().includes(ql) || (n.tags || []).some((t) => t.toLowerCase().includes(ql)))
     && (!tag || (n.tags || []).includes(tag)))
-  const flat = !!(ql || tag) // grouped by folder normally; flat list while filtering
 
   const row = (n) => (
     <button key={n.path} className="note-row" onClick={() => setOpenPath(n.path)} title={n.title}>
@@ -56,7 +107,7 @@ export default function NotesWidget({ onOpenSettings }) {
       <span className="note-row-main">
         <span className="note-row-title">{n.title}</span>
         <span className="note-row-meta">
-          {flat && n.folder && <span className="note-row-folder"><IconFolder size={11} /> {n.folder}</span>}
+          {n.folder && n.folder !== sel && <span className="note-row-folder"><IconFolder size={11} /> {n.folder}</span>}
           {(n.tags || []).slice(0, 3).map((t) => <span key={t} className="note-tag" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setTag(t) }}>#{t}</span>)}
         </span>
       </span>
@@ -64,34 +115,11 @@ export default function NotesWidget({ onOpenSettings }) {
     </button>
   )
 
-  let listBody
-  if (filtered.length === 0) listBody = <div className="note-empty-q">{(ql || tag) ? 'No matching notes.' : 'No notes yet — add one above.'}</div>
-  else if (flat) listBody = <div className="note-list">{filtered.map(row)}</div>
-  else {
-    const groups = {}
-    for (const n of filtered) (groups[n.folder] ||= []).push(n)
-    const keys = Object.keys(groups).sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)))
-    listBody = keys.map((folder) => {
-      const key = folder || '__root'; const isCol = collapsed.has(key)
-      return (
-        <div key={key} className="note-folder-sec">
-          <button type="button" className="group-head note-folder-head" aria-expanded={!isCol} onClick={() => toggleFolder(key)}>
-            <IconChevR size={13} className={`rem-chev${isCol ? '' : ' open'}`} />
-            <IconFolder size={13} />
-            <span className="g-title">{folder || 'Notes'}</span>
-            <span className="g-count">{groups[folder].length}</span>
-          </button>
-          {!isCol && <div className="note-list">{groups[folder].map(row)}</div>}
-        </div>
-      )
-    })
-  }
-
-  if (state === 'loading') return <div className="notes-widget"><SkeletonRows /></div>
-  if (state === 'error') return <div className="notes-widget"><ErrorState onRetry={load} /></div>
+  if (state === 'loading') return <div className="notes-widget" ref={wrapRef}><SkeletonRows /></div>
+  if (state === 'error') return <div className="notes-widget" ref={wrapRef}><ErrorState onRetry={load} /></div>
   if (state === 'unconfigured') {
     return (
-      <div className="notes-widget">
+      <div className="notes-widget" ref={wrapRef}>
         <div className="state">
           <div className="state-ic"><IconCloud size={22} /></div>
           <div className="state-title">Notes need a Nextcloud account</div>
@@ -102,30 +130,45 @@ export default function NotesWidget({ onOpenSettings }) {
     )
   }
 
-  return (
-    <div className="notes-widget">
-      <div className="note-toolbar">
-        <input className="note-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
-        <button className="iconbtn sm" aria-label="New note" title="New note" onClick={() => setAdding((a) => !a)}><IconPlus size={16} /></button>
+  const tree$ = (
+    <div className="notes-tree">
+      <div className="tree-head">
+        <span>Folders</span>
+        <span className="tree-head-actions">
+          <button className="iconbtn sm" title="New folder" aria-label="New folder" onClick={newFolder}><IconFolder size={14} /></button>
+          <button className="iconbtn sm" title="New note here" aria-label="New note here" onClick={newNote}><IconPlus size={15} /></button>
+        </span>
       </div>
-      {adding && (
-        <form className="note-new" onSubmit={submitNew}>
-          <input autoFocus className="note-search" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Note title…" aria-label="New note title" />
-          <input className="note-folder-in" list="note-folders" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} placeholder="Folder (optional)" aria-label="Folder" />
-          <datalist id="note-folders">{folders.map((f) => <option key={f} value={f} />)}</datalist>
-          <button type="submit" className="btn primary sm">Add</button>
-        </form>
-      )}
-      {(tag || allTags.length > 0) && (
-        <div className="note-tags-bar">
-          {tag
-            ? <button className="note-tag on" onClick={() => setTag(null)}>#{tag} ✕</button>
-            : allTags.slice(0, 12).map((t) => <button key={t} className="note-tag" onClick={() => setTag(t)}>#{t}</button>)}
+      <div className={`tree-row${sel === '' ? ' sel' : ''}`} style={{ paddingLeft: 6 }} onClick={() => setSel('')}>
+        <span className="tree-chev-pad" /><IconNote size={13} /><span className="tree-name">All notes</span>
+      </div>
+      {topFolders.map((k) => <FolderNode key={k.path} node={k} depth={0} sel={sel} expanded={expanded} onSelect={setSel} onToggle={toggleExpand} />)}
+      {topFolders.length === 0 && <div className="tree-empty">No folders yet</div>}
+    </div>
+  )
+
+  return (
+    <div ref={wrapRef} className={`notes-widget tree${compact ? ' compact' : ''}${compact && treeOpen ? ' tree-open' : ''}`}>
+      {(!compact || treeOpen) && tree$}
+      <div className="notes-main">
+        <div className="note-toolbar">
+          {compact && <button className={`iconbtn sm${treeOpen ? ' on' : ''}`} title="Folders" aria-label="Toggle folders" onClick={() => setTreeOpen((o) => !o)}><IconFolder size={16} /></button>}
+          <input className="note-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={sel ? `Search in ${sel}…` : 'Search notes…'} aria-label="Search notes" />
+          <button className="iconbtn sm" aria-label="New note" title="New note" onClick={newNote}><IconPlus size={16} /></button>
         </div>
-      )}
-      {notes.length === 0 && !adding
-        ? <EmptyState icon={IconNote} title="No notes yet" sub="Create your first note with the ＋ above." />
-        : listBody}
+        {(tag || allTags.length > 0) && (
+          <div className="note-tags-bar">
+            {tag
+              ? <button className="note-tag on" onClick={() => setTag(null)}>#{tag} ✕</button>
+              : allTags.slice(0, 12).map((t) => <button key={t} className="note-tag" onClick={() => setTag(t)}>#{t}</button>)}
+          </div>
+        )}
+        {filtered.length === 0
+          ? (notes.length === 0
+              ? <EmptyState icon={IconNote} title="No notes yet" sub="Create your first note with the ＋ above." />
+              : <div className="note-empty-q">{(ql || tag) ? 'No matching notes.' : 'This folder is empty.'}</div>)
+          : <div className="note-list">{filtered.map(row)}</div>}
+      </div>
       {openPath && <NoteEditor path={openPath} onClose={() => { setOpenPath(null); load() }} />}
     </div>
   )
