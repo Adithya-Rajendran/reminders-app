@@ -1,16 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
-import UpcomingWidget from './widgets/UpcomingWidget.jsx'
-import RemindersWidget from './widgets/RemindersWidget.jsx'
-import CalendarWidget from './widgets/CalendarWidget.jsx'
-import NotesWidget from './widgets/NotesWidget.jsx'
+import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { GroupList } from './GroupPicker.jsx'
 import { recentGroups } from './groups.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
-  IconList, IconClock, IconBell, IconCalendar, IconCloud,
-  IconX, IconInbox, IconRefresh, IconNote,
+  IconList, IconBell, IconCloud,
+  IconX, IconInbox, IconRefresh,
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
@@ -21,7 +18,6 @@ const Grid = WidthProvider(Responsive)
 const COLS = { lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
 const GRID_V = 3
-const W_DEFAULT = 10 // a default widget spans ~1/3 at lg (10 of 30)
 // Multiply a saved layout's x/w by this to reach the current grid, keyed by the
 // layout's stored gridV (1 = old 12-col, 2 = 24-col, 3 = current 30-col).
 const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1 }
@@ -29,32 +25,24 @@ const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1 }
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-const TYPE_ICON = {
-  upcoming: IconClock,
-  reminders: IconBell,
-  calendar: IconCalendar,
-  notes: IconNote,
-}
-const KNOWN_TYPES = new Set(Object.keys(TYPE_ICON))
-
-const WIDGET_MENU = [
-  { type: 'reminders', label: 'Reminders', icon: IconBell, hasSub: true },
-  { type: 'upcoming', label: 'Upcoming', icon: IconClock },
-  { type: 'calendar', label: 'Calendar', icon: IconCalendar },
-  { type: 'notes', label: 'Notes', icon: IconNote },
-]
+const DEFAULT_SIZE = { w: 10, h: 9 } // a default widget spans ~1/3 at lg (10 of 30)
+const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
 const newId = () => 'w-' + crypto.randomUUID()
 
-// A clean default dashboard: Reminders · Upcoming · Calendar.
+// A clean default dashboard (DEFAULT_BOARD in the registry), placed left to right.
 function buildDefault() {
-  const def = [
-    { i: newId(), type: 'reminders' },
-    { i: newId(), type: 'upcoming' },
-    { i: newId(), type: 'calendar' },
-  ]
+  const def = DEFAULT_BOARD.map((type) => ({ i: newId(), type }))
   const lay = {}
-  for (const bp of Object.keys(COLS)) lay[bp] = def.map((w, idx) => ({ i: w.i, x: (idx * W_DEFAULT) % COLS[bp], y: 0, w: W_DEFAULT, h: 9 }))
+  for (const bp of Object.keys(COLS)) {
+    let x = 0
+    lay[bp] = def.map((w) => {
+      const s = sizeFor(w.type)
+      const item = { i: w.i, x: x % COLS[bp], y: 0, w: s.w, h: s.h }
+      x += s.w
+      return item
+    })
+  }
   return { widgets: def, layouts: lay }
 }
 
@@ -83,7 +71,7 @@ function usePopover(open, setOpen) {
   return ref
 }
 
-export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', title }) {
+export default function Dashboard({ onOpenSettings, dashboardId = 'main', title }) {
   const [projects, setProjects] = useState([])
   const [caldavAccounts, setCaldavAccounts] = useState(null) // null until loaded
   const [widgets, setWidgets] = useState([])
@@ -112,7 +100,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
         // (e.g. the old tasklist/caldav widgets), and scale a pre-24-column layout
         // up to the new grid. Persist whichever cleanup happened so it sticks.
         const original = saved.layout.widgets || []
-        const sw = original.filter((w) => KNOWN_TYPES.has(w.type))
+        const sw = original.filter((w) => WIDGET_TYPES.has(w.type))
         let lay = saved.layout.layouts || {}
         const f = SCALE_TO_CURRENT[saved.layout.gridV || 1] ?? 2.5
         const needsGrid = f !== 1
@@ -178,15 +166,17 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
   }
 
   const addWidget = (type, group) => {
-    // For a reminders widget, `group` locks it to one group (null = all groups).
+    // For a group-aware widget (registry pickGroup), `group` locks it to one
+    // group (null = all groups).
     const w = { i: newId(), type, group: group || undefined }
+    const s = sizeFor(type)
     const nextWidgets = [...widgets, w]
     const nextLayouts = { ...layouts }
     for (const bp of Object.keys(COLS)) {
       const items = nextLayouts[bp] || []
       // Place below existing items with a finite y (avoid persisting Infinity -> null).
       const y = items.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0)
-      nextLayouts[bp] = [...items, { i: w.i, x: 0, y, w: W_DEFAULT, h: 9 }]
+      nextLayouts[bp] = [...items, { i: w.i, x: 0, y, w: s.w, h: s.h }]
     }
     setWidgets(nextWidgets)
     setLayouts(nextLayouts)
@@ -212,6 +202,9 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
 
   // Group creation happens only in Settings now — open it with the typed name.
   const onNewGroup = (name) => onOpenSettings?.({ createGroup: name })
+
+  // Shared context handed to every widget's render() (see widgets/registry.jsx).
+  const widgetCtx = { events, projects, onNewGroup, onOpenSettings }
 
   if (!loaded) {
     return (
@@ -268,10 +261,7 @@ export default function Dashboard({ user, onOpenSettings, dashboardId = 'main', 
             {widgets.map((w) => (
               <div key={w.i}>
                 <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
-                  {w.type === 'upcoming' && <UpcomingWidget />}
-                  {w.type === 'reminders' && <RemindersWidget events={events} projects={projects} group={w.group || null} onNewGroup={onNewGroup} />}
-                  {w.type === 'calendar' && <CalendarWidget />}
-                  {w.type === 'notes' && <NotesWidget onOpenSettings={onOpenSettings} />}
+                  {WIDGET_TYPES.get(w.type)?.render(w, widgetCtx)}
                 </WidgetFrame>
               </div>
             ))}
@@ -320,15 +310,15 @@ function Toolbar({ projects, onAdd, onReset, onNewGroup, title }) {
   )
 }
 
-/* ---------- Add-widget dropdown (Reminders has a group submenu) ---------- */
+/* ---------- Add-widget dropdown (pickGroup widgets get a group submenu) ---------- */
 function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
   const [open, setOpen] = useState(false)
-  const [sub, setSub] = useState(false)   // false | 'reminders'
+  const [sub, setSub] = useState(false)   // false | a pickGroup widget type
   const [groups, setGroups] = useState([])
   const ref = usePopover(open, setOpen)
   useEffect(() => { if (!open) setSub(false) }, [open])
   useEffect(() => {
-    if (sub !== 'reminders') return
+    if (!sub) return
     api('/api/reminder-groups').then((d) => setGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
   }, [sub])
 
@@ -346,11 +336,11 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
           {!sub ? (
             <>
               <div className="menu-label">Add a widget</div>
-              {WIDGET_MENU.map((m) => {
+              {WIDGETS.map((m) => {
                 const I = m.icon
                 return (
-                  <button key={m.type} className="menu-item" role="menuitem" onClick={() => (m.hasSub ? setSub(m.type) : add(m.type))} aria-haspopup={m.hasSub ? 'menu' : undefined}>
-                    <I size={16} /> {m.label}{m.hasSub && <IconChevR size={15} className="chev" />}
+                  <button key={m.type} className="menu-item" role="menuitem" onClick={() => (m.pickGroup ? setSub(m.type) : add(m.type))} aria-haspopup={m.pickGroup ? 'menu' : undefined}>
+                    <I size={16} /> {m.label}{m.pickGroup && <IconChevR size={15} className="chev" />}
                   </button>
                 )
               })}
@@ -366,7 +356,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
           ) : (
             <>
               <button className="menu-item" role="menuitem" onClick={() => setSub(false)} style={{ color: 'var(--muted)' }}>
-                <IconChevL size={15} /> Reminders
+                <IconChevL size={15} /> {WIDGET_TYPES.get(sub)?.label || 'Back'}
               </button>
               <div className="menu-sep" />
               <div className="menu-label">Lock to which group?</div>
@@ -374,7 +364,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
                 groups={groups}
                 recent={recent}
                 neutral={{ label: 'All groups', value: '', icon: IconBell }}
-                onPick={(v) => add('reminders', v || null)}
+                onPick={(v) => add(sub, v || null)}
                 onNew={(name) => { setOpen(false); onNewGroup?.(name) }}
               />
             </>
@@ -387,7 +377,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
 
 /* ---------- Widget frame ---------- */
 function WidgetFrame({ type, title, onRemove, children }) {
-  const Ic = TYPE_ICON[type] || IconList
+  const Ic = WIDGET_TYPES.get(type)?.icon || IconList
   return (
     <div className="widget">
       <div className="widget-head" title="Drag to move">
@@ -412,8 +402,7 @@ function WidgetFrame({ type, title, onRemove, children }) {
 }
 
 function titleFor(w) {
-  if (w.type === 'upcoming') return 'Upcoming'
-  if (w.type === 'calendar') return 'Calendar'
-  if (w.type === 'notes') return 'Notes'
-  return w.group || 'Reminders' // a group-locked reminders widget shows the group name
+  const spec = WIDGET_TYPES.get(w.type)
+  if (!spec) return w.type
+  return spec.title ? spec.title(w) : spec.label
 }

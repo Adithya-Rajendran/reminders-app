@@ -1,4 +1,3 @@
-import React from 'react'
 
 /* ============================================================
    Reminders — inline SVG icon set

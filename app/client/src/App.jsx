@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
@@ -308,7 +308,6 @@ export default function App() {
             key={activeDash}
             dashboardId={activeDash}
             title={(dashboards.find((d) => d.id === activeDash) || {}).name}
-            user={user}
             onOpenSettings={openSettings}
           />
         </div>

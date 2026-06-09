@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
 import { IconTrash, IconBell } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'

@@ -24,6 +24,7 @@ export default [
     settings: { react: { version: '18' } },
     rules: {
       'react/jsx-uses-react': 'off',
+      'react/jsx-uses-vars': 'error', // components referenced only in JSX count as used
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react/no-unknown-property': 'off',

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, notesApi } from './api.js'
 import { emitTasksChanged } from './tasksbus.js'
 import {

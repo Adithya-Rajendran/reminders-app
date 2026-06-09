@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ZERO_DATE, isRealDate } from '../tasklib.js'
 import { IconBell, IconClock } from '../icons.jsx'
