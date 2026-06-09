@@ -32,6 +32,7 @@ export const notesApi = {
   save: (path, body, etag, tags) => tk('/notes/item', { method: 'PUT', body: JSON.stringify({ path, body, etag, tags }) }),
   rename: (path, title) => tk('/notes/rename', { method: 'POST', body: JSON.stringify({ path, title }) }),
   move: (path, folder) => tk('/notes/move', { method: 'POST', body: JSON.stringify({ path, folder }) }),
+  moveFolder: (from, to) => tk('/notes/move-folder', { method: 'POST', body: JSON.stringify({ from, to }) }),
   folders: () => tk('/notes/folders'),
   createFolder: (folder) => tk('/notes/folders', { method: 'POST', body: JSON.stringify({ folder }) }),
   del: (path) => tk('/notes/item' + qp(path), { method: 'DELETE' }),

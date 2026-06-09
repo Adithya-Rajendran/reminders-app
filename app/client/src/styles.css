@@ -1303,6 +1303,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; padding: 2px 4px 8px; }
 .notes-back:hover { color: var(--text); }
 .tree-row.tree-note.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* drag & drop: highlight the folder (or root) a note/folder will drop into */
+.tree-row[draggable="true"] { cursor: grab; }
+.tree-row[draggable="true"]:active { cursor: grabbing; }
+.tree-row.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.notes-tree.drag-over-root { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 8px; }
 /* Narrow widget: collapse to a single master-detail column. */
 .notes-split.narrow { flex-direction: column; }
 .notes-split.narrow .notes-sidebar { width: auto; flex: 1; border-right: none; padding-right: 0; }
