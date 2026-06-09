@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { api } from './api.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import {
@@ -169,12 +170,47 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }
   )
 }
 
+/* ---------- Dashboard switcher (multiple dashboards) ---------- */
+function DashboardTabs({ dashboards, active, onSelect, onAdd, onRename, onRemove }) {
+  const [editing, setEditing] = useState(null)
+  const [val, setVal] = useState('')
+  const start = (d) => { setEditing(d.id); setVal(d.name) }
+  const commit = () => { if (editing) onRename(editing, val); setEditing(null) }
+  return (
+    <div className="dash-tabs" role="tablist" aria-label="Dashboards">
+      {dashboards.map((d) => (
+        <span key={d.id} className={`dash-tab${d.id === active ? ' on' : ''}`}>
+          {editing === d.id ? (
+            <input
+              autoFocus className="dash-tab-edit" value={val} aria-label="Dashboard name"
+              onChange={(e) => setVal(e.target.value)} onBlur={commit}
+              onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(null) }}
+            />
+          ) : (
+            <button
+              className="dash-tab-btn" role="tab" aria-selected={d.id === active}
+              onClick={() => onSelect(d.id)} onDoubleClick={() => start(d)}
+              title="Click to switch · double-click to rename"
+            >{d.name}</button>
+          )}
+          {d.id === active && dashboards.length > 1 && editing !== d.id && (
+            <button className="dash-tab-x" aria-label={`Delete ${d.name}`} title="Delete dashboard" onClick={() => onRemove(d.id)}>×</button>
+          )}
+        </span>
+      ))}
+      <button className="dash-tab-add" aria-label="New dashboard" title="New dashboard" onClick={onAdd}>+</button>
+    </div>
+  )
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
   const [theme, setTheme] = useState(() => localStorage.getItem('reminders-theme') || 'dark')
   const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || 'indigo')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
+  const [activeDash, setActiveDash] = useState('main')
 
   // Theme: persist + reflect on <html data-theme>.
   useEffect(() => {
@@ -204,6 +240,37 @@ export default function App() {
     return () => { alive = false }
   }, [])
 
+  // Load the user's dashboard list once signed in (falls back to one dashboard).
+  useEffect(() => {
+    if (status !== 'ready') return
+    let alive = true
+    api('/api/dashboards').then((r) => {
+      if (!alive) return
+      const list = Array.isArray(r?.dashboards) && r.dashboards.length ? r.dashboards : [{ id: 'main', name: 'Dashboard' }]
+      setDashboards(list)
+      setActiveDash((cur) => (list.some((d) => d.id === cur) ? cur : list[0].id))
+    }).catch(() => { /* keep the default single dashboard */ })
+    return () => { alive = false }
+  }, [status])
+
+  const persistDashboards = (list) => {
+    setDashboards(list)
+    api('/api/dashboards', { method: 'PUT', body: JSON.stringify({ dashboards: list }) }).catch(() => {})
+  }
+  const addDashboard = () => {
+    const id = 'd-' + crypto.randomUUID()
+    persistDashboards([...dashboards, { id, name: `Dashboard ${dashboards.length + 1}` }])
+    setActiveDash(id)
+  }
+  const renameDashboard = (id, name) => persistDashboards(dashboards.map((d) => (d.id === id ? { ...d, name: name.trim() || d.name } : d)))
+  const removeDashboard = (id) => {
+    if (dashboards.length <= 1) return
+    const next = dashboards.filter((d) => d.id !== id)
+    persistDashboards(next)
+    api('/api/dashboards/' + id, { method: 'DELETE' }).catch(() => {})
+    setActiveDash((cur) => (cur === id ? next[0].id : cur))
+  }
+
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   return (
@@ -226,7 +293,21 @@ export default function App() {
             onAccent={setAccent}
             onOpenSettings={() => setSettingsOpen(true)}
           />
-          <Dashboard user={user} onOpenSettings={() => setSettingsOpen(true)} />
+          <DashboardTabs
+            dashboards={dashboards}
+            active={activeDash}
+            onSelect={setActiveDash}
+            onAdd={addDashboard}
+            onRename={renameDashboard}
+            onRemove={removeDashboard}
+          />
+          <Dashboard
+            key={activeDash}
+            dashboardId={activeDash}
+            title={(dashboards.find((d) => d.id === activeDash) || {}).name}
+            user={user}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
         </div>
       )}
 

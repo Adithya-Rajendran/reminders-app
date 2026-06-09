@@ -65,6 +65,18 @@ const got = await cfg.getLayout(U, 'main')
 ok(got.layout?.widgets?.[0]?.i === 'w1' && got.version === 2, 'layout round-trips with version')
 ok((await cfg.getLayout(U, 'missing')).layout === null, 'missing layout returns {layout:null}')
 
+// --- dashboard registry (multi-dashboard switcher; reuses user_dashboards) ---
+ok((await cfg.getDashboards(U)) === null, 'getDashboards is null before any are saved')
+await cfg.saveDashboards(U, [{ id: 'main', name: 'Home' }, { id: 'd-2', name: 'Work' }])
+const dl = await cfg.getDashboards(U)
+ok(Array.isArray(dl) && dl.length === 2 && dl[1].name === 'Work', 'getDashboards round-trips the saved list')
+ok((await cfg.getDashboards(U2)) === null, 'dashboard registry is per-user')
+await cfg.saveLayout(U, 'd-2', { layout: { version: 1, widgets: [], layouts: {} } })
+ok((await cfg.getLayout(U, 'd-2')).layout !== null, 'a per-dashboard layout saves under its id')
+await cfg.deleteDashboardLayout(U, 'd-2')
+ok((await cfg.getLayout(U, 'd-2')).layout === null, 'deleteDashboardLayout removes that dashboard layout')
+ok((await cfg.getDashboards(U)).length === 2, 'deleting a layout leaves the registry row untouched')
+
 // --- cascade delete (FK ON DELETE CASCADE) ---
 await cfg.deleteAccount(U, 'ca-1')
 ok((await cfg.getAccount(U, 'ca-1')) === null, 'deleteAccount removes the account')

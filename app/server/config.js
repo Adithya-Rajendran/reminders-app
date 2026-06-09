@@ -64,6 +64,28 @@ export async function saveLayout(userId, dashboardId, body) {
     .run(userId, dashboardId, JSON.stringify(layout), version)
 }
 
+// The dashboard registry (names + order) lives in one reserved row, so multiple
+// named dashboards reuse the per-dashboardId layout storage with no new table.
+export const DASH_INDEX = '__dashboards__'
+
+export async function getDashboards(userId) {
+  const r = sqlite.prepare('SELECT layout_json FROM user_dashboards WHERE user_id=? AND dashboard_id=?').get(userId, DASH_INDEX)
+  if (!r) return null
+  try { const d = JSON.parse(r.layout_json); return Array.isArray(d.dashboards) ? d.dashboards : null } catch { return null }
+}
+
+export async function saveDashboards(userId, dashboards) {
+  sqlite.prepare(`INSERT INTO user_dashboards (user_id, dashboard_id, layout_json, layout_version, updated_at)
+    VALUES (?,?,?,1,datetime('now'))
+    ON CONFLICT(user_id, dashboard_id) DO UPDATE SET layout_json=excluded.layout_json, updated_at=datetime('now')`)
+    .run(userId, DASH_INDEX, JSON.stringify({ dashboards }))
+}
+
+// Drop a dashboard's saved layout (the registry row is updated separately).
+export async function deleteDashboardLayout(userId, dashboardId) {
+  sqlite.prepare('DELETE FROM user_dashboards WHERE user_id=? AND dashboard_id=?').run(userId, dashboardId)
+}
+
 // ============================================================
 //  CalDAV accounts
 // ============================================================
