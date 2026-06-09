@@ -342,7 +342,7 @@ Reads PG (`SELECT *` from the 3 tables), upserts into SQLite via `ON CONFLICT �
 1. **P4 tasks:** `pg_dump app` backup → flip `TASK_STORE=caldav` → `rollout restart` → onboarding gate confirms `ready` → soak 3–7 days. Postgres fully intact.
 2. **P5 config:** `migrate-config.js --dry-run` → reconcile → re-run for real → flip `CONFIG_STORE=sqlite` → `rollout restart` (users re-auth once) → soak.
 
-### 7.5 Verification gate (after each flip; test-harness: API via `kubectl exec`, UI via docker Playwright on `tasks.rke.alaras.net`, no port-forward, real session)
+### 7.5 Verification gate (after each flip; test-harness: API via `kubectl exec`, UI via docker Playwright on `tasks.example.com`, no port-forward, real session)
 After P4: `GET /api/caldav/status ready:true`; `/api/projects` lists VTODO lists (default first); create-with-no-project lands in default list (verify VTODO in Nextcloud); toggle done edits in place (foreign VALARM preserved); `/api/tasks?sort_by=due_date` keeps wire shape (ZERO sentinel, `reminders:[{reminder}]`); recurring complete returns `done:false` + advanced due; SSE `reminder` arrives. After P5: saved layout resolves (proves `user_dashboards` copy), accounts list from SQLite, **decrypt round-trip** (`/api/caldav/tasks` returns tasks ⇒ key survived), list enable/disable. UI smoke: dashboard + task widget + calendar render, Settings shows account.
 
 ### 7.6 Rollback per phase

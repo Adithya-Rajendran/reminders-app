@@ -1,3 +1,5 @@
+# Example Gateway API route — set the hostname and parentRef to match your own
+# Gateway. Prefer a plain Ingress? See the wiki → Deployment on Kubernetes.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -5,12 +7,12 @@ metadata:
   namespace: reminders-app
 spec:
   hostnames:
-    - tasks.rke.alaras.net
+    - tasks.example.com
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: shared-gateway
-      namespace: gateway
+      name: my-gateway              # your Gateway's name
+      namespace: gateway-namespace  # the namespace your Gateway lives in
   rules:
     - matches:
         - path:

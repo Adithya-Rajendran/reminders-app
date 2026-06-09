@@ -3,7 +3,7 @@
 // Everything else — tasks, projects, labels, reminders — lives in the user's
 // CalDAV server, never here.
 //
-// SQLite (better-sqlite3, WAL) on the ceph-rbd block volume. The handle is opened
+// SQLite (better-sqlite3, WAL) on a block-storage volume. The handle is opened
 // SYNCHRONOUSLY at import so the session store can be constructed at app setup,
 // before start() runs.
 import session from 'express-session'
@@ -14,7 +14,7 @@ const path = process.env.CONFIG_DB_PATH
 if (!path) { console.error('FATAL: CONFIG_DB_PATH is required'); process.exit(1) }
 
 export const sqlite = new Database(path)
-sqlite.pragma('journal_mode = WAL')      // safe on ceph-rbd BLOCK storage
+sqlite.pragma('journal_mode = WAL')      // safe on BLOCK storage (not NFS/CephFS)
 sqlite.pragma('busy_timeout = 5000')
 sqlite.pragma('synchronous = NORMAL')
 sqlite.pragma('foreign_keys = ON')
