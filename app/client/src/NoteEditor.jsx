@@ -1,14 +1,18 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import ModalFrame from './ModalFrame.jsx'
+import PromptModal from './PromptModal.jsx'
 import { notesApi } from './api.js'
 import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder } from './icons.jsx'
 
 // Tiptap is heavy (loaded only when a note is open) — code-split it out.
 const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
 
-// Full-screen note editor: a live WYSIWYG body (debounced autosave to Nextcloud)
-// plus a meta bar for the note's folder + tags.
-export default function NoteEditor({ path: initialPath, onClose }) {
+// A live WYSIWYG note body (debounced autosave to Nextcloud) plus a meta bar for
+// the note's folder + tags. Renders full-screen (ModalFrame) by default, or inline
+// inside a pane when `inline` is set (the split-view notes widget). `onChanged` is
+// called after a rename/move so the surrounding tree can refresh; `onDeleted` after
+// a delete.
+export default function NoteEditor({ path: initialPath, onClose, onChanged, onDeleted, inline = false }) {
   const [path, setPath] = useState(initialPath)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -19,6 +23,7 @@ export default function NoteEditor({ path: initialPath, onClose }) {
   const [newTag, setNewTag] = useState('')
   const [state, setState] = useState('loading') // loading | ready | error
   const [saving, setSaving] = useState('idle')   // idle | saving | saved | error
+  const [folderPrompt, setFolderPrompt] = useState(false)
   const saveTimer = useRef(null)
   const bodyRef = useRef('')
   const pathRef = useRef(initialPath)
@@ -34,6 +39,9 @@ export default function NoteEditor({ path: initialPath, onClose }) {
   stateRef.current = state
 
   useEffect(() => {
+    // Skip the reload when the parent just re-points us at our own (renamed/moved)
+    // path — we're already showing it, so a refetch would only flash.
+    if (initialPath === pathRef.current && stateRef.current === 'ready') return undefined
     let alive = true
     dirty.current = false
     notesApi.get(initialPath)
@@ -64,20 +72,21 @@ export default function NoteEditor({ path: initialPath, onClose }) {
     onClose?.()
   }
   useEffect(() => {
+    if (inline) return undefined // inside a widget pane Esc shouldn't close the note
     const onKey = (e) => { if (e.key === 'Escape') close() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, []) // close reads refs, so a stable handler is correct
+  }, [inline]) // close reads refs, so a stable handler is correct
 
   const commitTitle = async () => {
     const t = title.trim()
     const cur = path.split('/').pop().replace(/\.md$/i, '')
     if (!t || t === cur) { setTitle(cur); return }
-    try { const r = await notesApi.rename(path, t); setPath(r.path); setTitle(r.title) } catch { setTitle(cur) }
+    try { const r = await notesApi.rename(path, t); setPath(r.path); setTitle(r.title); onChanged?.(r.path) } catch { setTitle(cur) }
   }
   const del = async () => {
     clearTimeout(saveTimer.current)
-    try { await notesApi.del(path); onClose?.() } catch { setSaving('error') } // keep open on failure
+    try { await notesApi.del(path); (onDeleted || onClose)?.() } catch { setSaving('error') } // keep open on failure
   }
 
   // tags + folder edits save immediately (discrete changes)
@@ -87,13 +96,13 @@ export default function NoteEditor({ path: initialPath, onClose }) {
   const moveTo = async (f) => {
     const target = (f || '').trim()
     if (target === (folder || '')) return
-    try { const r = await notesApi.move(pathRef.current, target); setPath(r.path); setFolder(r.folder || '') } catch { /* ignore */ }
+    try { const r = await notesApi.move(pathRef.current, target); setPath(r.path); setFolder(r.folder || ''); onChanged?.(r.path) } catch { /* ignore */ }
   }
 
   const folderOpts = [...new Set([folder, ...folders].filter(Boolean))].sort()
 
-  return (
-    <ModalFrame overlayClass="note-overlay" modalClass="note-editor" ariaLabel="Note editor" onBackdrop={close}>
+  const inner = (
+    <>
       <div className="note-edit-head">
         <input
           className="note-title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={commitTitle}
@@ -111,7 +120,7 @@ export default function NoteEditor({ path: initialPath, onClose }) {
             <IconFolder size={14} />
             <select
               value={folder}
-              onChange={(e) => { const v = e.target.value; if (v === '__new') { const f = window.prompt('New folder name'); if (f) moveTo(f) } else moveTo(v) }}
+              onChange={(e) => { const v = e.target.value; if (v === '__new') setFolderPrompt(true); else moveTo(v) }}
               aria-label="Folder"
             >
               <option value="">Notes (root)</option>
@@ -140,6 +149,20 @@ export default function NoteEditor({ path: initialPath, onClose }) {
               </Suspense>
             )}
       </div>
+      {folderPrompt && (
+        <PromptModal
+          title="New folder" placeholder="Folder name" confirmLabel="Move here"
+          onSubmit={(name) => { setFolderPrompt(false); moveTo(name) }}
+          onCancel={() => setFolderPrompt(false)}
+        />
+      )}
+    </>
+  )
+
+  if (inline) return <div className="note-pane">{inner}</div>
+  return (
+    <ModalFrame overlayClass="note-overlay" modalClass="note-editor" ariaLabel="Note editor" onBackdrop={close}>
+      {inner}
     </ModalFrame>
   )
 }

@@ -1287,6 +1287,35 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-edit-body { flex: 1; min-height: 0; display: flex; }
 .note-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 
+/* Split workspace: tree sidebar + note open in the main pane (Obsidian/VSCode). */
+.notes-split { flex-direction: row; gap: 0; align-items: stretch; }
+.notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
+.notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.notes-split .notes-main { padding-left: 12px; }
+.notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
+.notes-main-empty .state-ic { margin-bottom: 4px; }
+/* Inline editor pane — same chrome as the modal editor, sized to fill the pane. */
+.note-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.note-pane .note-edit-head { padding: 2px 2px 10px; border-bottom: 1px solid var(--line); background: none; }
+.note-pane .note-title-input { font-size: 16px; }
+.note-pane .note-edit-meta { padding: 8px 2px; background: none; }
+.note-pane .note-edit-body { flex: 1; min-height: 0; }
+.notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; padding: 2px 4px 8px; }
+.notes-back:hover { color: var(--text); }
+.tree-row.tree-note.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Narrow widget: collapse to a single master-detail column. */
+.notes-split.narrow { flex-direction: column; }
+.notes-split.narrow .notes-sidebar { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.notes-split.narrow .notes-main { padding-left: 0; }
+
+/* Themed prompt dialog (replaces window.prompt). */
+.prompt-overlay { align-items: center; justify-content: center; }
+.prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn 140ms ease; }
+.prompt-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.prompt-label { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+.prompt-input { width: 100%; font-size: 14px; padding: 8px 10px; margin-top: 12px; }
+.prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
 /* Notes-folder selector in Settings */
 .notes-cfg { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .notes-cfg-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; }
