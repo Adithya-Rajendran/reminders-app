@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import ModalFrame from './ModalFrame.jsx'
 import { notesApi } from './api.js'
 import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder } from './icons.jsx'

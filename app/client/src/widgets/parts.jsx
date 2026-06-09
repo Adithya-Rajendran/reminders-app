@@ -1,4 +1,3 @@
-import React from 'react'
 import { IconRefresh, IconInbox } from '../icons.jsx'
 
 export function SkeletonRows({ n = 5 }) {

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 import { tk } from '../api.js'
 import { useTaskList } from '../useTasks.js'
 import { isRealDate } from '../tasklib.js'

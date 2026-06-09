@@ -309,7 +309,7 @@ export async function fetchTasksHandler(req, res) {
               listName: list.display_name, objectUrl: o.url, etag: o.etag,
             }))
           }
-        } catch (e) { /* skip a failing list */ }
+        } catch { /* skip a failing list */ }
       }
     }
     tasks.sort((a, b) => (a.done - b.done) || ((a.due || '9999') > (b.due || '9999') ? 1 : -1))
@@ -406,7 +406,7 @@ async function fetchEvents(userId, startISO, endISO) {
         for (const o of objs) {
           events.push(...parseVevents(o.data, { accountId: acc.id, listUrl: list.url, objectUrl: o.url, etag: o.etag }))
         }
-      } catch (e) { /* skip a failing / event-incapable list */ }
+      } catch { /* skip a failing / event-incapable list */ }
     }
   }
   return events

@@ -95,6 +95,8 @@ npm start        # run the BFF (serves app/public)
 
 CI (`.github/workflows/ci.yml`) runs lint + build on every push/PR; `docker.yml` builds and pushes the image to GHCR on `main` and tags. Both use GitHub-hosted runners (free for public repos) — no self-hosted runner required, though one can be added on the cluster if desired.
 
+**Extending the dashboard:** widgets are self-contained — one component file plus one entry in `app/client/src/widgets/registry.jsx`. See **[docs/adding-a-widget.md](docs/adding-a-widget.md)** for the walkthrough, and [`CLAUDE.md`](CLAUDE.md) for a map of the repo.
+
 ## Design
 
 Theme tokens for both light and dark themes live in `app/client/src/styles.css`; icons are inline SVG in `app/client/src/icons.jsx`.

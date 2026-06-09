@@ -132,7 +132,7 @@ export async function listTasks(req, res, next) {
   } catch (e) { next(e) }
 }
 
-export async function createTask(req, res, next) {
+export async function createTask(req, res, _next) {
   const uid = req.session.user.sub
   const b = req.body || {}
   const title = (b.title || '').trim()
@@ -180,7 +180,7 @@ export async function createTask(req, res, next) {
   }
 }
 
-export async function patchTask(req, res, next) {
+export async function patchTask(req, res, _next) {
   const uid = req.session.user.sub
   let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
   const b = req.body || {}
@@ -213,7 +213,7 @@ export async function patchTask(req, res, next) {
   }
 }
 
-export async function deleteTask(req, res, next) {
+export async function deleteTask(req, res, _next) {
   const uid = req.session.user.sub
   let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
   const resolved = await getListById(uid, dec.listId)

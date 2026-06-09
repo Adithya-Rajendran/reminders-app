@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Excalidraw, serializeAsJSON, exportToBlob } from '@excalidraw/excalidraw'
 import ModalFrame from './ModalFrame.jsx'
 import { IconX, IconCheck, IconSpinner } from './icons.jsx'

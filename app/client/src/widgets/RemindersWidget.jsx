@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { tk, reminderGroups } from '../api.js'
 import { useTaskList } from '../useTasks.js'
 import { createTask, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
