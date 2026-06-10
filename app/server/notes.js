@@ -246,6 +246,31 @@ export async function deleteNote(userId, path) {
   return { ok: true }
 }
 
+// Move a folder (and everything inside it) into another folder. `from`/`to` are
+// relative to the notes root; `to`='' is the root. Refuses to move a folder into
+// itself or one of its own descendants. Returns the folder's new relative path.
+export async function moveFolder(userId, from, to) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  const src = sanitizeFolder(from)
+  if (!src) throw err('folder required', 400)
+  const name = src.split('/').pop()
+  const destParent = sanitizeFolder(to) // '' = root
+  if (destParent === src || destParent.startsWith(src + '/')) throw err('cannot move a folder into itself', 400)
+  const srcParent = src.includes('/') ? src.slice(0, src.lastIndexOf('/')) : ''
+  if (destParent === srcParent) return { folder: src } // already there
+  const srcAbs = join(c.root, src)
+  if (!inRoot(c.root, srcAbs)) throw err('bad path', 400)
+  await dav.ensureCollection(c.account, join(c.root, destParent))
+  let rel = destParent ? destParent + '/' + name : name
+  let target = join(c.root, rel)
+  for (let n = 2; await dav.exists(c.account, target); n++) { rel = (destParent ? destParent + '/' : '') + name + ' ' + n; target = join(c.root, rel) }
+  if (!inRoot(c.root, target)) throw err('bad path', 400)
+  await dav.move(c.account, srcAbs, target)
+  invalidate(userId)
+  return { folder: rel }
+}
+
 // ---- resources (images, drawings) ----
 export async function putResource(userId, name, buffer, contentType) {
   const c = await ctx(userId)

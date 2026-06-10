@@ -45,15 +45,16 @@ async function defaultList(userId) {
 
 // Groups = the categories in use across reminders ∪ the saved mappings.
 export async function listGroups(userId) {
-  const map = await getGroupMap(userId)
+  const map = await getGroupMap(userId) // a group exists ONLY if it's mapped to a calendar
   const lists = await vtodoLists(userId)
   const byId = new Map(lists.map((l) => [l.id, l]))
   const counts = {}
-  const names = new Set(Object.keys(map))
-  for (const { vt } of await allUserVtodos(userId)) for (const c of catsOf(vt)) { names.add(c); counts[c] = (counts[c] || 0) + 1 }
-  const groups = [...names].sort((a, b) => a.localeCompare(b)).map((name) => {
-    const listId = map[name] || null
-    const l = listId ? byId.get(listId) : null
+  // A bare CATEGORIES tag with no calendar is the default group, not a group — count
+  // only reminders tagged with a real (mapped) group.
+  for (const { vt } of await allUserVtodos(userId)) for (const c of catsOf(vt)) if (c in map) counts[c] = (counts[c] || 0) + 1
+  const groups = Object.keys(map).sort((a, b) => a.localeCompare(b)).map((name) => {
+    const listId = map[name]
+    const l = byId.get(listId)
     return { name, listId, calendar: l ? (l.display_name || l.url) : null, count: counts[name] || 0 }
   })
   const calendars = lists.filter((l) => l.enabled).map((l) => ({ id: l.id, name: l.display_name || l.url }))

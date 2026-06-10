@@ -8,6 +8,17 @@ export const RES_PREFIX = '/api/notes/resources/'
 export const isDrawing = (src) => /\.excalidraw\.png([?#]|$)/.test(src || '')
 export const drawingId = (src) => { const m = /([^/]+)\.excalidraw\.png/.exec(src || ''); return m ? m[1] : null }
 
+// The Excalidraw scene resource name for any image src — its basename minus the
+// image extension, ensured to end in `.excalidraw`. Handles both the current
+// embed (`<id>.excalidraw.png` → `<id>.excalidraw`) and the older one
+// (`<id>.png` → `<id>.excalidraw`). null for a src with no basename. A regular
+// photo just yields a name whose scene won't exist (so it's treated as non-editable).
+export const sceneNameFor = (src) => {
+  const base = (String(src || '').split('/').pop() || '').split(/[?#]/)[0].replace(/\.(png|jpe?g|webp|gif|svg)$/i, '')
+  if (!base) return null
+  return /\.excalidraw$/i.test(base) ? base : base + '.excalidraw'
+}
+
 export const toDisplay = (md) => String(md || '').replace(/\]\(_resources\//g, '](' + RES_PREFIX)
 export const toDisk = (md) => String(md || '').replace(
   /\]\(\/api\/notes\/resources\/([^)\s?#]+)(\?[^)\s#]*)?(#[^)\s]*)?\)/g,

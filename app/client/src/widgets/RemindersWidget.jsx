@@ -52,13 +52,14 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     return next
   })
 
-  // Existing groups for the quick-add picker (only the all-groups view). Sourced
-  // from /api/reminder-groups so groups created in Settings (incl. empty ones) show.
+  // The real groups = those created in Settings (coupled to a calendar). A bare
+  // tag with no calendar is the default group, so we load the set in both views to
+  // fold uncoupled tags into "No group" (and hide their stray chips).
   const loadGroups = useCallback(() => {
     reminderGroups().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
   }, [])
-  useEffect(() => { if (!group) loadGroups() }, [group, loadGroups])
-  useEffect(() => (group ? undefined : onTasksChanged(loadGroups)), [group, loadGroups])
+  useEffect(() => { loadGroups() }, [loadGroups])
+  useEffect(() => onTasksChanged(loadGroups), [loadGroups])
 
   const add = async (e) => {
     e.preventDefault()
@@ -82,12 +83,19 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   ;(events || []).forEach((e) => { const ev = e?.data?.event; const t = ev?.data?.task; if (t && /reminder|overdue/i.test(ev?.event_name || '')) fired.add(t.id) })
 
   const chip = dueChip(when); const t = timeLabel(when)
-  const allGroups = [...new Set([...knownGroups, ...tasks.map(groupOf).filter(Boolean)])].sort()
+  // Only calendar-coupled groups count; uncoupled tags fold into the default group.
+  const isGroup = (name) => knownGroups.includes(name)
+  const displayGroup = (task) => { const g = groupOf(task); return isGroup(g) ? g : '' }
+  const allGroups = [...knownGroups].sort()
   const recent = recentGroups().filter((g) => allGroups.includes(g))
 
+  // Hide chips for tags that aren't real (coupled) groups so a folded reminder
+  // doesn't show a stray group chip while sitting in "No group". The handlers don't
+  // read labels, so passing the chip-filtered copy is safe.
+  const shown = (task) => ({ ...task, labels: (task.labels || []).filter((l) => isGroup(l.title || l)) })
   const row = (task) => (
     <div key={task.id} className={fired.has(task.id) ? 'reminding' : ''}>
-      <TaskRow task={task} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
+      <TaskRow task={shown(task)} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
     </div>
   )
 
@@ -100,7 +108,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     body = <div className="task-stream">{tasks.map(row)}</div> // locked → flat list
   } else {
     const groups = {}
-    for (const task of tasks) (groups[groupOf(task)] ||= []).push(task)
+    for (const task of tasks) (groups[displayGroup(task)] ||= []).push(task)
     const groupKeys = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
     body = groupKeys.map((g) => {
       const key = g || '__none'; const isCol = collapsed.has(key)
