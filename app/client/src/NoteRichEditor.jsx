@@ -6,7 +6,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
 import { ResizableImage } from './NoteImage.jsx'
-import { RES_PREFIX, isDrawing, drawingId, toDisplay, toDisk, EXT } from './notepaths.js'
+import { RES_PREFIX, sceneNameFor, toDisplay, toDisk, EXT } from './notepaths.js'
 import { notesApi } from './api.js'
 import { IconSpinner } from './icons.jsx'
 
@@ -15,14 +15,30 @@ const ExcalidrawModal = lazy(() => import('./ExcalidrawModal.jsx'))
 // Live WYSIWYG editor that reads/writes GitHub-flavored Markdown (notes stay
 // plain .md on disk). Supports inserting + re-editing Excalidraw drawings.
 export default function NoteRichEditor({ value, onChange }) {
-  const [drawing, setDrawing] = useState(null) // null | { scene, id }
+  const [drawing, setDrawing] = useState(null) // null | { scene, id, src }
   const editorRef = useRef(null)
+  const editRef = useRef(null)
+
+  // Open the Excalidraw editor for an image IF it has a sibling .excalidraw scene
+  // (so a real drawing is editable, a plain pasted image is not). Stable via a ref
+  // so the node view + paste config always call the latest.
+  const openForEdit = async (src) => {
+    const sceneName = sceneNameFor(src)
+    if (!sceneName) return
+    try {
+      const r = await fetch(RES_PREFIX + encodeURIComponent(sceneName))
+      if (!r.ok) return // not a drawing (no scene) — leave a plain image alone
+      const scene = await r.text()
+      setDrawing({ scene, id: sceneName.replace(/\.excalidraw$/i, ''), src })
+    } catch { /* ignore */ }
+  }
+  editRef.current = openForEdit
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'cb' } } }),
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }),
-      ResizableImage.configure({ inline: false, allowBase64: false }),
+      ResizableImage.configure({ inline: false, allowBase64: false, onEdit: (src) => editRef.current?.(src) }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({ html: false, tightLists: true, linkify: true, transformPastedText: true, transformCopiedText: true }),
@@ -41,9 +57,10 @@ export default function NoteRichEditor({ value, onChange }) {
         return false
       },
       handleDOMEvents: {
+        // Fallback for the editor surface; the node view handles the common case.
         dblclick: (_view, event) => {
           const t = event.target
-          if (t && t.tagName === 'IMG' && isDrawing(t.getAttribute('src'))) { openForEdit(t.getAttribute('src')); return true }
+          if (t && t.tagName === 'IMG') { editRef.current?.(t.getAttribute('src')); return true }
           return false
         },
       },
@@ -56,14 +73,7 @@ export default function NoteRichEditor({ value, onChange }) {
     if (toDisk(editor.storage.markdown.getMarkdown()) !== value) editor.commands.setContent(toDisplay(value), false)
   }, [value, editor])
 
-  const openForEdit = async (src) => {
-    const id = drawingId(src)
-    if (!id) return
-    let scene = null
-    try { const r = await fetch(RES_PREFIX + encodeURIComponent(id + '.excalidraw')); if (r.ok) scene = await r.text() } catch { /* fall back to a fresh canvas */ }
-    setDrawing({ scene, id })
-  }
-  const newDrawing = () => setDrawing({ scene: null, id: null })
+  const newDrawing = () => setDrawing({ scene: null, id: null, src: null })
 
   // Paste an image straight into the note → upload to _resources → embed.
   const uploadAndInsert = async (file) => {
@@ -79,10 +89,12 @@ export default function NoteRichEditor({ value, onChange }) {
     await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/octet-stream' }), 'application/octet-stream')
     await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
     const src = RES_PREFIX + id + '.excalidraw.png'
-    if (drawing.id) {
-      // edit: refresh the existing node's preview (cache-bust), preserving its width
+    if (drawing.src) {
+      // edit: replace the opened node's preview (cache-bust), preserving its width.
+      // Match the exact node we opened so any embed format (old `<id>.png`, new
+      // `<id>.excalidraw.png`) updates correctly.
       let pos = null, oldSrc = ''
-      ed.state.doc.descendants((node, p) => { if (node.type.name === 'image' && drawingId(node.attrs.src) === drawing.id) { pos = p; oldSrc = node.attrs.src || ''; return false } return true })
+      ed.state.doc.descendants((node, p) => { if (node.type.name === 'image' && node.attrs.src === drawing.src) { pos = p; oldSrc = node.attrs.src || ''; return false } return true })
       if (pos != null) {
         const frag = (/#.*$/.exec(oldSrc) || [''])[0]
         ed.chain().focus().command(({ tr }) => { tr.setNodeAttribute(pos, 'src', src + '?v=' + Date.now() + frag); return true }).run()

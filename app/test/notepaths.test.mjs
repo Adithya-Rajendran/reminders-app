@@ -1,7 +1,7 @@
 // Unit tests for the note image/drawing path helpers (client/src/notepaths.js).
 // Pure module (no Tiptap), so it imports cleanly in Node. Run with:
 //   docker run --rm -v "$PWD":/app -w /app node:22 node test/notepaths.test.mjs
-import { isDrawing, drawingId, toDisplay, toDisk, widthOf, withWidth, RES_PREFIX } from '../client/src/notepaths.js'
+import { isDrawing, drawingId, sceneNameFor, toDisplay, toDisk, widthOf, withWidth, RES_PREFIX } from '../client/src/notepaths.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -12,6 +12,13 @@ ok(isDrawing('/api/notes/resources/x.excalidraw.png?v=1'), 'isDrawing: with ?que
 ok(isDrawing('_resources/x.excalidraw.png#w640'), 'isDrawing: with #fragment')
 ok(!isDrawing('_resources/photo.png'), 'isDrawing: a normal png is not a drawing')
 ok(drawingId('_resources/abc-123.excalidraw.png#w640') === 'abc-123', 'drawingId extracts the id before the fragment')
+
+// ---- scene name resolution (which .excalidraw a drawing image edits) ----
+ok(sceneNameFor('/api/notes/resources/abc.excalidraw.png') === 'abc.excalidraw', 'sceneNameFor: new embed -> <id>.excalidraw')
+ok(sceneNameFor('/api/notes/resources/abc.excalidraw.png?v=9#w320') === 'abc.excalidraw', 'sceneNameFor: ignores ?query + #fragment')
+ok(sceneNameFor('_resources/abc.png') === 'abc.excalidraw', 'sceneNameFor: old embed (<id>.png) -> <id>.excalidraw')
+ok(sceneNameFor('_resources/photo.jpg') === 'photo.excalidraw', 'sceneNameFor: any image maps to a candidate scene (existence is checked separately)')
+ok(sceneNameFor('') === null, 'sceneNameFor: empty src -> null')
 
 // ---- display <-> disk rewrite ----
 ok(toDisplay('![d](_resources/x.png)') === '![d](' + RES_PREFIX + 'x.png)', 'toDisplay rewrites _resources -> API url')
