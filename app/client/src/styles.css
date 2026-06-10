@@ -1361,6 +1361,9 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-img-wrap.sel { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
 .img-resize { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); cursor: nwse-resize; opacity: 0; transition: opacity .15s; }
 .note-img-wrap:hover .img-resize, .note-img-wrap.sel .img-resize { opacity: 1; }
+/* "Edit" affordance on a drawing image (double-click also works) */
+.img-edit { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; line-height: 1; padding: 5px 9px; border: none; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; opacity: 0; transition: opacity .15s; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.note-img-wrap.is-drawing:hover .img-edit, .note-img-wrap.is-drawing.sel .img-edit { opacity: 1; }
 .excali-overlay { align-items: stretch; }
 .excali-modal { width: min(96vw, 1240px); height: min(92vh, 920px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); }
 .excali-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
