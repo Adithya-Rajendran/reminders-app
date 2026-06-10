@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import ModalFrame from './ModalFrame.jsx'
 import PromptModal from './PromptModal.jsx'
 import { notesApi } from './api.js'
+import { createSaveQueue } from './savequeue.js'
 import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder } from './icons.jsx'
 
 // Tiptap is heavy (loaded only when a note is open) — code-split it out.
@@ -30,20 +31,27 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   const etagRef = useRef(null)
   const tagsRef = useRef([])
   const stateRef = useRef('loading')
-  const inFlight = useRef(false)
-  const pending = useRef(false)
-  const dirty = useRef(false)
   pathRef.current = path
   etagRef.current = etag
   tagsRef.current = tags
   stateRef.current = state
+
+  // Serialized autosave (savequeue.js): never overlap two PUTs; a save requested
+  // mid-flight coalesces into one trailing save with the latest body + tags.
+  const queue = useRef(null)
+  if (!queue.current) {
+    queue.current = createSaveQueue({
+      save: async () => { const r = await notesApi.save(pathRef.current, bodyRef.current, etagRef.current, tagsRef.current); setEtag(r.etag) },
+      onState: setSaving,
+    })
+  }
 
   useEffect(() => {
     // Skip the reload when the parent just re-points us at our own (renamed/moved)
     // path — we're already showing it, so a refetch would only flash.
     if (initialPath === pathRef.current && stateRef.current === 'ready') return undefined
     let alive = true
-    dirty.current = false
+    queue.current.reset()
     notesApi.get(initialPath)
       .then((n) => { if (!alive) return; setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setFolder(n.folder || ''); setState('ready') })
       .catch(() => { if (alive) setState('error') })
@@ -51,24 +59,14 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     return () => { alive = false }
   }, [initialPath])
 
-  // Serialized autosave: never overlap two PUTs; a save requested mid-flight is
-  // coalesced into one trailing save with the latest body + tags.
-  const doSave = async () => {
-    if (inFlight.current) { pending.current = true; return }
-    if (!dirty.current) return
-    inFlight.current = true; dirty.current = false; setSaving('saving')
-    try { const r = await notesApi.save(pathRef.current, bodyRef.current, etagRef.current, tagsRef.current); setEtag(r.etag); setSaving('saved') }
-    catch { dirty.current = true; setSaving('error') }
-    finally { inFlight.current = false; if (pending.current) { pending.current = false; doSave() } }
-  }
   const onBody = (text) => {
-    setBody(text); bodyRef.current = text; dirty.current = true; setSaving('saving')
+    setBody(text); bodyRef.current = text; queue.current.markDirty(); setSaving('saving')
     clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(doSave, 700)
+    saveTimer.current = setTimeout(queue.current.flush, 700)
   }
   const close = async () => {
     clearTimeout(saveTimer.current)
-    try { if (stateRef.current === 'ready' && dirty.current) await doSave() } catch { /* best effort */ }
+    try { if (stateRef.current === 'ready' && queue.current.isDirty()) await queue.current.flush() } catch { /* best effort */ }
     onClose?.()
   }
   useEffect(() => {
@@ -90,7 +88,7 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   }
 
   // tags + folder edits save immediately (discrete changes)
-  const changeTags = (next) => { setTags(next); tagsRef.current = next; dirty.current = true; doSave() }
+  const changeTags = (next) => { setTags(next); tagsRef.current = next; queue.current.markDirty(); queue.current.flush() }
   const addTag = () => { const t = newTag.trim().replace(/[#,]/g, ''); if (t && !tags.includes(t)) changeTags([...tags, t]); setNewTag('') }
   const removeTag = (t) => changeTags(tags.filter((x) => x !== t))
   const moveTo = async (f) => {

@@ -7,7 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { api, tk } from '../api.js'
 import { ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
-import { Calendar, X, Trash, Check, Spinner } from '../icons.jsx'
+import { IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../icons.jsx'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')
@@ -278,9 +278,9 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
     <div className="overlay" onMouseDown={onClose}>
       <div className="modal" style={{ maxWidth: 480 }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="ic"><Calendar size={20} /></span>
+          <span className="ic"><IconCalendar size={20} /></span>
           <h2>{isCreate ? 'New event' : 'Edit event'}</h2>
-          <button className="iconbtn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><X /></button>
+          <button className="iconbtn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><IconX /></button>
         </div>
         <form className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={submit}>
           <div className="field">
@@ -322,12 +322,12 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
           <div className="modal-foot" style={{ padding: 0, borderTop: 0 }}>
             {!isCreate && (
               <button type="button" className="btn danger" onClick={remove} disabled={busy} style={{ marginRight: 'auto' }}>
-                <Trash size={16} /> Delete
+                <IconTrash size={16} /> Delete
               </button>
             )}
             <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button>
             <button type="submit" className="btn primary" disabled={busy || noCalendars}>
-              {busy ? <><Spinner /> Saving…</> : <><Check size={16} /> {isCreate ? 'Create' : 'Save'}</>}
+              {busy ? <><IconSpinner size={16} /> Saving…</> : <><IconCheck size={16} /> {isCreate ? 'Create' : 'Save'}</>}
             </button>
           </div>
         </form>

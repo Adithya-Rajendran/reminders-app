@@ -8,10 +8,10 @@ import GroupPicker from '../GroupPicker.jsx'
 import TaskRow from './TaskRow.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
+import { loadStringSet, saveStringSet } from '../storage.js'
 import { IconBell, IconClock, IconPlus, IconChevR } from '../icons.jsx'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
-const loadCollapsed = () => { try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')) } catch { return new Set() } }
 
 function nextRemind(t) {
   const times = (t.reminders || []).map((r) => new Date(r.reminder).getTime()).filter((n) => !isNaN(n))
@@ -42,13 +42,13 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   const [pickOpen, setPickOpen] = useState(false)
   const [err, setErr] = useState('')
   const [knownGroups, setKnownGroups] = useState([])
-  const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const [collapsed, setCollapsed] = useState(() => loadStringSet(COLLAPSE_KEY))
   const whenRef = useRef(null)
 
   const toggleGroup = (key) => setCollapsed((prev) => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
-    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next])) } catch { /* ignore */ }
+    saveStringSet(COLLAPSE_KEY, next)
     return next
   })
 

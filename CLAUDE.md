@@ -29,6 +29,7 @@ app/client/src/
   widgets/registry.jsx     # THE widget registry: every widget is declared here (lazy chunks)
   widgets/*.jsx            # one file per widget + shared parts (TaskRow, parts.jsx)
   usePopover.js            # shared outside-click/Esc popover hook
+  notetree.js, savequeue.js, notepaths.js, storage.js  # pure logic (node-tested)
   api.js                   # fetch helpers (api/tk/notesApi), 401 -> login redirect
   useTasks.js, tasklib.js  # task-list hook (optimistic updates + undo), task utils
   tasksbus.js              # cross-widget "tasks changed" event bus

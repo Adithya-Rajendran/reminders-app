@@ -31,3 +31,9 @@ export const widthOf = (src) => { const m = /(?:^|;)w(\d+)/.exec(fragOf(src)); r
 export const withWidth = (src, w) => { const f = /#.*$/.exec(src || ''); const head = f ? src.slice(0, f.index) : (src || ''); return head + (w ? '#w' + w : '') }
 
 export const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
+
+// ---- folder path helpers (notes tree) ----
+export const parentFolder = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
+// Every prefix of "a/b/c" -> ['a', 'a/b', 'a/b/c'] (the path itself included) —
+// used to expand a folder and all of its ancestors in the tree.
+export const ancestorsOf = (p) => String(p || '').split('/').filter(Boolean).map((_, i, a) => a.slice(0, i + 1).join('/'))
