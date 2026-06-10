@@ -21,7 +21,7 @@ export default [
       globals: { ...globals.browser, ...sharedGlobals },
     },
     plugins: { react, 'react-hooks': reactHooks },
-    settings: { react: { version: '18' } },
+    settings: { react: { version: 'detect' } },
     rules: {
       'react/jsx-uses-react': 'off',
       'react/jsx-uses-vars': 'error', // components referenced only in JSX count as used

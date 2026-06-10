@@ -50,7 +50,7 @@ k8s/                       # example manifests; docs/ has screenshots + guides
 
 ## Conventions
 
-- Plain ESM JavaScript everywhere (no TypeScript); React 18 function components.
+- Plain ESM JavaScript everywhere (no TypeScript); React 19 function components.
 - **Adding a widget = one component file + one registry entry** — see
   `docs/adding-a-widget.md`. Never rename/reuse a widget `type`: it's persisted
   in user layouts (unknown types are silently dropped on load, by design).

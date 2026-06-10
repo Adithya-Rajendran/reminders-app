@@ -227,11 +227,12 @@ app.put('/api/notes/resources/:name', requireAuth, express.raw({ type: '*/*', li
 })
 
 // Any other /api/* is a real 404 (JSON, so the SPA doesn't get an HTML page).
-app.all('/api/*', (_q, r) => r.status(404).json({ error: 'not found' }))
+// (`{*splat}` is Express 5 syntax for the old `*`: zero or more segments.)
+app.all('/api/{*splat}', (_q, r) => r.status(404).json({ error: 'not found' }))
 
 // ---- Static SPA + client-side routing fallback ----
 app.use(express.static(PUBLIC_DIR))
-app.get('*', (req, res, next) => {
+app.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next()
   res.sendFile(path.join(PUBLIC_DIR, 'index.html'))
 })

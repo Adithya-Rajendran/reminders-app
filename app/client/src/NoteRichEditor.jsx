@@ -1,7 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
@@ -36,8 +35,11 @@ export default function NoteRichEditor({ value, onChange }) {
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'cb' } } }),
-      Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }),
+      StarterKit.configure({
+        codeBlock: { HTMLAttributes: { class: 'cb' } },
+        // Link ships inside StarterKit since tiptap v3 — configure it here.
+        link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } },
+      }),
       ResizableImage.configure({ inline: false, allowBase64: false, onEdit: (src) => editRef.current?.(src) }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -45,6 +47,9 @@ export default function NoteRichEditor({ value, onChange }) {
     ],
     content: toDisplay(value),
     autofocus: 'end',
+    // tiptap v3 stops re-rendering on every transaction by default; the toolbar
+    // reads editor.isActive(...) on render, so opt back in to live active states.
+    shouldRerenderOnTransaction: true,
     onUpdate: ({ editor: ed }) => onChange?.(toDisk(ed.storage.markdown.getMarkdown())),
     editorProps: {
       attributes: { class: 'tiptap-content', spellcheck: 'true' },
@@ -70,7 +75,7 @@ export default function NoteRichEditor({ value, onChange }) {
 
   useEffect(() => {
     if (!editor || value == null) return
-    if (toDisk(editor.storage.markdown.getMarkdown()) !== value) editor.commands.setContent(toDisplay(value), false)
+    if (toDisk(editor.storage.markdown.getMarkdown()) !== value) editor.commands.setContent(toDisplay(value), { emitUpdate: false })
   }, [value, editor])
 
   const newDrawing = () => setDrawing({ scene: null, id: null, src: null })
