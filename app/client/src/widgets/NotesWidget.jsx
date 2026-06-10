@@ -1,33 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { notesApi } from '../api.js'
 import NoteEditor from '../NoteEditor.jsx'
 import PromptModal from '../PromptModal.jsx'
+import { buildTree, folderKids, noteKids, countNotes, canDropInto } from '../notetree.js'
+import { ancestorsOf } from '../notepaths.js'
+import { loadStringSet, saveStringSet } from '../storage.js'
 import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
 import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL } from '../icons.jsx'
 
 const EXPAND_KEY = 'notes-expanded-folders'
-const loadSet = (k) => { try { return new Set(JSON.parse(localStorage.getItem(k) || '[]')) } catch { return new Set() } }
 const NARROW = 520 // below this widget width, collapse to a single (master-detail) column
-
-// Build a nested tree of folders (incl. empty) with each note attached to its folder.
-function buildTree(folderPaths, notes) {
-  const root = { name: '', path: '', children: {}, notes: [] }
-  const ensure = (fp) => {
-    let node = root, acc = ''
-    for (const seg of String(fp).split('/').filter(Boolean)) {
-      acc = acc ? acc + '/' + seg : seg
-      node.children[seg] = node.children[seg] || { name: seg, path: acc, children: {}, notes: [] }
-      node = node.children[seg]
-    }
-    return node
-  }
-  for (const fp of folderPaths) ensure(fp)
-  for (const n of notes) ensure(n.folder || '').notes.push(n)
-  return root
-}
-const folderKids = (node) => Object.values(node.children).sort((a, b) => a.name.localeCompare(b.name))
-const noteKids = (node) => (node.notes || []).slice().sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
-const countNotes = (node) => (node.notes || []).length + folderKids(node).reduce((s, c) => s + countNotes(c), 0)
 
 function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onOpen, dnd }) {
   return (
@@ -35,7 +17,7 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
       {folderKids(node).map((f) => {
         const isOpen = expanded.has(f.path)
         return (
-          <React.Fragment key={f.path}>
+          <Fragment key={f.path}>
             <div
               className={`tree-row${sel === f.path ? ' sel' : ''}${dnd.over === f.path ? ' drag-over' : ''}`}
               style={{ paddingLeft: 6 + depth * 13 }}
@@ -49,7 +31,7 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
               <span className="tree-count">{countNotes(f)}</span>
             </div>
             {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} dnd={dnd} />}
-          </React.Fragment>
+          </Fragment>
         )
       })}
       {noteKids(node).map((n) => (
@@ -78,7 +60,7 @@ export default function NotesWidget({ onOpenSettings }) {
   const [notes, setNotes] = useState([])
   const [folders, setFolders] = useState([])
   const [sel, setSel] = useState('')      // active folder (where new items go)
-  const [expanded, setExpanded] = useState(() => loadSet(EXPAND_KEY))
+  const [expanded, setExpanded] = useState(() => loadStringSet(EXPAND_KEY))
   const [q, setQ] = useState('')
   const [tag, setTag] = useState(null)
   const [openPath, setOpenPath] = useState(null)
@@ -111,25 +93,19 @@ export default function NotesWidget({ onOpenSettings }) {
 
   const toggleExpand = (path) => setExpanded((prev) => {
     const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path)
-    try { localStorage.setItem(EXPAND_KEY, JSON.stringify([...n])) } catch { /* ignore */ }
+    saveStringSet(EXPAND_KEY, n)
     return n
   })
-  const expandAncestors = (path) => setExpanded((prev) => new Set([...prev, ...path.split('/').map((_, i, a) => a.slice(0, i + 1).join('/')).filter(Boolean)]))
+  const expandAncestors = (path) => setExpanded((prev) => new Set([...prev, ...ancestorsOf(path)]))
 
   const newNote = async () => {
     try { const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
   }
 
   // ---- drag & drop: move a note (or folder) into a folder, or out to the root ----
-  const folderParent = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
-  const canDrop = (target) => { // target = destination folder rel path ('' = root)
-    const d = dragItem; if (!d) return false
-    if (d.type === 'note') return (d.folder || '') !== target
-    return target !== d.path && !target.startsWith(d.path + '/') && folderParent(d.path) !== target
-  }
-  const doDrop = async (target) => {
+  const doDrop = async (target) => { // target = destination folder rel path ('' = root)
     const d = dragItem; setDragItem(null); setOverTarget(null)
-    if (!d || !canDrop(target)) return
+    if (!canDropInto(d, target)) return
     try {
       if (d.type === 'note') {
         const r = await notesApi.move(d.path, target)
@@ -148,11 +124,11 @@ export default function NotesWidget({ onOpenSettings }) {
     over: overTarget,
     noteStart: (n) => (e) => { setDragItem({ type: 'note', path: n.path, folder: n.folder || '' }); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', n.path) } catch { /* ignore */ } },
     folderStart: (f) => (e) => { e.stopPropagation(); setDragItem({ type: 'folder', path: f.path }); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', f.path) } catch { /* ignore */ } },
-    folderOver: (path) => (e) => { if (canDrop(path)) { e.preventDefault(); e.stopPropagation(); if (overTarget !== path) setOverTarget(path) } },
+    folderOver: (path) => (e) => { if (canDropInto(dragItem, path)) { e.preventDefault(); e.stopPropagation(); if (overTarget !== path) setOverTarget(path) } },
     folderDrop: (path) => (e) => { e.preventDefault(); e.stopPropagation(); doDrop(path) },
     noteOver: (e) => { e.stopPropagation() }, // notes aren't drop targets — don't bubble to the root zone
     noteDrop: (e) => { e.preventDefault(); e.stopPropagation() },
-    rootOver: (e) => { if (canDrop('')) { e.preventDefault(); if (overTarget !== '') setOverTarget('') } },
+    rootOver: (e) => { if (canDropInto(dragItem, '')) { e.preventDefault(); if (overTarget !== '') setOverTarget('') } },
     rootDrop: (e) => { e.preventDefault(); doDrop('') },
     end: () => { setDragItem(null); setOverTarget(null) },
   }

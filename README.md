@@ -58,7 +58,7 @@ Browser ──TLS──▶ Gateway/Ingress ──▶ Reminders (Node BFF + React
                        VALARM poller ─▶ per-user SSE
 ```
 
-The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly session, and is a thin layer over **CalDAV**: tasks/projects/labels/recurrence/reminders are VTODOs in the user's own CalDAV server (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), giving real multi-tenancy and device sync for free. A small **SQLite** file (WAL, on a block volume) holds only what's easy to recreate — dashboard layouts, encrypted CalDAV account config, and sessions. A **VALARM poller** pushes per-user SSE reminders. The **SPA** (`app/client`, React 18 + Vite) is the dashboard. See the **[wiki → Architecture](https://github.com/Adithya-Rajendran/reminders-app/wiki/Architecture)** for the full design.
+The **BFF** (`app/server`, Node + Express) does server-side OIDC, keeps an HttpOnly session, and is a thin layer over **CalDAV**: tasks/projects/labels/recurrence/reminders are VTODOs in the user's own CalDAV server (via [tsdav](https://github.com/natelindev/tsdav) + [ical.js](https://github.com/kewisch/ical.js)), giving real multi-tenancy and device sync for free. A small **SQLite** file (WAL, on a block volume) holds only what's easy to recreate — dashboard layouts, encrypted CalDAV account config, and sessions. A **VALARM poller** pushes per-user SSE reminders. The **SPA** (`app/client`, React 19 + Vite) is the dashboard. See the **[wiki → Architecture](https://github.com/Adithya-Rajendran/reminders-app/wiki/Architecture)** for the full design.
 
 ## Quick start (container image)
 

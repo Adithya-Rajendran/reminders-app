@@ -2,9 +2,8 @@
 /* ============================================================
    Reminders — inline SVG icon set
    All thin 1.75px stroke, currentColor, ~18px default.
-   Ported from the design handoff (icons.jsx) to ESM named exports.
-   Legacy names (Gear, Plus, X, ...) are kept as aliases so existing
-   imports keep working.
+   Canonical Icon* named exports only — keep this file free of
+   icons nothing imports.
    ============================================================ */
 
 export const Icon = ({ d, size = 18, sw = 1.75, fill, children, label, ...rest }) => (
@@ -110,23 +109,6 @@ export const IconLogout = (p) => (
 export const IconChevR = (p) => <Icon {...p} d="M9 6l6 6-6 6" />
 export const IconChevL = (p) => <Icon {...p} d="M15 6l-6 6 6 6" />
 export const IconChevDown = (p) => <Icon {...p} d="M6 9l6 6 6-6" />
-export const IconGrip = (p) => (
-  <Icon {...p} fill="currentColor" stroke="none">
-    <circle cx="9" cy="6" r="1.4" />
-    <circle cx="15" cy="6" r="1.4" />
-    <circle cx="9" cy="12" r="1.4" />
-    <circle cx="15" cy="12" r="1.4" />
-    <circle cx="9" cy="18" r="1.4" />
-    <circle cx="15" cy="18" r="1.4" />
-  </Icon>
-)
-export const IconResize = (p) => (
-  <Icon {...p} sw={1.6}>
-    <path d="M20 10v10H10M20 16l-10 4M20 20l-4 0" opacity="0" />
-    <path d="M9 20h11M14 20l6-6M19 20l1-1" opacity="0" />
-    <path d="M8 21h13M13 21l8-8M18 21l3-3" />
-  </Icon>
-)
 export const IconShield = (p) => (
   <Icon {...p}>
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -145,12 +127,6 @@ export const IconLink = (p) => (
     <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   </Icon>
 )
-export const IconSliders = (p) => (
-  <Icon {...p}>
-    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
-  </Icon>
-)
-export const IconArrowUp = (p) => <Icon {...p} d="M12 19V5M5 12l7-7 7 7" />
 export const IconPalette = (p) => (
   <Icon {...p}>
     <path d="M12 2a10 10 0 1 0 0 20 2.4 2.4 0 0 0 2.4-2.4c0-.66-.27-1.25-.7-1.7-.27-.3-.45-.7-.45-1.13 0-.87.7-1.57 1.57-1.57H17a5 5 0 0 0 5-5c0-4.7-4.48-8.2-10-8.2z" />
@@ -160,13 +136,6 @@ export const IconPalette = (p) => (
     <circle cx="6.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
   </Icon>
 )
-export const IconFlag = (p) => (
-  <Icon {...p}>
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <path d="M4 22v-7" />
-  </Icon>
-)
-
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (
   <Icon {...p} sw={1.6}>
@@ -181,22 +150,3 @@ export const IconApple = (p) => (
     <path d="M14.4 6.3a3.4 3.4 0 0 0 .8-2.4 3.5 3.5 0 0 0-2.3 1.2 3.2 3.2 0 0 0-.8 2.3 2.9 2.9 0 0 0 2.3-1.1z" />
   </Icon>
 )
-
-/* ============================================================
-   Legacy aliases — keep the current app's existing import names
-   working by mapping them onto the equivalent design icons.
-   ============================================================ */
-export const Gear = IconGear
-export const Plus = IconPlus
-export const X = IconX
-export const Check = IconCheck
-export const Trash = IconTrash
-export const Refresh = IconRefresh
-export const Calendar = IconCalendar
-export const Cloud = IconCloud
-export const Logout = IconLogout
-export const Grip = IconGrip
-// Brand mark used by the top bar / login — design uses the bell glyph.
-export const Logo = IconBell
-// Spinning SVG spinner (defaults to the legacy 16px size).
-export const Spinner = ({ size = 16, ...p }) => <IconSpinner size={size} {...p} />

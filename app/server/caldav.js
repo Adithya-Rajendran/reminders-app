@@ -6,6 +6,7 @@ import dns from 'node:dns/promises'
 import net from 'node:net'
 import { createDAVClient } from 'tsdav'
 import ICAL from 'ical.js'
+import { baseOf, okPut } from './util.js'
 import {
   getAccount, listAccounts, insertAccount, deleteAccount, deleteAccountById,
   upsertList, pruneLists, listsForAccount, enabledListsForAccount, setListEnabled,
@@ -151,7 +152,7 @@ export async function createGroupCalendar(acc, name) {
   const home = calendarHome(lists)
   if (!home) { const e = new Error('cannot locate the CalDAV calendar home'); e.status = 502; throw e }
   const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('g-' + crypto.randomUUID().slice(0, 8))
-  const taken = new Set(lists.map((l) => (l.url.endsWith('/') ? l.url : l.url + '/')))
+  const taken = new Set(lists.map((l) => baseOf(l.url)))
   let url = home + slug + '/'
   for (let n = 2; taken.has(url); n++) url = home + slug + '-' + n + '/'
   const body = '<?xml version="1.0" encoding="utf-8"?>'
@@ -168,7 +169,7 @@ export async function createGroupCalendar(acc, name) {
 // Delete a calendar collection (removes its VTODOs). Used when a group is deleted
 // with "also delete the calendar".
 export async function deleteCalendar(acc, url) {
-  const u = url.endsWith('/') ? url : url + '/'
+  const u = baseOf(url)
   const r = await safeFetch(u, { method: 'DELETE', headers: { Authorization: authHeader(acc) } })
   if (!r.ok && r.status !== 204 && r.status !== 404) { const e = new Error('delete calendar failed (' + r.status + ')'); e.status = 502; throw e }
 }
@@ -435,10 +436,10 @@ async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
   }
   vcal.addSubcomponent(ve)
 
-  const objectUrl = (listUrl.endsWith('/') ? listUrl : listUrl + '/') + uid + '.ics'
+  const objectUrl = baseOf(listUrl) + uid + '.ics'
   const headers = { Authorization: authHeader(acc), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }
   const put = await safeFetch(objectUrl, { method: 'PUT', headers, body: vcal.toString() })
-  if (!put.ok && put.status !== 201 && put.status !== 204) throw new Error('create failed (' + put.status + ')')
+  if (!okPut(put)) throw new Error('create failed (' + put.status + ')')
   return parseVevents(vcal.toString(), { accountId: acc.id, listUrl, objectUrl, etag: put.headers.get('etag') })[0]
 }
 

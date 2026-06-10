@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Excalidraw, serializeAsJSON, exportToBlob } from '@excalidraw/excalidraw'
+import '@excalidraw/excalidraw/index.css' // 0.18+: styles are no longer auto-injected
 import ModalFrame from './ModalFrame.jsx'
 import { IconX, IconCheck, IconSpinner } from './icons.jsx'
 

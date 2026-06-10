@@ -1,7 +1,7 @@
 // Unit tests for the note image/drawing path helpers (client/src/notepaths.js).
 // Pure module (no Tiptap), so it imports cleanly in Node. Run with:
 //   docker run --rm -v "$PWD":/app -w /app node:22 node test/notepaths.test.mjs
-import { isDrawing, drawingId, sceneNameFor, toDisplay, toDisk, widthOf, withWidth, RES_PREFIX } from '../client/src/notepaths.js'
+import { isDrawing, drawingId, sceneNameFor, toDisplay, toDisk, widthOf, withWidth, parentFolder, ancestorsOf, RES_PREFIX } from '../client/src/notepaths.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -37,6 +37,13 @@ ok(widthOf('x.png?v=1') === null, 'widthOf ignores a ?query (only the fragment c
 ok(withWidth('x.png', 320) === 'x.png#w320', 'withWidth adds a width fragment')
 ok(withWidth('x.png#w100', 320) === 'x.png#w320', 'withWidth replaces an existing width')
 ok(withWidth('x.png#w100', null) === 'x.png', 'withWidth(null) clears the fragment')
+
+// ---- folder path helpers ----
+ok(parentFolder('a/b/c') === 'a/b', 'parentFolder of a nested path')
+ok(parentFolder('a') === '', 'parentFolder of a top-level folder is the root')
+ok(ancestorsOf('a/b/c').join() === 'a,a/b,a/b/c', 'ancestorsOf lists every prefix incl. the path itself')
+ok(ancestorsOf('a').join() === 'a', 'ancestorsOf of a top-level folder is just itself')
+ok(ancestorsOf('').length === 0, 'ancestorsOf of the root is empty')
 
 console.log(`\nnotepaths.test: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

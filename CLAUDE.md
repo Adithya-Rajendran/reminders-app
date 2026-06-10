@@ -29,6 +29,7 @@ app/client/src/
   widgets/registry.jsx     # THE widget registry: every widget is declared here (lazy chunks)
   widgets/*.jsx            # one file per widget + shared parts (TaskRow, parts.jsx)
   usePopover.js            # shared outside-click/Esc popover hook
+  notetree.js, savequeue.js, notepaths.js, storage.js  # pure logic (node-tested)
   api.js                   # fetch helpers (api/tk/notesApi), 401 -> login redirect
   useTasks.js, tasklib.js  # task-list hook (optimistic updates + undo), task utils
   tasksbus.js              # cross-widget "tasks changed" event bus
@@ -39,6 +40,7 @@ app/server/
   index.js                 # Express app: session, auth guard, route mounting
   config.js                # SQLite (layouts, dashboards, encrypted account config)
   tasks_caldav.js, caldav.js, recurrence_caldav.js  # CalDAV VTODO/VEVENT layer
+  vtodo.js, util.js        # shared ICS parsing + tiny helpers (node-tested)
   notes.js, webdav.js      # Markdown notes over WebDAV
   reminder_groups.js       # group <-> calendar mapping
   valarm-poller.js, events.js  # VALARM poll -> per-user SSE feed
@@ -48,7 +50,7 @@ k8s/                       # example manifests; docs/ has screenshots + guides
 
 ## Conventions
 
-- Plain ESM JavaScript everywhere (no TypeScript); React 18 function components.
+- Plain ESM JavaScript everywhere (no TypeScript); React 19 function components.
 - **Adding a widget = one component file + one registry entry** — see
   `docs/adding-a-widget.md`. Never rename/reuse a widget `type`: it's persisted
   in user layouts (unknown types are silently dropped on load, by design).

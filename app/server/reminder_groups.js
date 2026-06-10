@@ -2,26 +2,13 @@
 // in its mapped CalDAV calendar (so each group syncs as its own task list).
 // Reminders themselves live in CalDAV; only the name->calendar map is in SQLite.
 import crypto from 'node:crypto'
-import ICAL from 'ical.js'
 import { safeFetch, authHeader, createGroupCalendar, deleteCalendar } from './caldav.js'
 import { asMatch } from './webdav.js'
 import { listsWithId, getListById, getGroupMap, setGroupMapping, deleteGroupMapping, deleteListRow } from './config.js'
 import { allUserVtodos, invalidateUserCache } from './tasks_caldav.js'
+import { safeParse, categoryNames, setCategories } from './vtodo.js'
+import { err, accountOf, baseOf, okPut } from './util.js'
 
-const err = (msg, status) => { const e = new Error(msg); e.status = status; return e }
-const accountOf = (row) => ({ id: row.account_id, type: row.account_type, server_url: row.account_server_url, username: row.account_username, password_enc: row.account_password_enc })
-const baseOf = (url) => (url.endsWith('/') ? url : url + '/')
-const okPut = (s) => s.ok || s.status === 201 || s.status === 204
-
-function catsOf(vt) {
-  const out = new Set()
-  for (const p of vt.getAllProperties('categories')) for (const v of (p.getValues() || [])) { const s = String(v).trim(); if (s) out.add(s) }
-  return [...out]
-}
-function setCats(vt, names) {
-  vt.removeAllProperties('categories')
-  if (names.length) { const p = new ICAL.Property('categories'); p.setValues(names); vt.addProperty(p) }
-}
 // Give a relocated copy a fresh UID. Nextcloud keeps DELETEd objects in a trashbin
 // whose rows still occupy the (calendarid, uid) unique index, so re-creating an
 // object with a UID that previously lived in the destination calendar 500s. A new
@@ -30,11 +17,8 @@ const reuid = (vt) => vt.updatePropertyWithValue('uid', crypto.randomUUID())
 async function fetchVcal(account, objectUrl) {
   const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(account) } })
   if (!r.ok) return null
-  try {
-    const vcal = new ICAL.Component(ICAL.parse(await r.text()))
-    const vt = vcal.getAllSubcomponents('vtodo').find((x) => !x.getFirstProperty('recurrence-id')) || vcal.getFirstSubcomponent('vtodo')
-    return vt ? { vcal, vt, etag: r.headers.get('etag') } : null
-  } catch { return null }
+  const { vcal, vt } = safeParse(await r.text())
+  return vt ? { vcal, vt, etag: r.headers.get('etag') } : null
 }
 
 const vtodoLists = async (userId) => (await listsWithId(userId)).filter((l) => l.supports_vtodo)
@@ -51,7 +35,7 @@ export async function listGroups(userId) {
   const counts = {}
   // A bare CATEGORIES tag with no calendar is the default group, not a group — count
   // only reminders tagged with a real (mapped) group.
-  for (const { vt } of await allUserVtodos(userId)) for (const c of catsOf(vt)) if (c in map) counts[c] = (counts[c] || 0) + 1
+  for (const { vt } of await allUserVtodos(userId)) for (const c of categoryNames(vt)) if (c in map) counts[c] = (counts[c] || 0) + 1
   const groups = Object.keys(map).sort((a, b) => a.localeCompare(b)).map((name) => {
     const listId = map[name]
     const l = byId.get(listId)
@@ -73,7 +57,7 @@ async function migrateInto(userId, groupName, targetListId) {
     const src = await getListById(userId, listId)
     if (!src) continue
     const f = await fetchVcal(src.account, objectUrl)
-    if (!f || !catsOf(f.vt).includes(groupName)) continue
+    if (!f || !categoryNames(f.vt).includes(groupName)) continue
     reuid(f.vt) // fresh UID so the destination's trashbin can't collide on (calendarid, uid)
     const put = await safeFetch(tbase + crypto.randomUUID() + '.ics', { method: 'PUT', headers: { Authorization: authHeader(target.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: f.vcal.toString() })
     if (okPut(put)) { await safeFetch(objectUrl, { method: 'DELETE', headers: { Authorization: authHeader(src.account), ...(f.etag ? { 'If-Match': asMatch(f.etag) } : {}) } }); moved++ }
@@ -126,8 +110,10 @@ export async function deleteGroup(userId, groupName, deleteCalendarFlag) {
     const src = await getListById(userId, lid)
     if (!src) continue
     const f = await fetchVcal(src.account, objectUrl)
-    if (!f || !catsOf(f.vt).includes(name)) continue
-    setCats(f.vt, catsOf(f.vt).filter((c) => c !== name))
+    if (!f) continue
+    const cats = categoryNames(f.vt)
+    if (!cats.includes(name)) continue
+    setCategories(f.vt, cats.filter((c) => c !== name))
     if (defResolved && lid !== def.id) {
       reuid(f.vt) // fresh UID so the default calendar's trashbin can't collide on (calendarid, uid)
       const put = await safeFetch(tbase + crypto.randomUUID() + '.ics', { method: 'PUT', headers: { Authorization: authHeader(defResolved.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: f.vcal.toString() })
