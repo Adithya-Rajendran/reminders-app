@@ -41,7 +41,11 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   const queue = useRef(null)
   if (!queue.current) {
     queue.current = createSaveQueue({
-      save: async () => { const r = await notesApi.save(pathRef.current, bodyRef.current, etagRef.current, tagsRef.current); setEtag(r.etag) },
+      save: async () => {
+        const p = pathRef.current
+        const r = await notesApi.save(p, bodyRef.current, etagRef.current, tagsRef.current)
+        if (pathRef.current === p) setEtag(r.etag) // the pane may have switched notes mid-PUT
+      },
       onState: setSaving,
     })
   }
@@ -51,9 +55,15 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     // path — we're already showing it, so a refetch would only flash.
     if (initialPath === pathRef.current && stateRef.current === 'ready') return undefined
     let alive = true
+    // Switching to another note: save pending edits to the old path now — the
+    // reset() below would silently drop them.
+    clearTimeout(saveTimer.current)
+    if (stateRef.current === 'ready' && queue.current.isDirty()) queue.current.flush()
     queue.current.reset()
     notesApi.get(initialPath)
-      .then((n) => { if (!alive) return; setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setFolder(n.folder || ''); setState('ready') })
+      // setPath keeps pathRef in sync with what's loaded — without it, autosaves
+      // after a switch PUT the new body at the OLD note's path (and 412).
+      .then((n) => { if (!alive) return; setPath(initialPath); setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setFolder(n.folder || ''); setState('ready') })
       .catch(() => { if (alive) setState('error') })
     notesApi.folders().then((r) => { if (alive) setFolders(r.folders || []) }).catch(() => {})
     return () => { alive = false }
