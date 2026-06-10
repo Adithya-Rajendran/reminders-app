@@ -40,6 +40,7 @@ app/server/
   index.js                 # Express app: session, auth guard, route mounting
   config.js                # SQLite (layouts, dashboards, encrypted account config)
   tasks_caldav.js, caldav.js, recurrence_caldav.js  # CalDAV VTODO/VEVENT layer
+  vtodo.js, util.js        # shared ICS parsing + tiny helpers (node-tested)
   notes.js, webdav.js      # Markdown notes over WebDAV
   reminder_groups.js       # group <-> calendar mapping
   valarm-poller.js, events.js  # VALARM poll -> per-user SSE feed

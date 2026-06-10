@@ -6,6 +6,8 @@ import crypto from 'node:crypto'
 import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
+import { safeParse, categoryNames, setCategories } from './vtodo.js'
+import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
 import { advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo, isRecurring, registerTimezones } from './recurrence_caldav.js'
@@ -19,19 +21,11 @@ const outTs = (d) => (d && new Date(d).getUTCFullYear() > 1) ? new Date(d).toISO
 const OUR_TO_ICAL = { 0: 0, 1: 9, 2: 7, 3: 5, 4: 3, 5: 1 }
 function icalToOur(p) { const n = Number(p) || 0; if (n <= 0) return 0; if (n <= 2) return 5; if (n <= 4) return 4; if (n <= 6) return 3; if (n <= 8) return 2; return 1 }
 const clampPriority = (p) => { const n = Math.trunc(Number(p)); return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0 }
-const accountOf = (row) => ({ id: row.account_id, type: row.account_type, server_url: row.account_server_url, username: row.account_username, password_enc: row.account_password_enc })
 
-// ---- VTODO helpers ----
-const pickMaster = (vcal) => { const v = vcal.getAllSubcomponents('vtodo'); return v.find((x) => !x.getFirstProperty('recurrence-id')) || v[0] || null }
-function safeParse(ics) { try { const vcal = new ICAL.Component(ICAL.parse(ics)); return { vcal, vt: pickMaster(vcal) } } catch { return { vcal: null, vt: null } } }
+// ---- VTODO helpers (ICS parsing/CATEGORIES shared with reminder_groups.js via vtodo.js) ----
 function inDue(v) { if (v === null || v === undefined || v === '' || v === ZERO) return null; const d = new Date(v); return (isNaN(d) || d.getUTCFullYear() <= 1) ? null : ICAL.Time.fromJSDate(d, true) }
 function setDue(vt, time) { vt.removeAllProperties('due'); if (time) { const p = new ICAL.Property('due'); p.resetType('date-time'); p.setValue(time); vt.addProperty(p) } }
-function setCategories(vt, names) { vt.removeAllProperties('categories'); if (names.length) { const p = new ICAL.Property('categories'); p.setValues(names); vt.addProperty(p) } }
-function readCategories(vt) {
-  const set = new Set()
-  for (const p of vt.getAllProperties('categories')) for (const v of (p.getValues() || [])) { const s = String(v).trim(); if (s) set.add(s) }
-  return [...set].map((title) => ({ id: encodeLabelId(title), title, hex_color: '' }))
-}
+const readCategories = (vt) => categoryNames(vt).map((title) => ({ id: encodeLabelId(title), title, hex_color: '' }))
 export function serializeVtodo(vt, listId, objectUrl) {
   const done = String(vt.getFirstPropertyValue('status') || 'NEEDS-ACTION').toUpperCase() === 'COMPLETED'
   const dueV = vt.getFirstPropertyValue('due') || vt.getFirstPropertyValue('dtstart')
@@ -132,7 +126,9 @@ export async function listTasks(req, res, next) {
   } catch (e) { next(e) }
 }
 
-export async function createTask(req, res, _next) {
+// createTask/patchTask/deleteTask/attachLabel respond to upstream failures
+// directly (specific 4xx/502 messages the client shows) instead of next(e).
+export async function createTask(req, res) {
   const uid = req.session.user.sub
   const b = req.body || {}
   const title = (b.title || '').trim()
@@ -167,10 +163,9 @@ export async function createTask(req, res, _next) {
     if (Number(b.repeat_after) > 0 || Number(b.repeat_mode) === 1 || Number(b.repeat_mode) === 2) applyRepeatFields(vt, b.repeat_after, b.repeat_mode)
     if (Array.isArray(b.reminders)) applyReminders(vt, b.reminders)
     vcal.addSubcomponent(vt)
-    const base = resolved.list.url.endsWith('/') ? resolved.list.url : resolved.list.url + '/'
-    const objectUrl = base + uid2 + '.ics'
+    const objectUrl = baseOf(resolved.list.url) + uid2 + '.ics'
     const put = await safeFetch(objectUrl, { method: 'PUT', headers: { Authorization: authHeader(resolved.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: vcal.toString() })
-    if (!put.ok && put.status !== 201 && put.status !== 204) { const e = new Error('create failed (' + put.status + ')'); e.status = put.status; throw e }
+    if (!okPut(put)) { const e = new Error('create failed (' + put.status + ')'); e.status = put.status; throw e }
     invalidate(uid)
     res.status(201).json(serializeVtodo(vt, resolved.list.id, objectUrl))
   } catch (e) {
@@ -180,7 +175,7 @@ export async function createTask(req, res, _next) {
   }
 }
 
-export async function patchTask(req, res, _next) {
+export async function patchTask(req, res) {
   const uid = req.session.user.sub
   let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
   const b = req.body || {}
@@ -213,7 +208,7 @@ export async function patchTask(req, res, _next) {
   }
 }
 
-export async function deleteTask(req, res, _next) {
+export async function deleteTask(req, res) {
   const uid = req.session.user.sub
   let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
   const resolved = await getListById(uid, dec.listId)

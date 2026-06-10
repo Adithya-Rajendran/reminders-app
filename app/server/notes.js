@@ -7,6 +7,7 @@ import crypto from 'node:crypto'
 import yaml from 'js-yaml'
 import { getAccount, listAccounts, getNotesConfig, setNotesConfig } from './config.js'
 import * as dav from './webdav.js'
+import { err } from './util.js'
 
 export const RES = '_resources'
 const MD = 'text/markdown; charset=utf-8'
@@ -44,7 +45,6 @@ export function inRoot(root, path) {
   if (p.split('/').includes('..')) return false
   return p === root || p.startsWith(root + '/')
 }
-const err = (msg, status) => { const e = new Error(msg); e.status = status; return e }
 const sanitizeName = (s) => String(s || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
 // Drops empty + traversal ('.', '..') segments so a crafted folder/path can
 // never escape the user's Files root (defense in depth around inRoot).
