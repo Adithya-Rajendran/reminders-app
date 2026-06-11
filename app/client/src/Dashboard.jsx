@@ -44,18 +44,22 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // Initial load: projects + saved layout (or a sensible default).
   useEffect(() => {
     (async () => {
-      let pr = []
-      try { pr = await tk('/projects') } catch { pr = [] }
+      // The three boot fetches are independent — run them concurrently instead
+      // of paying three sequential round-trips before the grid can render.
+      const [prR, acctR, savedR] = await Promise.allSettled([
+        tk('/projects'),
+        api('/api/caldav/accounts'),
+        api('/api/layouts/' + dashboardId),
+      ])
+      let pr = prR.status === 'fulfilled' ? prR.value : []
       pr = Array.isArray(pr) ? pr.filter((p) => p.id > 0) : []
       setProjects(pr)
 
       // How many CalDAV accounts are linked — drives the onboarding gate.
-      let acctCount = 0
-      try { const r = await api('/api/caldav/accounts'); acctCount = (r.accounts || []).length } catch { acctCount = 0 }
+      const acctCount = acctR.status === 'fulfilled' ? (acctR.value?.accounts || []).length : 0
       setCaldavAccounts(acctCount)
 
-      let saved = null
-      try { saved = await api('/api/layouts/' + dashboardId) } catch { /* none */ }
+      const saved = savedR.status === 'fulfilled' ? savedR.value : null
       if (saved?.layout) {
         // Any persisted layout is authoritative — but drop retired widget types
         // (e.g. the old tasklist/caldav widgets), and scale a pre-24-column layout

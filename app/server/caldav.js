@@ -296,12 +296,13 @@ export async function fetchTasksHandler(req, res) {
   try {
     const accs = await listAccounts(req.session.user.sub)
     const tasks = []
-    for (const acc of accs) {
+    // Same parallel fan-out as fetchEvents — see the comment there.
+    await Promise.allSettled(accs.map(async (acc) => {
       const lists = await enabledListsForAccount(acc.id)
-      if (!lists.length) continue
+      if (!lists.length) return
       let client
-      try { client = await clientFor(acc) } catch { continue }
-      for (const list of lists) {
+      try { client = await clientFor(acc) } catch { return }
+      await Promise.allSettled(lists.map(async (list) => {
         try {
           const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: VTODO_FILTER })
           for (const o of objs) {
@@ -311,8 +312,8 @@ export async function fetchTasksHandler(req, res) {
             }))
           }
         } catch { /* skip a failing list */ }
-      }
-    }
+      }))
+    }))
     tasks.sort((a, b) => (a.done - b.done) || ((a.due || '9999') > (b.due || '9999') ? 1 : -1))
     res.json({ tasks })
   } catch (e) {
@@ -396,20 +397,24 @@ function parseVevents(icsData, ctx) {
 async function fetchEvents(userId, startISO, endISO) {
   const accs = await listAccounts(userId)
   const events = []
-  for (const acc of accs) {
+  // Fan out across accounts AND lists: every calendar-query REPORT is a full
+  // round-trip to the CalDAV server (~250ms+ on a typical Nextcloud), so a
+  // month view over N calendars was paying N×RTT sequentially. allSettled
+  // keeps the old skip-a-failing-list behavior.
+  await Promise.allSettled(accs.map(async (acc) => {
     const lists = await enabledListsForAccount(acc.id)
-    if (!lists.length) continue
+    if (!lists.length) return
     let client
-    try { client = await clientFor(acc) } catch { continue }
-    for (const list of lists) {
+    try { client = await clientFor(acc) } catch { return }
+    await Promise.allSettled(lists.map(async (list) => {
       try {
         const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: veventFilter(startISO, endISO) })
         for (const o of objs) {
           events.push(...parseVevents(o.data, { accountId: acc.id, listUrl: list.url, objectUrl: o.url, etag: o.etag }))
         }
       } catch { /* skip a failing / event-incapable list */ }
-    }
-  }
+    }))
+  }))
   return events
 }
 
