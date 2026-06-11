@@ -182,7 +182,10 @@ export default function NotesWidget({ onOpenSettings }) {
             className={`notes-tree${overTarget === '' && dragItem ? ' drag-over-root' : ''}`}
             onDragOver={dnd.rootOver} onDrop={dnd.rootDrop}
           >
-            {notes.length === 0
+            {notes.length === 0 && folders.length === 0
+              // Folders exist without notes (created empty in-app or in Nextcloud)
+              // and must still render — otherwise a fresh folder looks like the
+              // create silently failed. Empty-state only when BOTH are empty.
               ? <EmptyState icon={IconNote} title="No notes yet" sub="Create your first note with the ＋ above." />
               : searching
                 ? (matches.length === 0
