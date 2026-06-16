@@ -3,7 +3,7 @@
 // not clobber foreign properties/alarms. Imports only ical.js (no SQLite).
 // Run with: node test/vtodo_meta.test.mjs
 import ICAL from 'ical.js'
-import { readCue, writeCue, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal } from '../server/vtodo_meta.js'
+import { readCue, writeCue, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow } from '../server/vtodo_meta.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -154,6 +154,34 @@ function roundtrip(vcal) {
   writeParentGoal(vt, 'g'); writeParentGoal(vt, '')
   ok(readParentGoal(vt) === '', 'writeParentGoal("") clears the parent link')
   ok(vt.getAllProperties('related-to').map((p) => String(p.getFirstValue())).join() === 'sib-9', 'clearing parent leaves the foreign sibling intact')
+}
+
+// ---- flow canvas (Cues mindmap): position + edges round-trip; only this widget reads it ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeFlow(vt, { x: 120, y: 40, to: ['uid-b', 'uid-c', 'uid-b'] }) // duplicate edge collapses
+  vt.updatePropertyWithValue('x-foo-custom', 'keepme')              // foreign X-prop must survive alongside
+  const f = readFlow(roundtrip(vcal))
+  ok(f && f.x === 120 && f.y === 40, 'flow x/y survive round-trip')
+  ok(JSON.stringify(f.to) === JSON.stringify(['uid-b', 'uid-c']), 'flow edges dedupe and survive round-trip')
+  ok(String(roundtrip(vcal).getFirstPropertyValue('x-foo-custom')) === 'keepme', 'foreign X-prop preserved alongside flow')
+}
+{
+  const { vt } = makeVtodo()
+  ok(readFlow(vt) === null, 'unplaced task has null flow (no X-prop)')
+  writeFlow(vt, { x: 5, y: 6, to: [] })
+  ok(readFlow(vt).x === 5, 'flow writes then reads back')
+  writeFlow(vt, null)
+  ok(readFlow(vt) === null, 'writeFlow(null) clears the flow prop')
+  ok(vt.getAllProperties('x-reminders-flow').length === 0, 'cleared flow removes the X-prop entirely')
+}
+{
+  // coordinates coerce to finite numbers; junk edges are dropped
+  const { vt } = makeVtodo()
+  writeFlow(vt, { x: 'NaN', y: undefined, to: ['ok', '', '  ', null] })
+  const f = readFlow(vt)
+  ok(f.x === 0 && f.y === 0, 'non-finite coords coerce to 0')
+  ok(JSON.stringify(f.to) === JSON.stringify(['ok']), 'blank/null edges are dropped')
 }
 
 console.log(`\nvtodo_meta.test: ${pass} passed, ${fail} failed`)

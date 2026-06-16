@@ -22,6 +22,7 @@ const XPROP = {
   habit_log: 'x-reminders-habit-log',
   is_goal: 'x-reminders-goal',
   goal_plan: 'x-reminders-goal-plan',
+  flow: 'x-reminders-flow',
 }
 
 // ---- low-level text accessors ----
@@ -142,4 +143,33 @@ export function writeParentGoal(vt, uid) {
   p.setParameter('reltype', 'PARENT')
   p.setValue(u)
   vt.addProperty(p)
+}
+
+// ---- flow canvas (Cues mindmap) ----
+// A reminder's position + outgoing links on the Cues canvas. Stored as opaque
+// JSON in X-REMINDERS-FLOW; read by the Cues widget ONLY (no other widget touches
+// it). Shape: { x:Number, y:Number, to:[uid,…] }. The graph is distributed —
+// every node owns its own coordinates and its outgoing edges — so there is no
+// global document to keep in sync. Empty/blank object means "not placed yet".
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+export function readFlow(vt) {
+  const raw = readMeta(vt, 'flow')
+  if (!raw) return null
+  let o
+  try { o = JSON.parse(raw) } catch { return null }
+  if (!o || typeof o !== 'object') return null
+  return {
+    x: num(o.x),
+    y: num(o.y),
+    to: Array.isArray(o.to) ? [...new Set(o.to.map((s) => String(s || '').trim()).filter(Boolean))] : [],
+  }
+}
+export function writeFlow(vt, flow) {
+  if (flow == null) return writeMeta(vt, 'flow', '')
+  const clean = {
+    x: num(flow.x),
+    y: num(flow.y),
+    to: Array.isArray(flow.to) ? [...new Set(flow.to.map((s) => String(s || '').trim()).filter(Boolean))] : [],
+  }
+  writeMeta(vt, 'flow', JSON.stringify(clean))
 }
