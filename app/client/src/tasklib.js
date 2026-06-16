@@ -30,10 +30,21 @@ function parseDate(text) {
 
 const PRI_RE = /(^|\s)!([1-5])\b/
 const LABEL_RE = /(^|\s)\*([\w-]+)/g
+// Implementation-intention cue: "after morning erg -> draft figure". The text
+// left of the first arrow (-> or →) is the trigger; the task (with its own
+// date/priority/label tokens) is on the right.
+const ARROW_RE = /\s*(?:->|→)\s*/
 
-// Parse "Submit report tomorrow !2 *finance" -> structured fields.
+// Parse "after erg -> Submit report tomorrow !2 *finance" -> structured fields.
 export function parseQuickAdd(input) {
-  let title = ' ' + input + ' '
+  let cue
+  let body = String(input == null ? '' : input)
+  const am = body.match(ARROW_RE)
+  if (am) {
+    const left = body.slice(0, am.index).trim()
+    if (left) { cue = left; body = body.slice(am.index + am[0].length) }
+  }
+  let title = ' ' + body + ' '
   let priority = 0
   const labels = []
   const pm = title.match(PRI_RE)
@@ -44,7 +55,7 @@ export function parseQuickAdd(input) {
   const { date, matched } = parseDate(title)
   if (matched) title = title.replace(new RegExp('\\b' + matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), ' ')
   title = title.replace(/\s+/g, ' ').trim()
-  return { title, priority, due_date: date || undefined, labels }
+  return { title, priority, due_date: date || undefined, labels, ...(cue ? { cue } : {}) }
 }
 
 // ---- due chip label + urgency class ----

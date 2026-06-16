@@ -168,6 +168,50 @@ export const IconCopy = (p) => (
   </Icon>
 )
 
+// Productivity-layer marks (review / cues / habits / goals / frog / quick-win)
+export const IconChart = (p) => (
+  <Icon {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M8 17v-5M13 17V8M18 17v-8" />
+  </Icon>
+)
+export const IconCue = (p) => (
+  <Icon {...p}>
+    <path d="M4 12h12" />
+    <path d="M13 7l5 5-5 5" />
+    <circle cx="4" cy="12" r="1.7" fill="currentColor" stroke="none" />
+  </Icon>
+)
+export const IconFlame = (p) => (
+  <Icon {...p}>
+    <path d="M12 2c2.5 4 5 5.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2.5-5C10.5 7 11.5 5 12 2z" />
+  </Icon>
+)
+export const IconTarget = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </Icon>
+)
+export const IconFrog = (p) => (
+  <Icon {...p}>
+    <circle cx="8.5" cy="8" r="2.2" />
+    <circle cx="15.5" cy="8" r="2.2" />
+    <path d="M4 13a8 8 0 0 0 16 0" />
+    <path d="M9 17c1 1 5 1 6 0" />
+  </Icon>
+)
+export const IconGrid = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="8" height="8" rx="1.5" />
+    <rect x="13" y="3" width="8" height="8" rx="1.5" />
+    <rect x="3" y="13" width="8" height="8" rx="1.5" />
+    <rect x="13" y="13" width="8" height="8" rx="1.5" />
+  </Icon>
+)
+export const IconBolt = (p) => <Icon {...p} d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (
   <Icon {...p} sw={1.6}>

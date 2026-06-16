@@ -1,0 +1,145 @@
+// Read/write helpers for the app's own VTODO metadata (cue / habit log / goal).
+// Everything lives ON the VTODO so it round-trips through getModifyPut
+// (read→mutate→PUT) and syncs to the user's devices. Default storage is
+// X-REMINDERS-* properties — the existing repeat fields (x-reminders-repeat-*)
+// already prove unknown X-props survive ical.js/tsdav and generic CalDAV servers.
+//
+// A DESCRIPTION-fenced fallback is supported for READS so that, if a particular
+// server is ever found to strip unknown X-props, flipping STRATEGY to 'fence'
+// keeps the feature working without touching call sites or the wire shape.
+import ICAL from 'ical.js'
+
+// 'xprop' (default) | 'fence'. Reads always check both; only writes branch.
+const STRATEGY = 'xprop'
+
+const FENCE_BEGIN = '-----REMINDERS-META-----'
+const FENCE_END = '-----END-REMINDERS-META-----'
+
+// Logical key -> X-property name. (RELATED-TO for goal links is handled
+// separately below — it's a standard iCal property, not an X-prop.)
+const XPROP = {
+  cue: 'x-reminders-cue',
+  habit_log: 'x-reminders-habit-log',
+  is_goal: 'x-reminders-goal',
+  goal_plan: 'x-reminders-goal-plan',
+}
+
+// ---- low-level text accessors ----
+function getXText(vt, name) {
+  const v = vt.getFirstPropertyValue(name)
+  return v == null ? '' : String(v)
+}
+function setXText(vt, name, value) {
+  // Store verbatim like the existing x-reminders-repeat-* props: unknown X-props
+  // round-trip as a single opaque value (no comma-splitting / escaping surprises).
+  vt.removeAllProperties(name)
+  const s = value == null ? '' : String(value)
+  if (s) vt.updatePropertyWithValue(name, s)
+}
+
+// ---- DESCRIPTION fence (fallback storage) ----
+// Split a DESCRIPTION into the user-facing text and the parsed meta object.
+// The fenced block is always appended at the end (in fence mode), so the text
+// is everything before the fence with trailing whitespace trimmed.
+export function splitDescription(desc) {
+  const raw = String(desc || '')
+  const i = raw.indexOf(FENCE_BEGIN)
+  if (i < 0) return { text: raw, meta: {} }
+  const after = raw.slice(i + FENCE_BEGIN.length)
+  const j = after.indexOf(FENCE_END)
+  const inner = j < 0 ? after : after.slice(0, j)
+  let meta = {}
+  try { const m = JSON.parse(inner.trim()); if (m && typeof m === 'object') meta = m } catch { /* not our fence */ }
+  return { text: raw.slice(0, i).replace(/\s+$/, ''), meta }
+}
+
+// User-facing description with any meta fence removed (used by the serializer so
+// a fence never leaks into the task's notes).
+export const cleanDescription = (vt) => splitDescription(getXText(vt, 'description')).text
+
+function writeFenceKey(vt, key, value) {
+  const { text, meta } = splitDescription(getXText(vt, 'description'))
+  if (value == null || value === '') delete meta[key]
+  else meta[key] = String(value)
+  const next = Object.keys(meta).length
+    ? (text ? text + '\n\n' : '') + FENCE_BEGIN + '\n' + JSON.stringify(meta) + '\n' + FENCE_END
+    : text
+  vt.removeAllProperties('description')
+  if (next) vt.updatePropertyWithValue('description', next)
+}
+
+// ---- generic meta read/write ----
+export function readMeta(vt, key) {
+  const x = XPROP[key]
+  const direct = x ? getXText(vt, x) : ''
+  if (direct) return direct
+  const { meta } = splitDescription(getXText(vt, 'description'))
+  return meta && meta[key] != null ? String(meta[key]) : ''
+}
+export function writeMeta(vt, key, value) {
+  if (STRATEGY === 'fence') return writeFenceKey(vt, key, value)
+  const x = XPROP[key]
+  if (x) setXText(vt, x, value)
+}
+
+// ---- cue (implementation intention) ----
+export const readCue = (vt) => readMeta(vt, 'cue')
+export const writeCue = (vt, cue) => writeMeta(vt, 'cue', String(cue || '').trim())
+
+// ---- habit completion log ----
+// A recurring task's completions are NOT otherwise recoverable: advancing a
+// recurrence date-shifts the master and reopens it (no STATUS:COMPLETED, no
+// RECURRENCE-ID overrides). We append the completion DAY to X-REMINDERS-HABIT-LOG
+// so streak/consistency can be reconstructed from CalDAV alone. Stored as a
+// space-separated list of YYYY-MM-DD, deduped, sorted, capped to the last N days.
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+const HABIT_CAP = 400
+
+export function readHabitLog(vt) {
+  const raw = readMeta(vt, 'habit_log')
+  if (!raw) return []
+  // tolerate space- or comma-separated (forward/back compatible)
+  return [...new Set(String(raw).split(/[\s,]+/).map((s) => s.trim()).filter((s) => YMD_RE.test(s)))].sort()
+}
+export function writeHabitLog(vt, dates, cap = HABIT_CAP) {
+  const uniq = [...new Set((dates || []).map(String).filter((s) => YMD_RE.test(s)))].sort()
+  writeMeta(vt, 'habit_log', uniq.slice(-cap).join(' '))
+}
+// Append one completion day (idempotent per day). `ymd` is 'YYYY-MM-DD'.
+export function appendHabitLog(vt, ymd, cap = HABIT_CAP) {
+  if (!YMD_RE.test(String(ymd))) return
+  writeHabitLog(vt, [...readHabitLog(vt), String(ymd)], cap)
+}
+
+// ---- goals ----
+// A goal is just a VTODO flagged X-REMINDERS-GOAL=1, with an optional WOOP-style
+// plan in X-REMINDERS-GOAL-PLAN. Child tasks link UP to it via the standard
+// RELATED-TO;RELTYPE=PARENT property (value = the goal's UID).
+export const readGoalFlag = (vt) => readMeta(vt, 'is_goal') === '1'
+export const writeGoalFlag = (vt, on) => writeMeta(vt, 'is_goal', on ? '1' : '')
+export const readGoalPlan = (vt) => readMeta(vt, 'goal_plan')
+export const writeGoalPlan = (vt, plan) => writeMeta(vt, 'goal_plan', String(plan || '').trim())
+
+// RFC 5545: RELTYPE defaults to PARENT when the parameter is absent.
+const relIsParent = (p) => {
+  const rt = p.getParameter && p.getParameter('reltype')
+  return !rt || String(rt).toUpperCase() === 'PARENT'
+}
+export function readParentGoal(vt) {
+  for (const p of vt.getAllProperties('related-to')) {
+    if (relIsParent(p)) { const v = p.getFirstValue(); if (v) return String(v) }
+  }
+  return ''
+}
+// Replace only the PARENT link; preserve any foreign RELATED-TO (SIBLING/CHILD).
+export function writeParentGoal(vt, uid) {
+  const keep = vt.getAllProperties('related-to').filter((p) => !relIsParent(p))
+  vt.removeAllProperties('related-to')
+  for (const p of keep) vt.addProperty(p)
+  const u = String(uid || '').trim()
+  if (!u) return
+  const p = new ICAL.Property('related-to')
+  p.setParameter('reltype', 'PARENT')
+  p.setValue(u)
+  vt.addProperty(p)
+}

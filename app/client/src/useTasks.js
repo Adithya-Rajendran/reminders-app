@@ -33,6 +33,12 @@ export function useTaskList(selector) {
     updateTask(task.id, { priority }).then(emitTasksChanged).catch(() => refresh())
   }, [])
 
+  // Set/clear the implementation-intention cue ("after X -> do Y").
+  const onSetCue = useCallback((task, cue) => {
+    storePatch(task.id, { cue })
+    updateTask(task.id, { cue }).then(emitTasksChanged).catch(() => refresh())
+  }, [])
+
   // Set due date + (optionally) a reminder at the same instant, from the picker.
   // due_date is an ISO string or ZERO_DATE to clear; reminder is an ISO or null.
   const onSchedule = useCallback((task, { due_date, reminder }) => {
@@ -88,5 +94,5 @@ export function useTaskList(selector) {
     } catch { replaceTasks(snapshot); refresh() }
   }, [showUndo])
 
-  return { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo }
+  return { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, undo, dismissUndo }
 }

@@ -82,6 +82,28 @@ ok(q5.title === 'Standup' && isRealDate(q5.due_date) &&
 const q6 = parseQuickAdd('Task !7')
 ok(q6.priority === 0 && q6.title === 'Task !7', "'Task !7' -> !7 not a valid priority (stays 0) and is NOT stripped from title")
 
+// --- parseQuickAdd: if-then cue (arrow token) ---
+const cue1 = parseQuickAdd('after morning erg -> draft figure')
+ok(cue1.cue === 'after morning erg' && cue1.title === 'draft figure',
+  "'after morning erg -> draft figure' -> cue/title split on the arrow")
+
+const cue2 = parseQuickAdd('after standup -> email boss tomorrow !2 *work')
+ok(cue2.cue === 'after standup' && cue2.title === 'email boss' && cue2.priority === 2 &&
+  JSON.stringify(cue2.labels) === JSON.stringify(['work']) && isRealDate(cue2.due_date),
+  'cue split, then date/priority/label tokens parsed from the right side')
+
+const cue3 = parseQuickAdd('after lunch → walk the dog')
+ok(cue3.cue === 'after lunch' && cue3.title === 'walk the dog', 'unicode arrow → also splits the cue')
+
+const cue4 = parseQuickAdd('Plain task no arrow')
+ok(cue4.cue === undefined && cue4.title === 'Plain task no arrow', 'no arrow -> no cue field')
+
+const cue5 = parseQuickAdd('-> just do it')
+ok(cue5.cue === undefined, 'arrow with an empty trigger -> no cue')
+
+const cue6 = parseQuickAdd('after gym -> stretch -> cooldown')
+ok(cue6.cue === 'after gym' && cue6.title === 'stretch -> cooldown', 'only the FIRST arrow splits the cue from the task')
+
 // --- pdotClass ---
 ok(pdotClass(5) === 'p1' && pdotClass(4) === 'p1', 'pdotClass 5 and 4 -> p1')
 ok(pdotClass(3) === 'p2', 'pdotClass 3 -> p2')
