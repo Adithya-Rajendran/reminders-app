@@ -1599,6 +1599,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
 .habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
 
+/* Inline habit consistency strip shown under a recurring task's row in Reminders. */
+.habit-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.habit-strip .habit-streak { margin-left: 0; }
+.habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
+.habit-strip .chip { font-size: 11px; }
+
 /* Goals widget — progress + new-goal (WOOP) form */
 .goal-new { margin-bottom: 10px; }
 .goal-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: color-mix(in oklab, var(--panel-solid) 40%, transparent); }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { reminderGroups } from '../api.js'
 import { useTaskList } from '../useTasks.js'
-import { selectReminders, labelGroup } from '../taskviews.js'
+import { selectReminders, selectHabits, isRecurringTask, hasGroup, labelGroup } from '../taskviews.js'
 import { createTask, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { recentGroups, pushRecentGroup } from '../groups.js'
@@ -10,7 +10,7 @@ import TaskRow from './TaskRow.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
 import { loadStringSet, saveStringSet } from '../storage.js'
-import { IconBell, IconClock, IconPlus, IconChevR } from '../icons.jsx'
+import { IconBell, IconClock, IconPlus, IconChevR, IconFlame } from '../icons.jsx'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
 
@@ -24,8 +24,16 @@ function defaultWhen() {
 export default function RemindersWidget({ events, projects, group, onNewGroup }) {
   const inboxId = projects?.[0]?.id
   // Derive from the shared task store (one /api/tasks fetch for the whole board).
-  const selector = useCallback((all) => selectReminders(all, group), [group])
-  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
+  // We take the whole list and split it into a Habits section (recurring tasks,
+  // shown with an inline consistency strip) and the reminder groups (non-recurring
+  // tasks carrying a reminder) — so habits live here instead of a separate widget.
+  const selector = useCallback((all) => all, [])
+  const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
+  const reminders = useMemo(() => selectReminders(allTasks, group).filter((t) => !isRecurringTask(t)), [allTasks, group])
+  const habits = useMemo(() => {
+    const h = selectHabits(allTasks)
+    return group ? h.filter((t) => hasGroup(t, group)) : h
+  }, [allTasks, group])
 
   const [draft, setDraft] = useState('')
   const [qaGroup, setQaGroup] = useState('')
@@ -83,51 +91,50 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   const allGroups = [...knownGroups].sort()
   const recent = recentGroups().filter((g) => allGroups.includes(g))
 
-  // Pre-filter chips (hide tags that aren't real, coupled groups) and bucket by
-  // group ONCE per task/groups change, so rows keep stable identity across
-  // unrelated re-renders (typing in the quick-add box no longer re-renders rows).
-  // The handlers don't read labels, so passing the chip-filtered copy is safe.
-  const shownTasks = useMemo(() => tasks.map((task) => {
-    const raw = labelGroup(task)
-    return {
-      st: { ...task, labels: (task.labels || []).filter((l) => isGroup(l.title || l)) },
-      key: isGroup(raw) ? raw : '',
-    }
-  }), [tasks, isGroup])
+  // Hide chips for tags that aren't real (coupled) groups so a stray tag doesn't
+  // render as a label. Done once per task/groups change so rows keep stable
+  // identity across unrelated re-renders (typing in quick-add no longer re-renders).
+  const chipFilter = useCallback((task) => ({ ...task, labels: (task.labels || []).filter((l) => isGroup(l.title || l)) }), [isGroup])
+  const shownTasks = useMemo(() => reminders.map((task) => ({ st: chipFilter(task), key: isGroup(labelGroup(task)) ? labelGroup(task) : '' })), [reminders, chipFilter, isGroup])
+  const shownHabits = useMemo(() => habits.map(chipFilter), [habits, chipFilter])
   const groups = useMemo(() => {
     const g = {}
     for (const { st, key } of shownTasks) (g[key] ||= []).push(st)
     return g
   }, [shownTasks])
 
-  const renderRow = (st) => (
+  const renderRow = (st, showHabit) => (
     <div key={st.id} className={fired.has(st.id) ? 'reminding' : ''}>
-      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
+      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} showHabit={showHabit} />
     </div>
   )
+  const renderSection = (key, title, items, showHabit) => {
+    const isCol = collapsed.has(key)
+    return (
+      <div key={key} className="rem-group-sec">
+        <button type="button" className="group-head rem-head" aria-expanded={!isCol} title={isCol ? 'Expand section' : 'Minimize section'} onClick={() => toggleGroup(key)}>
+          <IconChevR size={13} className={`rem-chev${isCol ? '' : ' open'}`} />
+          <span className="g-title">{title}</span>
+          <span className="g-count">{items.length}</span>
+        </button>
+        {!isCol && <div className="task-stream">{items.map((st) => renderRow(st, showHabit))}</div>}
+      </div>
+    )
+  }
+  // Recurring tasks surface as a Habits section (with an inline consistency strip)
+  // above the reminder groups — the standalone Habits widget folded in here.
+  const habitsSec = shownHabits.length ? renderSection('__habits', <><IconFlame size={13} /> Habits</>, shownHabits, true) : null
 
   let body
   if (state === 'loading') body = <SkeletonRows />
   else if (state === 'error') body = <ErrorState onRetry={load} />
-  else if (tasks.length === 0) {
+  else if (reminders.length === 0 && habits.length === 0) {
     body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, pick a group and a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
   } else if (group) {
-    body = <div className="task-stream">{shownTasks.map(({ st }) => renderRow(st))}</div> // locked → flat list
+    body = <>{habitsSec}<div className="task-stream">{shownTasks.map(({ st }) => renderRow(st))}</div></> // locked → flat list
   } else {
     const groupKeys = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
-    body = groupKeys.map((g) => {
-      const key = g || '__none'; const isCol = collapsed.has(key)
-      return (
-        <div key={key} className="rem-group-sec">
-          <button type="button" className="group-head rem-head" aria-expanded={!isCol} title={isCol ? 'Expand group' : 'Minimize group'} onClick={() => toggleGroup(key)}>
-            <IconChevR size={13} className={`rem-chev${isCol ? '' : ' open'}`} />
-            <span className="g-title">{g || 'No group'}</span>
-            <span className="g-count">{groups[g].length}</span>
-          </button>
-          {!isCol && <div className="task-stream">{groups[g].map(renderRow)}</div>}
-        </div>
-      )
-    })
+    body = <>{habitsSec}{groupKeys.map((g) => renderSection(g || '__none', g || 'No group', groups[g], false))}</>
   }
 
   return (

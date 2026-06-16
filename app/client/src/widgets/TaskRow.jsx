@@ -1,9 +1,37 @@
 import { memo, useRef, useState } from 'react'
 import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
-import { isQuickWin, isTwoMinName } from '../taskviews.js'
+import { isQuickWin, isTwoMinName, isRecurringTask } from '../taskviews.js'
+import { computeHabitStats, recentDays } from '../habitstats.js'
 import { usePopover } from '../usePopover.js'
-import { IconTrash, IconBell } from '../icons.jsx'
+import { IconTrash, IconBell, IconFlame } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
+
+const HABIT_DOTS = 14
+
+// Compact habit consistency strip shown under a recurring task's row when a
+// widget passes showHabit (the Reminders widget does). Reconstructed from the
+// task's X-REMINDERS-HABIT-LOG — no extra fetch. Reuses the .habit-* tokens.
+function HabitStrip({ task }) {
+  const s = computeHabitStats(task, new Date())
+  const dots = recentDays(task, new Date(), HABIT_DOTS)
+  return (
+    <div className="habit-strip">
+      <span className="habit-dots" aria-hidden="true">
+        {dots.map((d) => <span key={d.ms} className={`hdot${d.done ? ' done' : ''}`} />)}
+      </span>
+      <span className={`habit-streak${s.streak > 0 ? ' on' : ''}`} title="Current streak (forgiving)">
+        <IconFlame size={12} /> {s.streak}
+      </span>
+      <span className="chip">{s.consistency30}% · 30d</span>
+      {s.total > 0 && (
+        <span className="habit-auto" title="Progress toward the ~66-day automaticity horizon">
+          <span className="habit-auto-bar"><span className="habit-auto-fill" style={{ width: `${s.automaticityPct}%` }} /></span>
+          day {Math.min(s.daysSinceStart, 66)}/66
+        </span>
+      )}
+    </div>
+  )
+}
 
 const ClockMini = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -15,11 +43,12 @@ const ClockMini = () => (
 // popover, and a hover-revealed delete affordance. Memoized: the handlers from
 // useTaskList are stable, so a row only re-renders when its own `task` changes —
 // editing/typing elsewhere in a list no longer re-renders every sibling row.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, showHabit }) {
   const [burst, setBurst] = useState(false)
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
   const cue = (task.cue || '').trim()
+  const habit = showHabit && isRecurringTask(task)
 
   const toggle = () => {
     if (!task.done) { setBurst(true); setTimeout(() => setBurst(false), 480) }
@@ -49,6 +78,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
           {isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
           {(task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
         </div>
+        {habit && <HabitStrip task={task} />}
       </div>
       {onDelete && (
         <button
