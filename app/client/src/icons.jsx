@@ -210,6 +210,7 @@ export const IconGrid = (p) => (
     <rect x="13" y="13" width="8" height="8" rx="1.5" />
   </Icon>
 )
+export const IconBolt = (p) => <Icon {...p} d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

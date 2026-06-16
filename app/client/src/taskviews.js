@@ -41,6 +41,16 @@ export function selectHabits(tasks) {
   return tasks.filter((t) => !t.done && isRecurringTask(t))
 }
 
+// Two-minute quick wins: keyed off an existing label convention (a "2min" tag,
+// also matching "2 min" / "2-min"). A filter/badge, not new persistence.
+export const QUICK_WIN_LABEL = '2min'
+const normLabel = (s) => String(s || '').toLowerCase().replace(/[\s-]/g, '')
+export const isTwoMinName = (name) => normLabel(name) === QUICK_WIN_LABEL
+export const isQuickWin = (t) => (t.labels || []).some((l) => isTwoMinName(l.title || l))
+export function selectQuickWins(tasks) {
+  return tasks.filter((t) => !t.done && isQuickWin(t))
+}
+
 // ---- Today's frog + Eisenhower (pure views over priority × due-proximity) ----
 const dueMs = (t) => (isRealDate(t.due_date) ? new Date(t.due_date).getTime() : Infinity)
 

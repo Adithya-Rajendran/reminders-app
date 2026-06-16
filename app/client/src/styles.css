@@ -1642,3 +1642,9 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .eq-list { display: flex; flex-direction: column; gap: 3px; }
 .eq-item { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eq-empty { font-size: 11.5px; color: var(--faint); }
+
+/* Two-minute quick-win badge + Upcoming filter toggle */
+.qw-badge { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 32%, transparent); font-weight: 700; }
+.up-filter { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
+.qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }

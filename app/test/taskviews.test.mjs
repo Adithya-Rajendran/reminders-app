@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -96,6 +96,21 @@ ok(eisenhowerQuadrant({ priority: 5, due_date: iso(-2 * DAY) }, NOW).q === 'Q1',
     { id: '6', is_goal: true, priority: 5 },            // excluded
   ], NOW)
   ok(g.Q1.length === 1 && g.Q2.length === 1 && g.Q3.length === 1 && g.Q4.length === 1, 'groupEisenhower buckets one per quadrant, excludes done/goals')
+}
+
+// ---- two-minute quick wins ----
+ok(isTwoMinName('2min') && isTwoMinName('2 min') && isTwoMinName('2-Min'), 'isTwoMinName matches 2min / 2 min / 2-Min')
+ok(!isTwoMinName('20min') && !isTwoMinName('admin'), 'isTwoMinName does not over-match')
+ok(isQuickWin({ labels: [{ title: 'Work' }, { title: '2 min' }] }) === true, 'isQuickWin: a 2min label among others')
+ok(isQuickWin({ labels: [{ title: 'Work' }] }) === false, 'isQuickWin: no 2min label')
+{
+  const qw = [
+    { id: 'q1', done: false, labels: [{ title: '2min' }] },
+    { id: 'q2', done: false, labels: [{ title: 'errand' }] },     // not tagged
+    { id: 'q3', done: true, labels: [{ title: '2min' }] },         // done -> excluded
+    { id: 'q4', done: false, labels: [{ title: '2-min' }] },
+  ]
+  ok(selectQuickWins(qw).map((t) => t.id).join() === 'q1,q4', 'selectQuickWins: open, 2min-tagged only')
 }
 
 // ---- dueBucket ----

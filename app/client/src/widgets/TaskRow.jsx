@@ -1,5 +1,6 @@
 import { memo, useRef, useState } from 'react'
 import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
+import { isQuickWin, isTwoMinName } from '../taskviews.js'
 import { usePopover } from '../usePopover.js'
 import { IconTrash, IconBell } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
@@ -45,7 +46,8 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
           {onSetCue
             ? <CueControl task={task} onSetCue={onSetCue} />
             : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>}
-          {(task.labels || []).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
+          {isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
+          {(task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
         </div>
       </div>
       {onDelete && (
