@@ -41,6 +41,19 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS group_calendars (
     user_id TEXT NOT NULL, group_name TEXT NOT NULL, list_id INTEGER NOT NULL,
     PRIMARY KEY (user_id, group_name));
+  -- Full-text search index over note bodies. This is derived/cheap-to-recreate
+  -- data: it is rebuilt lazily from the WebDAV walk and cleared per-user when
+  -- they point notes at a different WebDAV (see notes.setConfig -> noteindex).
+  CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(
+    body, title, folder UNINDEXED, path UNINDEXED, user_id UNINDEXED,
+    tokenize = 'unicode61 remove_diacritics 2');
+  -- [[wikilink]] edges (src note -> normalized target title), populated in the
+  -- same pass; powers the backlinks panel.
+  CREATE TABLE IF NOT EXISTS note_links (
+    user_id TEXT NOT NULL, src_path TEXT NOT NULL,
+    target TEXT NOT NULL, raw TEXT, context TEXT,
+    PRIMARY KEY (user_id, src_path, target));
+  CREATE INDEX IF NOT EXISTS note_links_target_idx ON note_links(user_id, target);
 `)
 console.log('sqlite config db ready at', path, '(journal_mode=' + sqlite.pragma('journal_mode', { simple: true }) + ')')
 

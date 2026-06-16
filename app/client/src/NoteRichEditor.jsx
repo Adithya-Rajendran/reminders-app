@@ -3,9 +3,23 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+import { TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { Markdown } from 'tiptap-markdown'
 import { ResizableImage } from './NoteImage.jsx'
+import { CodeBlock } from './editor/CodeBlockLowlight.js'
+import { MarkdownTable } from './editor/MarkdownTable.js'
+import { Callout } from './editor/Callout.js'
+import { SlashCommand } from './editor/SlashCommand.js'
+import { Wikilink } from './editor/Wikilink.js'
+import EditorBubbleMenu from './editor/EditorBubbleMenu.jsx'
+import SlashMenuPopup from './editor/SlashMenuPopup.jsx'
+import WikilinkMenu from './editor/WikilinkMenu.jsx'
+import TableControls from './editor/TableControls.jsx'
+import LinkPopover from './editor/LinkPopover.jsx'
+import { usePopover } from './usePopover.js'
 import { RES_PREFIX, sceneNameFor, toDisplay, toDisk, EXT } from './notepaths.js'
+import { resolveWikilink } from './wikilinks.js'
+import { emitOpenNote } from './notesbus.js'
 import { notesApi } from './api.js'
 import { IconSpinner } from './icons.jsx'
 
@@ -13,10 +27,27 @@ const ExcalidrawModal = lazy(() => import('./ExcalidrawModal.jsx'))
 
 // Live WYSIWYG editor that reads/writes GitHub-flavored Markdown (notes stay
 // plain .md on disk). Supports inserting + re-editing Excalidraw drawings.
-export default function NoteRichEditor({ value, onChange }) {
+export default function NoteRichEditor({ value, onChange, notes = [], folder = '' }) {
   const [drawing, setDrawing] = useState(null) // null | { scene, id, src }
   const editorRef = useRef(null)
   const editRef = useRef(null)
+  // Latest note list + current folder for wikilink resolution/autocomplete, read
+  // through refs so the once-created editor always sees fresh data.
+  const notesRef = useRef(notes)
+  const folderRef = useRef(folder)
+  notesRef.current = notes
+  folderRef.current = folder
+  // Click a [[wikilink]] → open the target note, creating it (in this note's
+  // folder) when it doesn't exist yet.
+  const openWikilink = async (target, _alias, inFolder) => {
+    const hit = resolveWikilink(target, notesRef.current, inFolder)
+    if (hit) { emitOpenNote(hit.path); return }
+    try { const n = await notesApi.create(inFolder || '', target); emitOpenNote(n.path) } catch { /* ignore */ }
+  }
+  // The markdown we last loaded/emitted — so a node-view normalization (e.g. a
+  // blockquote being promoted to a callout on load) that serializes back to the
+  // same markdown doesn't masquerade as an edit and trigger a spurious save.
+  const lastValueRef = useRef(value)
 
   // Open the Excalidraw editor for an image IF it has a sibling .excalidraw scene
   // (so a real drawing is editable, a plain pasted image is not). Stable via a ref
@@ -36,29 +67,50 @@ export default function NoteRichEditor({ value, onChange }) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        codeBlock: { HTMLAttributes: { class: 'cb' } },
+        // Replaced by the lowlight code block below (same `codeBlock` node name,
+        // so markdown fences still round-trip).
+        codeBlock: false,
         // Link ships inside StarterKit since tiptap v3 — configure it here.
         link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } },
       }),
+      CodeBlock,
+      MarkdownTable.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Callout,
+      SlashCommand,
+      Wikilink.configure({ getNotes: () => notesRef.current || [], getFolder: () => folderRef.current || '', onOpen: openWikilink }),
       ResizableImage.configure({ inline: false, allowBase64: false, onEdit: (src) => editRef.current?.(src) }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown.configure({ html: false, tightLists: true, linkify: true, transformPastedText: true, transformCopiedText: true }),
     ],
     content: toDisplay(value),
-    autofocus: 'end',
+    // Open at the top (cursor at start) rather than scrolled to the end.
+    autofocus: 'start',
     // v3's render-phase editor creation races its own 1ms destroy-if-unmounted
     // timer against React's passive effects: if effects run late (first open,
     // busy main thread) the editor is destroyed with storage wiped while our
     // effects still hold it. Creating the editor in an effect (the v2 behavior)
     // avoids the race.
     immediatelyRender: false,
+    // appendTransaction doesn't fire for the editor's initial content, so promote
+    // `> [!TYPE]` blockquotes into callouts explicitly once the editor is ready.
+    onCreate: ({ editor: ed }) => { ed.commands.promoteCallouts?.() },
     // tiptap v3 stops re-rendering on every transaction by default; the toolbar
     // reads editor.isActive(...) on render, so opt back in to live active states.
     shouldRerenderOnTransaction: true,
     // storage is wiped on a destroyed editor — never feed onChange from one
     // (toDisk(undefined) would save the string "undefined" as the note body).
-    onUpdate: ({ editor: ed }) => { const md = ed.storage.markdown; if (md) onChange?.(toDisk(md.getMarkdown())) },
+    onUpdate: ({ editor: ed }) => {
+      const md = ed.storage.markdown
+      if (!md) return
+      const next = toDisk(md.getMarkdown())
+      if (next === lastValueRef.current) return // no real change (e.g. a load-time callout promotion)
+      lastValueRef.current = next
+      onChange?.(next)
+    },
     editorProps: {
       attributes: { class: 'tiptap-content', spellcheck: 'true' },
       handlePaste: (_view, event) => {
@@ -83,8 +135,15 @@ export default function NoteRichEditor({ value, onChange }) {
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || value == null) return
+    // `value` echoing back our own onChange emission — don't re-set content (that
+    // would fight the editor and, with the load-time callout promotion, loop).
+    if (value === lastValueRef.current) return
     const md = editor.storage.markdown
-    if (md && toDisk(md.getMarkdown()) !== value) editor.commands.setContent(toDisplay(value), { emitUpdate: false })
+    if (md && toDisk(md.getMarkdown()) !== value) {
+      editor.commands.setContent(toDisplay(value), { emitUpdate: false })
+      editor.commands.promoteCallouts?.()
+    }
+    lastValueRef.current = value
   }, [value, editor])
 
   const newDrawing = () => setDrawing({ scene: null, id: null, src: null })
@@ -122,6 +181,10 @@ export default function NoteRichEditor({ value, onChange }) {
   return (
     <div className="tiptap-wrap">
       <Toolbar editor={editor} onDraw={newDrawing} />
+      <TableControls editor={editor} />
+      <EditorBubbleMenu editor={editor} />
+      <SlashMenuPopup />
+      <WikilinkMenu />
       <EditorContent editor={editor} className="tiptap-editor" />
       {drawing && (
         <Suspense fallback={<div className="overlay"><IconSpinner size={26} /></div>}>
@@ -133,19 +196,14 @@ export default function NoteRichEditor({ value, onChange }) {
 }
 
 function Toolbar({ editor, onDraw }) {
+  const [linkOpen, setLinkOpen] = useState(false)
+  const linkRef = usePopover(linkOpen, setLinkOpen)
   if (!editor) return null
   const c = () => editor.chain().focus()
   const Btn = ({ active, on, label, title }) => (
     <button type="button" className={`tiptap-tb-btn${active ? ' on' : ''}`} title={title} aria-label={title}
       onMouseDown={(e) => { e.preventDefault(); on() }}>{label}</button>
   )
-  const link = () => {
-    const prev = editor.getAttributes('link').href || ''
-    const url = window.prompt('Link URL', prev)
-    if (url === null) return
-    if (url === '') c().unsetLink().run()
-    else c().extendMarkRange('link').setLink({ href: url }).run()
-  }
   return (
     <div className="tiptap-toolbar">
       <Btn active={editor.isActive('bold')} on={() => c().toggleBold().run()} label={<b>B</b>} title="Bold" />
@@ -163,8 +221,13 @@ function Toolbar({ editor, onDraw }) {
       <Btn active={editor.isActive('blockquote')} on={() => c().toggleBlockquote().run()} label="❝" title="Quote" />
       <Btn active={editor.isActive('code')} on={() => c().toggleCode().run()} label="‹›" title="Inline code" />
       <Btn active={editor.isActive('codeBlock')} on={() => c().toggleCodeBlock().run()} label="{ }" title="Code block" />
-      <Btn active={editor.isActive('link')} on={link} label="↗" title="Link" />
+      <span className="tiptap-link-wrap" ref={linkRef}>
+        <button type="button" className={`tiptap-tb-btn${editor.isActive('link') ? ' on' : ''}`} title="Link" aria-label="Link"
+          onMouseDown={(e) => { e.preventDefault(); setLinkOpen((o) => !o) }}>↗</button>
+        {linkOpen && <LinkPopover editor={editor} onClose={() => setLinkOpen(false)} />}
+      </span>
       <span className="tiptap-tb-sep" />
+      <Btn active={editor.isActive('table')} on={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} label="▦" title="Insert table" />
       <Btn active={false} on={onDraw} label="✏️" title="Insert drawing (double-click a drawing to edit)" />
     </div>
   )

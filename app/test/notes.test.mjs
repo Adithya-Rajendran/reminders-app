@@ -31,6 +31,13 @@ const ACC = { server_url: 'https://nc.example.com/remote.php/dav', username: 'al
   ok(body === 'no front matter here\n# Title', 'body is preserved when there is no front-matter')
 }
 {
+  // pinned + trash metadata are plain scalars that must round-trip as valid YAML
+  const md = serializeNote({ id: 'p', pinned: true, trashedFrom: 'Work/Sub', trashedAt: '2026-06-16T00:00:00Z' }, 'b')
+  const { meta } = parseNote(md)
+  ok(meta.pinned === true, 'pinned: true round-trips')
+  ok(meta.trashedFrom === 'Work/Sub' && meta.trashedAt === '2026-06-16T00:00:00Z', 'trash metadata round-trips')
+}
+{
   // a body that itself contains a --- horizontal rule must not be mistaken for fm
   const md = serializeNote({ id: 'x' }, 'para\n\n---\n\nmore')
   const { meta, body } = parseNote(md)

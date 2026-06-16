@@ -23,7 +23,8 @@ ok(buildTree([], [{ path: 'x.md', title: 'X', folder: 'auto/sub' }]).children.au
 
 // ---- ordering + counts ----
 ok(folderKids(tree).map((f) => f.name).join() === 'empty,work', 'folders sort by name')
-ok(noteKids(tree.children.work).map((n) => n.title).join() === 'C,B', 'notes sort newest-first by updated')
+ok(noteKids(tree.children.work).map((n) => n.title).join() === 'C,B', 'notes sort newest-first by updated (default)')
+ok(noteKids(tree.children.work, 'title-asc').map((n) => n.title).join() === 'B,C', 'noteKids accepts a sort key (title A-Z)')
 ok(countNotes(tree) === 4, 'countNotes counts the whole subtree')
 ok(countNotes(tree.children.work) === 3, 'countNotes includes nested folders')
 ok(countNotes(tree.children.empty) === 0, 'an empty folder counts zero')

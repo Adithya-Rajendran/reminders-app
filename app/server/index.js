@@ -173,6 +173,15 @@ app.delete('/api/reminder-groups', requireAuth, async (req, res, next) => {
 app.get('/api/notes', requireAuth, async (req, res, next) => {
   try { const list = await notes.listNotes(req.session.user.sub); res.json({ configured: list !== null, notes: list || [] }) } catch (e) { next(e) }
 })
+app.get('/api/notes/search', requireAuth, async (req, res, next) => {
+  try {
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 30))
+    res.json({ results: notes.searchNotes(req.session.user.sub, String(req.query.q || ''), limit) })
+  } catch (e) { next(e) }
+})
+app.get('/api/notes/backlinks', requireAuth, async (req, res, next) => {
+  try { res.json({ backlinks: notes.backlinksFor(req.session.user.sub, req.query.path || '') }) } catch (e) { next(e) }
+})
 app.get('/api/notes/config', requireAuth, async (req, res, next) => {
   try { res.json(await notes.getConfig(req.session.user.sub)) } catch (e) { next(e) }
 })
@@ -204,6 +213,12 @@ app.post('/api/notes/rename', requireAuth, async (req, res, next) => {
   if (!path || !title) return res.status(400).json({ error: 'path and title required' })
   try { res.json(await notes.renameNote(req.session.user.sub, path, title)) } catch (e) { next(e) }
 })
+app.post('/api/notes/pin', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.setPinned(req.session.user.sub, req.body?.path, !!req.body?.pinned)) } catch (e) { next(e) }
+})
+app.post('/api/notes/duplicate', requireAuth, async (req, res, next) => {
+  try { res.status(201).json(await notes.duplicateNote(req.session.user.sub, req.body?.path)) } catch (e) { next(e) }
+})
 app.post('/api/notes/move', requireAuth, async (req, res, next) => {
   const { path, folder } = req.body || {}
   if (!path) return res.status(400).json({ error: 'path required' })
@@ -218,6 +233,18 @@ app.delete('/api/notes/item', requireAuth, async (req, res, next) => {
   const path = req.query.path || req.body?.path
   if (!path) return res.status(400).json({ error: 'path required' })
   try { res.json(await notes.deleteNote(req.session.user.sub, path)) } catch (e) { next(e) }
+})
+app.get('/api/notes/trash', requireAuth, async (req, res, next) => {
+  try { res.json({ notes: (await notes.listTrash(req.session.user.sub)) || [] }) } catch (e) { next(e) }
+})
+app.post('/api/notes/trash', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.trashNote(req.session.user.sub, req.body?.path)) } catch (e) { next(e) }
+})
+app.post('/api/notes/restore', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.restoreNote(req.session.user.sub, req.body?.path)) } catch (e) { next(e) }
+})
+app.post('/api/notes/trash/empty', requireAuth, async (req, res, next) => {
+  try { res.json(await notes.emptyTrash(req.session.user.sub)) } catch (e) { next(e) }
 })
 app.get('/api/notes/resources/:name', requireAuth, async (req, res, next) => {
   try {
