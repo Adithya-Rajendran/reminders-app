@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote } from '../icons.jsx'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart } from '../icons.jsx'
 
 // Widgets are lazy: each becomes its own build chunk, fetched the first time it
 // appears on a board. Heavy dependencies (FullCalendar, the notes editor) stay
@@ -9,6 +9,7 @@ const UpcomingWidget = lazy(() => import('./UpcomingWidget.jsx'))
 const RemindersWidget = lazy(() => import('./RemindersWidget.jsx'))
 const CalendarWidget = lazy(() => import('./CalendarWidget.jsx'))
 const NotesWidget = lazy(() => import('./NotesWidget.jsx'))
+const ReviewWidget = lazy(() => import('./ReviewWidget.jsx'))
 
 // Every dashboard widget is declared here; the Dashboard itself is generic.
 // Adding a widget = one component file in this folder + one entry below.
@@ -55,6 +56,13 @@ export const WIDGETS = [
     label: 'Notes',
     icon: IconNote,
     render: (_w, ctx) => <NotesWidget onOpenSettings={ctx.onOpenSettings} />,
+  },
+  {
+    type: 'review',
+    label: 'Weekly Review',
+    icon: IconChart,
+    defaultSize: { w: 8, h: 8 },
+    render: () => <ReviewWidget />,
   },
 ]
 

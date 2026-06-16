@@ -168,6 +168,14 @@ export const IconCopy = (p) => (
   </Icon>
 )
 
+// Productivity-layer marks (review / cues / habits / goals / frog / quick-win)
+export const IconChart = (p) => (
+  <Icon {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M8 17v-5M13 17V8M18 17v-8" />
+  </Icon>
+)
+
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (
   <Icon {...p} sw={1.6}>
