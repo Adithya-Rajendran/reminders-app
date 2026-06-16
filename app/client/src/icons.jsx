@@ -194,6 +194,22 @@ export const IconTarget = (p) => (
     <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
   </Icon>
 )
+export const IconFrog = (p) => (
+  <Icon {...p}>
+    <circle cx="8.5" cy="8" r="2.2" />
+    <circle cx="15.5" cy="8" r="2.2" />
+    <path d="M4 13a8 8 0 0 0 16 0" />
+    <path d="M9 17c1 1 5 1 6 0" />
+  </Icon>
+)
+export const IconGrid = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="8" height="8" rx="1.5" />
+    <rect x="13" y="3" width="8" height="8" rx="1.5" />
+    <rect x="3" y="13" width="8" height="8" rx="1.5" />
+    <rect x="13" y="13" width="8" height="8" rx="1.5" />
+  </Icon>
+)
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

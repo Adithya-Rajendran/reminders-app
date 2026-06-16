@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -63,6 +63,40 @@ const habitTasks = [
 ]
 ok(isRecurringTask({ repeat_after: 86400 }) === true && isRecurringTask({ repeat_after: 0 }) === false, 'isRecurringTask: repeat_after > 0')
 ok(selectHabits(habitTasks).map((t) => t.id).join() === 'h1,h2,h3', 'selectHabits: open recurring tasks only')
+
+// ---- selectFrog ----
+const frogTasks = [
+  { id: 'a', done: false, priority: 3, due_date: iso(2 * DAY) },
+  { id: 'b', done: false, priority: 5, due_date: iso(3 * DAY) }, // top priority, later due
+  { id: 'c', done: false, priority: 5, due_date: iso(1 * DAY) }, // top priority, nearer due -> frog
+  { id: 'd', done: true, priority: 5, due_date: iso(0) },        // done -> excluded
+  { id: 'e', is_goal: true, priority: 5 },                       // goal -> excluded
+]
+ok(selectFrog(frogTasks).id === 'c', 'selectFrog: highest priority, then nearest due')
+ok(selectFrog([]) === null, 'selectFrog: empty -> null')
+ok(selectFrog([{ id: 'z', done: true, priority: 5 }]) === null, 'selectFrog: all done -> null')
+ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, priority: 4 }]).id === 'y', 'selectFrog: no due dates -> highest priority wins')
+
+// ---- eisenhowerQuadrant ----
+const NOW = new Date()
+ok(eisenhowerQuadrant({ priority: 4, due_date: iso(1 * DAY) }, NOW).q === 'Q1', 'important + urgent -> Q1')
+ok(eisenhowerQuadrant({ priority: 4, due_date: iso(5 * DAY) }, NOW).q === 'Q2', 'important + not urgent -> Q2')
+ok(eisenhowerQuadrant({ priority: 1, due_date: iso(1 * DAY) }, NOW).q === 'Q3', 'not important + urgent -> Q3')
+ok(eisenhowerQuadrant({ priority: 1 }, NOW).q === 'Q4', 'not important + no due -> Q4')
+ok(eisenhowerQuadrant({ priority: 5, due_date: iso(-2 * DAY) }, NOW).q === 'Q1', 'overdue counts as urgent -> Q1')
+
+// ---- groupEisenhower ----
+{
+  const g = groupEisenhower([
+    { id: '1', priority: 5, due_date: iso(1 * DAY) },   // Q1
+    { id: '2', priority: 4, due_date: iso(10 * DAY) },  // Q2
+    { id: '3', priority: 0, due_date: iso(1 * DAY) },   // Q3
+    { id: '4', priority: 0 },                           // Q4
+    { id: '5', done: true, priority: 5, due_date: iso(0) }, // excluded
+    { id: '6', is_goal: true, priority: 5 },            // excluded
+  ], NOW)
+  ok(g.Q1.length === 1 && g.Q2.length === 1 && g.Q3.length === 1 && g.Q4.length === 1, 'groupEisenhower buckets one per quadrant, excludes done/goals')
+}
 
 // ---- dueBucket ----
 ok(dueBucket(iso(-2 * DAY)).k === 'overdue', 'dueBucket: past -> overdue')

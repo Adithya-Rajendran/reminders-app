@@ -41,6 +41,33 @@ export function selectHabits(tasks) {
   return tasks.filter((t) => !t.done && isRecurringTask(t))
 }
 
+// ---- Today's frog + Eisenhower (pure views over priority × due-proximity) ----
+const dueMs = (t) => (isRealDate(t.due_date) ? new Date(t.due_date).getTime() : Infinity)
+
+// The one task to start with: highest PRIORITY, then nearest DUE. Goals and done
+// tasks are excluded. Returns null when nothing is open.
+export function selectFrog(tasks) {
+  const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
+  if (!open.length) return null
+  return open.slice().sort((a, b) => (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b))[0]
+}
+
+const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)
+// Eisenhower quadrant from importance (PRIORITY ≥ 3) × urgency (due-proximity).
+export function eisenhowerQuadrant(task, now = new Date()) {
+  const important = (task.priority || 0) >= 3
+  const urgent = isRealDate(task.due_date) && (new Date(task.due_date).getTime() - (+now)) <= URGENT_MS
+  return { q: important ? (urgent ? 'Q1' : 'Q2') : (urgent ? 'Q3' : 'Q4'), important, urgent }
+}
+export function groupEisenhower(tasks, now = new Date()) {
+  const g = { Q1: [], Q2: [], Q3: [], Q4: [] }
+  for (const t of (tasks || [])) {
+    if (t.done || t.is_goal) continue
+    g[eisenhowerQuadrant(t, now).q].push(t)
+  }
+  return g
+}
+
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 // Relative day bucket for the Upcoming list.
 export function dueBucket(due) {
