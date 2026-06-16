@@ -1,5 +1,6 @@
 import express from 'express'
 import session from 'express-session'
+import compression from 'compression'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as config from './config.js'
@@ -26,6 +27,11 @@ if (!SESSION_SECRET) {
 const app = express()
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
+
+// gzip API JSON + static assets. The SSE feed is skipped automatically: its
+// handler (events.js) sets `Cache-Control: no-transform`, which compression
+// honors — without that it would buffer the stream and break live reminders.
+app.use(compression())
 
 // JSON for everything EXCEPT raw resource uploads (images/drawings), which their
 // own route streams as binary — JSON-parsing them would corrupt the bytes.
@@ -231,9 +237,20 @@ app.put('/api/notes/resources/:name', requireAuth, express.raw({ type: '*/*', li
 app.all('/api/{*splat}', (_q, r) => r.status(404).json({ error: 'not found' }))
 
 // ---- Static SPA + client-side routing fallback ----
-app.use(express.static(PUBLIC_DIR))
+// Vite content-hashes everything under /assets, so those files are immutable and
+// safe to cache for a year; index.html (served only via the fallback below) must
+// stay revalidated since it references the current hashed filenames. `index:false`
+// routes "/" through the fallback so the HTML never gets the immutable header.
+app.use(express.static(PUBLIC_DIR, {
+  index: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache')
+    else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  },
+}))
 app.get('/{*splat}', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next()
+  res.set('Cache-Control', 'no-cache')
   res.sendFile(path.join(PUBLIC_DIR, 'index.html'))
 })
 

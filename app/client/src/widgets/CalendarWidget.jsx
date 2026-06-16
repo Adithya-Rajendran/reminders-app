@@ -6,7 +6,8 @@ import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import { api, tk } from '../api.js'
 import { ZERO_DATE } from '../tasklib.js'
-import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
+import { emitTasksChanged } from '../tasksbus.js'
+import { subscribe, ensureLoaded } from '../taskstore.js'
 import { IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../icons.jsx'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
@@ -76,14 +77,15 @@ export default function CalendarWidget() {
 
   const refetch = () => calRef.current?.getApi().refetchEvents()
 
-  // Refetch when any other widget mutates a task, so the calendar stays in sync.
-  useEffect(() => onTasksChanged(() => calRef.current?.getApi().refetchEvents()), [])
+  // Refetch when the shared task store changes — including optimistic edits made
+  // in other widgets — so the calendar's task layer stays in sync.
+  useEffect(() => subscribe(() => calRef.current?.getApi().refetchEvents()), [])
 
-  // ---- merged event source: reminders/tasks (once) + CalDAV events ----
+  // ---- merged event source: reminders/tasks (from the shared store) + CalDAV events ----
   const loadEvents = useCallback((info, success, failure) => {
     const start = info.startStr, end = info.endStr
     Promise.allSettled([
-      tk('/tasks?sort_by=due_date&order_by=asc&per_page=100'),
+      ensureLoaded(),
       api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
     ]).then(([taskRes, evRes]) => {
       const out = []

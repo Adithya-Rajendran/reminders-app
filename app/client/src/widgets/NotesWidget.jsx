@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notesApi } from '../api.js'
 import NoteEditor from '../NoteEditor.jsx'
 import PromptModal from '../PromptModal.jsx'
@@ -138,11 +138,11 @@ export default function NotesWidget({ onOpenSettings }) {
     try { await notesApi.createFolder(path); expandAncestors(path); setSel(path); await load() } catch { /* ignore */ }
   }
 
-  const allTags = [...new Set(notes.flatMap((n) => n.tags || []))].sort()
+  const allTags = useMemo(() => [...new Set(notes.flatMap((n) => n.tags || []))].sort(), [notes])
   const ql = q.trim().toLowerCase()
   const searching = !!(ql || tag)
-  const matches = notes.filter((n) => (!ql || n.title.toLowerCase().includes(ql) || (n.folder || '').toLowerCase().includes(ql) || (n.tags || []).some((t) => t.toLowerCase().includes(ql))) && (!tag || (n.tags || []).includes(tag)))
-  const tree = buildTree([...new Set([...folders, ...notes.map((n) => n.folder).filter(Boolean)])], notes)
+  const matches = useMemo(() => notes.filter((n) => (!ql || n.title.toLowerCase().includes(ql) || (n.folder || '').toLowerCase().includes(ql) || (n.tags || []).some((t) => t.toLowerCase().includes(ql))) && (!tag || (n.tags || []).includes(tag))), [notes, ql, tag])
+  const tree = useMemo(() => buildTree([...new Set([...folders, ...notes.map((n) => n.folder).filter(Boolean)])], notes), [folders, notes])
 
   if (state === 'loading') return <div className="notes-widget"><SkeletonRows /></div>
   if (state === 'error') return <div className="notes-widget"><ErrorState onRetry={load} /></div>

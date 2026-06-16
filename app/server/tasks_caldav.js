@@ -4,7 +4,7 @@
 // labels = CATEGORIES. Wired into the API routes by index.js.
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
-import { clientFor, authHeader, safeFetch, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
+import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
 import { accountOf, baseOf, okPut } from './util.js'
@@ -46,25 +46,52 @@ export function serializeVtodo(vt, listId, objectUrl) {
   }
 }
 
-// ---- tiny per-user read cache to coalesce the widget stampede ----
-const TTL = 12000
-const cache = new Map() // sub -> { at, byUrl: Map<url, objects[]> }
-function getCache(sub) { let c = cache.get(sub); if (!c || Date.now() - c.at > TTL) { c = { at: Date.now(), byUrl: new Map() }; cache.set(sub, c) } return c }
+// ---- per-user read cache: coalesce the widget stampede + skip unchanged lists ----
+// Caches the PARSED vtodos (ICAL.parse is the costly part) per list, keyed by the
+// collection's ctag. Within FRESH_TTL we trust the cache outright; past it, a cheap
+// Depth:0 ctag PROPFIND decides whether the full REPORT can be skipped. The 60s
+// VALARM poller is the big winner: an idle tick becomes a PROPFIND per list with no
+// re-download and no re-parse. Cached components are only ever read here (writes go
+// through getModifyPut + invalidate), so sharing them is safe.
+const FRESH_TTL = 12000
+const cache = new Map() // sub -> Map<listUrl, { parsed:[{url,vt}], ctag:string|null, at:number }>
+const userCache = (sub) => { let c = cache.get(sub); if (!c) { c = new Map(); cache.set(sub, c) } return c }
 export const invalidateUserCache = (sub) => cache.delete(sub)
 const invalidate = invalidateUserCache
+
+// Pure decision (exported for the unit test): 'fresh' = reuse without any network,
+// 'ctag' = probe the ctag before deciding, 'report' = do the full REPORT.
+export function cacheDecision(entry, now, ttl = FRESH_TTL) {
+  if (!entry) return 'report'
+  if (now - entry.at < ttl) return 'fresh'
+  return entry.ctag ? 'ctag' : 'report'
+}
+
 async function fetchObjectsCached(sub, account, listUrl) {
-  const c = getCache(sub)
-  if (c.byUrl.has(listUrl)) return c.byUrl.get(listUrl)
+  const c = userCache(sub)
+  const entry = c.get(listUrl)
+  const decision = cacheDecision(entry, Date.now())
+  if (decision === 'fresh') return entry.parsed
+  let knownCtag = entry?.ctag || null
+  if (decision === 'ctag') {
+    const cur = await collectionCtag(account, listUrl).catch(() => null)
+    if (cur && cur === knownCtag) { entry.at = Date.now(); return entry.parsed } // unchanged → reuse parse
+    knownCtag = cur // changed or unavailable → fall through (reseed ctag below; null = fail open)
+  }
   const client = await clientFor(account)
   const objs = await client.fetchCalendarObjects({ calendar: { url: listUrl }, filters: VTODO_FILTER })
-  c.byUrl.set(listUrl, objs)
-  return objs
+  const parsed = objs.map((o) => ({ url: o.url, vt: safeParse(o.data).vt }))
+  // Reuse the ctag the change-probe already fetched; only on a cold entry do we
+  // pay one extra PROPFIND to seed it.
+  const ctag = knownCtag != null ? knownCtag : await collectionCtag(account, listUrl).catch(() => null)
+  c.set(listUrl, { parsed, ctag, at: Date.now() })
+  return parsed
 }
 export async function allUserVtodos(sub) {
   const lists = (await listsWithId(sub)).filter((l) => l.supports_vtodo && l.enabled)
   const out = []
   await Promise.allSettled(lists.map(async (l) => {
-    try { for (const o of await fetchObjectsCached(sub, accountOf(l), l.url)) { const { vt } = safeParse(o.data); if (vt) out.push({ vt, listId: l.id, objectUrl: o.url }) } } catch { /* skip a failing list */ }
+    try { for (const { url, vt } of await fetchObjectsCached(sub, accountOf(l), l.url)) { if (vt) out.push({ vt, listId: l.id, objectUrl: url }) } } catch { /* skip a failing list */ }
   }))
   return out
 }
@@ -111,7 +138,7 @@ export async function listProjectTasks(req, res, next) {
     if (!resolved || !resolved.list.supportsVtodo) return res.status(404).json({ error: 'not found' })
     const objs = await fetchObjectsCached(uid, resolved.account, resolved.list.url)
     const tasks = []
-    for (const o of objs) { const { vt } = safeParse(o.data); if (vt) tasks.push(serializeVtodo(vt, listId, o.url)) }
+    for (const { url, vt } of objs) { if (vt) tasks.push(serializeVtodo(vt, listId, url)) }
     const per = Math.min(Number(req.query.per_page) || 250, 250)
     res.json(sortTasks(tasks).slice(0, per))
   } catch (e) { next(e) }

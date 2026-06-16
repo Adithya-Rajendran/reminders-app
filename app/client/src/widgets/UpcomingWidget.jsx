@@ -1,35 +1,23 @@
-import { useCallback } from 'react'
-import { tk } from '../api.js'
+import { useCallback, useMemo } from 'react'
 import { useTaskList } from '../useTasks.js'
-import { isRealDate } from '../tasklib.js'
+import { selectUpcoming, dueBucket, UPCOMING_ORDER } from '../taskviews.js'
 import TaskRow from './TaskRow.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
 import { IconClock } from '../icons.jsx'
 
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
-function groupOf(due) {
-  const diff = Math.round((startOfDay(new Date(due)) - startOfDay(new Date())) / 864e5)
-  if (diff < 0) return { k: 'overdue', label: 'Overdue' }
-  if (diff === 0) return { k: 'today', label: 'Today' }
-  if (diff === 1) return { k: 'tomorrow', label: 'Tomorrow' }
-  if (diff < 7) return { k: 'week', label: 'This week' }
-  return { k: 'later', label: 'Later' }
-}
-const ORDER = ['overdue', 'today', 'tomorrow', 'week', 'later']
-
 export default function UpcomingWidget() {
-  const loader = useCallback(async () => {
-    const all = await tk('/tasks?sort_by=due_date&order_by=asc&per_page=100')
-    return (Array.isArray(all) ? all : []).filter((t) => !t.done && isRealDate(t.due_date))
-  }, [])
+  // Derive from the shared task store (one /api/tasks fetch for the whole board).
+  const selector = useCallback((all) => selectUpcoming(all), [])
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
 
-  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(loader)
-
-  const groups = {}
-  for (const t of tasks) {
-    const g = groupOf(t.due_date)
-    ;(groups[g.k] ||= { label: g.label, items: [] }).items.push(t)
-  }
+  const groups = useMemo(() => {
+    const g = {}
+    for (const t of tasks) {
+      const b = dueBucket(t.due_date)
+      ;(g[b.k] ||= { label: b.label, items: [] }).items.push(t)
+    }
+    return g
+  }, [tasks])
 
   return (
     <div className="tasklist">
@@ -37,7 +25,7 @@ export default function UpcomingWidget() {
       {state === 'error' && <ErrorState onRetry={load} />}
       {state === 'ready' && (tasks.length === 0
         ? <EmptyState icon={IconClock} title="Nothing upcoming" sub="Scheduled tasks appear here, grouped by when they’re due." />
-        : ORDER.filter((k) => groups[k]).map((k) => (
+        : UPCOMING_ORDER.filter((k) => groups[k]).map((k) => (
             <div key={k}>
               <div className="group-head">
                 <span className="g-title">{groups[k].label}</span>
