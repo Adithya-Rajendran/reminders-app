@@ -3,15 +3,44 @@ import { notesApi } from '../api.js'
 import NoteEditor from '../NoteEditor.jsx'
 import PromptModal from '../PromptModal.jsx'
 import { buildTree, folderKids, noteKids, countNotes, canDropInto } from '../notetree.js'
+import { sortNotes, SORTS } from '../notesort.js'
 import { ancestorsOf } from '../notepaths.js'
-import { loadStringSet, saveStringSet } from '../storage.js'
+import { onOpenNote } from '../notesbus.js'
+import { pushRecent, pruneRecent } from '../noterecent.js'
+import { loadStringSet, saveStringSet, loadJson, saveJson } from '../storage.js'
+import { usePopover } from '../usePopover.js'
+import NoteContextMenu from '../NoteContextMenu.jsx'
+import TrashView from '../TrashView.jsx'
 import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
-import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL } from '../icons.jsx'
+import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash } from '../icons.jsx'
 
 const EXPAND_KEY = 'notes-expanded-folders'
+const RECENT_KEY = 'notes-recent'
 const NARROW = 520 // below this widget width, collapse to a single (master-detail) column
 
-function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onOpen, dnd }) {
+// One note row in the tree / pinned / recent lists. dnd is omitted for the
+// pinned/recent virtual sections (those aren't drop sources).
+function NoteRow({ n, active, paddingLeft, onOpen, onCtx, dnd }) {
+  return (
+    <div
+      className={`tree-row tree-note${active ? ' active' : ''}`} style={{ paddingLeft }}
+      draggable={!!dnd} onDragStart={dnd ? dnd.noteStart(n) : undefined} onDragEnd={dnd ? dnd.end : undefined}
+      onDragOver={dnd ? dnd.noteOver : undefined} onDrop={dnd ? dnd.noteDrop : undefined}
+      onClick={() => onOpen(n.path)} onContextMenu={(e) => { e.preventDefault(); onCtx(n, e.clientX, e.clientY) }} title={n.title}
+    >
+      <IconNote size={13} />
+      {n.pinned && <IconPin size={11} className="tree-pin-mark" />}
+      <span className="tree-name">{n.title}</span>
+      {(n.tags || []).slice(0, 2).map((t) => <span key={t} className="note-tag mini">#{t}</span>)}
+      <button type="button" className="tree-row-menu" aria-label="Note actions" title="Note actions"
+        onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); onCtx(n, r.right, r.bottom) }}>
+        <IconDots size={14} />
+      </button>
+    </div>
+  )
+}
+
+function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onOpen, onCtx, dnd, sort }) {
   return (
     <>
       {folderKids(node).map((f) => {
@@ -30,23 +59,12 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
               <span className="tree-name">{f.name}</span>
               <span className="tree-count">{countNotes(f)}</span>
             </div>
-            {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} dnd={dnd} />}
+            {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} onCtx={onCtx} dnd={dnd} sort={sort} />}
           </Fragment>
         )
       })}
-      {noteKids(node).map((n) => (
-        <div
-          key={n.path}
-          className={`tree-row tree-note${active === n.path ? ' active' : ''}`}
-          style={{ paddingLeft: 6 + depth * 13 + 16 }}
-          draggable onDragStart={dnd.noteStart(n)} onDragEnd={dnd.end}
-          onDragOver={dnd.noteOver} onDrop={dnd.noteDrop}
-          onClick={() => onOpen(n.path)} title={n.title}
-        >
-          <IconNote size={13} />
-          <span className="tree-name">{n.title}</span>
-          {(n.tags || []).slice(0, 2).map((t) => <span key={t} className="note-tag mini">#{t}</span>)}
-        </div>
+      {noteKids(node, sort).map((n) => (
+        <NoteRow key={n.path} n={n} active={active === n.path} paddingLeft={6 + depth * 13 + 16} onOpen={onOpen} onCtx={onCtx} dnd={dnd} />
       ))}
     </>
   )
@@ -63,11 +81,22 @@ export default function NotesWidget({ onOpenSettings }) {
   const [expanded, setExpanded] = useState(() => loadStringSet(EXPAND_KEY))
   const [q, setQ] = useState('')
   const [tag, setTag] = useState(null)
+  const [contentHits, setContentHits] = useState([]) // full-text body matches (server FTS)
   const [openPath, setOpenPath] = useState(null)
   const [folderPrompt, setFolderPrompt] = useState(false)
   const [narrow, setNarrow] = useState(false)
+  const [sort, setSort] = useState(() => loadJson('notes-sort', 'updated'))
+  const [sortOpen, setSortOpen] = useState(false)
+  const sortRef = usePopover(sortOpen, setSortOpen)
+  const changeSort = (k) => { setSort(k); saveJson('notes-sort', k); setSortOpen(false) }
   const [dragItem, setDragItem] = useState(null) // { type:'note'|'folder', path, folder? }
   const [overTarget, setOverTarget] = useState(null) // destination folder rel path ('' = root) | null
+  const [ctxMenu, setCtxMenu] = useState(null) // { note, x, y } | null
+  const [renamePrompt, setRenamePrompt] = useState(null) // { path, title } | null
+  const [recent, setRecent] = useState(() => loadJson(RECENT_KEY, []))
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [tplOpen, setTplOpen] = useState(false)
+  const tplRef = usePopover(tplOpen, setTplOpen)
 
   // Track widget width so the layout can collapse to one column when small.
   const roRef = useRef(null)
@@ -91,6 +120,36 @@ export default function NotesWidget({ onOpenSettings }) {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // Open a note requested from elsewhere (command palette, a [[wikilink]], a
+  // backlink). Reload so a just-created note appears, then bring it up.
+  useEffect(() => onOpenNote((path) => { setOpenPath(path); load() }), [load])
+
+  // Keep the open note's folder chain expanded once it's known in the list — so
+  // a palette/wikilink jump into a collapsed folder reveals where the note lives.
+  useEffect(() => {
+    if (!openPath) return
+    const n = notes.find((x) => x.path === openPath)
+    if (n && n.folder) setExpanded((prev) => new Set([...prev, ...ancestorsOf(n.folder)]))
+  }, [openPath, notes])
+
+  // Track recently-opened notes (device-local).
+  useEffect(() => {
+    if (!openPath) return
+    const n = notes.find((x) => x.path === openPath)
+    const title = n?.title || openPath.split('/').pop().replace(/\.md$/i, '')
+    setRecent((prev) => { const next = pushRecent(prev, { path: openPath, title }); saveJson(RECENT_KEY, next); return next })
+  }, [openPath, notes])
+
+  // ---- per-note actions (context menu) ----
+  const openCtx = (note, x, y) => setCtxMenu({ note, x, y })
+  const doDuplicate = async (n) => { try { const r = await notesApi.duplicate(n.path); await load(); setOpenPath(r.path) } catch { /* ignore */ } }
+  const doPin = async (n) => { try { await notesApi.setPinned(n.path, !n.pinned); await load() } catch { /* ignore */ } }
+  const doDelete = async (n) => { try { await notesApi.trash(n.path); if (openPath === n.path) setOpenPath(null); await load() } catch { /* ignore */ } }
+  const submitRename = async (newTitle) => {
+    const p = renamePrompt; setRenamePrompt(null)
+    try { const r = await notesApi.rename(p.path, newTitle); if (openPath === p.path && r?.path) setOpenPath(r.path); await load() } catch { /* ignore */ }
+  }
+
   const toggleExpand = (path) => setExpanded((prev) => {
     const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path)
     saveStringSet(EXPAND_KEY, n)
@@ -100,6 +159,17 @@ export default function NotesWidget({ onOpenSettings }) {
 
   const newNote = async () => {
     try { const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
+  }
+  // New note from a template (a note in the Templates folder): duplicate it, then
+  // move the copy into the active folder and open it.
+  const newFromTemplate = async (tpl) => {
+    setTplOpen(false)
+    try {
+      const dup = await notesApi.duplicate(tpl.path)
+      let path = dup.path
+      if (sel) { const mv = await notesApi.move(dup.path, sel); path = mv.path; expandAncestors(sel) }
+      await load(); setOpenPath(path)
+    } catch { /* ignore */ }
   }
 
   // ---- drag & drop: move a note (or folder) into a folder, or out to the root ----
@@ -142,7 +212,32 @@ export default function NotesWidget({ onOpenSettings }) {
   const ql = q.trim().toLowerCase()
   const searching = !!(ql || tag)
   const matches = useMemo(() => notes.filter((n) => (!ql || n.title.toLowerCase().includes(ql) || (n.folder || '').toLowerCase().includes(ql) || (n.tags || []).some((t) => t.toLowerCase().includes(ql))) && (!tag || (n.tags || []).includes(tag))), [notes, ql, tag])
+
+  // Full-text body search (server FTS) runs alongside the instant title filter,
+  // debounced; results surface under a "Found in contents" header.
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) { setContentHits([]); return undefined }
+    let alive = true
+    const t = setTimeout(() => {
+      notesApi.search(term).then((r) => { if (alive) setContentHits(Array.isArray(r.results) ? r.results : []) }).catch(() => { if (alive) setContentHits([]) })
+    }, 220)
+    return () => { alive = false; clearTimeout(t) }
+  }, [q])
+  // Body hits not already shown as a title match (and respecting the tag filter).
+  const bodyHits = useMemo(() => {
+    if (!ql) return []
+    const titlePaths = new Set(matches.map((m) => m.path))
+    const tagOk = (p) => !tag || (notes.find((n) => n.path === p)?.tags || []).includes(tag)
+    return contentHits.filter((h) => !titlePaths.has(h.path) && tagOk(h.path))
+  }, [contentHits, matches, ql, tag, notes])
   const tree = useMemo(() => buildTree([...new Set([...folders, ...notes.map((n) => n.folder).filter(Boolean)])], notes), [folders, notes])
+  const pinnedNotes = useMemo(() => sortNotes(notes.filter((n) => n.pinned), sort), [notes, sort])
+  const templates = useMemo(() => notes.filter((n) => n.folder === 'Templates' || (n.folder || '').startsWith('Templates/')), [notes])
+  const recentNotes = useMemo(() => {
+    const byPath = new Map(notes.map((n) => [n.path, n]))
+    return pruneRecent(recent, new Set(byPath.keys())).map((r) => byPath.get(r.path) || r).slice(0, 6)
+  }, [recent, notes])
 
   if (state === 'loading') return <div className="notes-widget"><SkeletonRows /></div>
   if (state === 'error') return <div className="notes-widget"><ErrorState onRetry={load} /></div>
@@ -159,8 +254,8 @@ export default function NotesWidget({ onOpenSettings }) {
     )
   }
 
-  const showSidebar = !narrow || !openPath
-  const showMain = !narrow || !!openPath
+  const showSidebar = !narrow || (!openPath && !trashOpen)
+  const showMain = !narrow || !!openPath || trashOpen
 
   return (
     <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}`} ref={setWrap}>
@@ -168,8 +263,28 @@ export default function NotesWidget({ onOpenSettings }) {
         <aside className="notes-sidebar">
           <div className="note-toolbar">
             <input className="note-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
+            <div className="note-sort" ref={sortRef}>
+              <button className="iconbtn sm" aria-label="Sort notes" title="Sort notes" aria-haspopup="menu" aria-expanded={sortOpen} onClick={() => setSortOpen((o) => !o)}><IconSort size={15} /></button>
+              {sortOpen && (
+                <div className="menu note-sort-menu" role="menu">
+                  <div className="menu-label">Sort by</div>
+                  {SORTS.map((s) => <button key={s.key} type="button" className={`menu-item${sort === s.key ? ' active' : ''}`} role="menuitem" onClick={() => changeSort(s.key)}>{s.label}</button>)}
+                </div>
+              )}
+            </div>
             <button className="iconbtn sm" aria-label="New folder" title={sel ? `New folder in ${sel}` : 'New folder'} onClick={() => setFolderPrompt(true)}><IconFolder size={15} /></button>
             <button className="iconbtn sm" aria-label="New note" title={sel ? `New note in ${sel}` : 'New note'} onClick={newNote}><IconPlus size={16} /></button>
+            {templates.length > 0 && (
+              <div className="note-tpl" ref={tplRef}>
+                <button className="iconbtn sm" aria-label="New from template" title="New from template" aria-haspopup="menu" aria-expanded={tplOpen} onClick={() => setTplOpen((o) => !o)}><IconChevDown size={14} /></button>
+                {tplOpen && (
+                  <div className="menu note-tpl-menu" role="menu">
+                    <div className="menu-label">New from template</div>
+                    {templates.map((t) => <button key={t.path} type="button" className="menu-item" role="menuitem" onClick={() => newFromTemplate(t)}>{t.title}</button>)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {(tag || allTags.length > 0) && (
             <div className="note-tags-bar">
@@ -188,51 +303,108 @@ export default function NotesWidget({ onOpenSettings }) {
               // create silently failed. Empty-state only when BOTH are empty.
               ? <EmptyState icon={IconNote} title="No notes yet" sub="Create your first note with the ＋ above." />
               : searching
-                ? (matches.length === 0
-                    ? <div className="note-empty-q">No matching notes.</div>
-                    : matches.map((n) => (
-                        <div
-                          key={n.path} className={`tree-row tree-note${openPath === n.path ? ' active' : ''}`} style={{ paddingLeft: 8 }}
-                          draggable onDragStart={dnd.noteStart(n)} onDragEnd={dnd.end}
-                          onDragOver={dnd.noteOver} onDrop={dnd.noteDrop}
-                          onClick={() => setOpenPath(n.path)} title={n.title}
-                        >
-                          <IconNote size={13} />
-                          <span className="tree-name">{n.title}</span>
-                          {n.folder && <span className="tree-note-folder">{n.folder}</span>}
-                        </div>
-                      )))
-                : <TreeLevel node={tree} depth={0} sel={sel} active={openPath} expanded={expanded} onSelect={setSel} onToggle={toggleExpand} onOpen={setOpenPath} dnd={dnd} />}
+                ? (
+                  <>
+                    {sortNotes(matches, sort).map((n) => (
+                      <div
+                        key={n.path} className={`tree-row tree-note${openPath === n.path ? ' active' : ''}`} style={{ paddingLeft: 8 }}
+                        draggable onDragStart={dnd.noteStart(n)} onDragEnd={dnd.end}
+                        onDragOver={dnd.noteOver} onDrop={dnd.noteDrop}
+                        onClick={() => setOpenPath(n.path)} onContextMenu={(e) => { e.preventDefault(); openCtx(n, e.clientX, e.clientY) }} title={n.title}
+                      >
+                        <IconNote size={13} />
+                        {n.pinned && <IconPin size={11} className="tree-pin-mark" />}
+                        <span className="tree-name">{n.title}</span>
+                        {n.folder && <span className="tree-note-folder">{n.folder}</span>}
+                      </div>
+                    ))}
+                    {bodyHits.length > 0 && (
+                      <>
+                        <div className="note-search-head">Found in contents</div>
+                        {bodyHits.map((h) => (
+                          <div
+                            key={h.path} className={`tree-row tree-note note-hit${openPath === h.path ? ' active' : ''}`} style={{ paddingLeft: 8 }}
+                            onClick={() => setOpenPath(h.path)} title={h.title}
+                          >
+                            <IconNote size={13} />
+                            <div className="note-hit-main">
+                              <span className="tree-name">{h.title}</span>
+                              <span className="note-hit-snip">{(h.snippet || []).map((s, i) => (s.hit ? <mark key={i}>{s.t}</mark> : <span key={i}>{s.t}</span>))}</span>
+                            </div>
+                            {h.folder && <span className="tree-note-folder">{h.folder}</span>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {matches.length === 0 && bodyHits.length === 0 && <div className="note-empty-q">No matching notes.</div>}
+                  </>
+                )
+                : (
+                  <>
+                    {pinnedNotes.length > 0 && (
+                      <div className="tree-section">
+                        <div className="tree-head"><IconPin size={11} /> Pinned</div>
+                        {pinnedNotes.map((n) => <NoteRow key={'pin:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
+                      </div>
+                    )}
+                    {recentNotes.length > 0 && (
+                      <div className="tree-section">
+                        <div className="tree-head">Recent</div>
+                        {recentNotes.map((n) => <NoteRow key={'rec:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
+                      </div>
+                    )}
+                    <TreeLevel node={tree} depth={0} sel={sel} active={openPath} expanded={expanded} onSelect={setSel} onToggle={toggleExpand} onOpen={setOpenPath} onCtx={openCtx} dnd={dnd} sort={sort} />
+                  </>
+                )}
           </div>
+          <button className={`notes-trash-btn${trashOpen ? ' on' : ''}`} onClick={() => setTrashOpen(true)} title="Trash"><IconTrash size={14} /> Trash</button>
         </aside>
       )}
       {showMain && (
         <main className="notes-main">
-          {narrow && openPath && (
+          {narrow && openPath && !trashOpen && (
             <button className="notes-back" onClick={() => setOpenPath(null)}><IconChevL size={15} /> Files</button>
           )}
-          {openPath
-            ? (
-              <NoteEditor
-                inline path={openPath}
-                onClose={() => setOpenPath(null)}
-                onChanged={(np) => { if (np) setOpenPath(np); load() }}
-                onDeleted={() => { setOpenPath(null); load() }}
-              />
-            )
-            : (
-              <div className="notes-main-empty">
-                <div className="state-ic"><IconNote size={24} /></div>
-                <div className="state-title">Select a note</div>
-                <div className="state-sub">Pick one from the tree, or create a note with ＋.</div>
-              </div>
-            )}
+          {trashOpen
+            ? <TrashView onClose={() => setTrashOpen(false)} onChanged={load} />
+            : openPath
+              ? (
+                <NoteEditor
+                  inline path={openPath} notes={notes}
+                  onClose={() => setOpenPath(null)}
+                  onChanged={(np) => { if (np) setOpenPath(np); load() }}
+                  onDeleted={() => { setOpenPath(null); load() }}
+                />
+              )
+              : (
+                <div className="notes-main-empty">
+                  <div className="state-ic"><IconNote size={24} /></div>
+                  <div className="state-title">Select a note</div>
+                  <div className="state-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>
+                  <button className="btn primary sm" style={{ marginTop: 10 }} onClick={newNote}><IconPlus size={14} /> New note</button>
+                </div>
+              )}
         </main>
       )}
       {folderPrompt && (
         <PromptModal
           title="New folder" label={sel ? `Inside “${sel}”` : 'In Notes (root)'} placeholder="Folder name"
           onSubmit={createFolder} onCancel={() => setFolderPrompt(false)}
+        />
+      )}
+      {renamePrompt && (
+        <PromptModal
+          title="Rename note" initialValue={renamePrompt.title} placeholder="Note title" confirmLabel="Rename"
+          onSubmit={submitRename} onCancel={() => setRenamePrompt(null)}
+        />
+      )}
+      {ctxMenu && (
+        <NoteContextMenu
+          note={ctxMenu.note} x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}
+          onRename={() => setRenamePrompt({ path: ctxMenu.note.path, title: ctxMenu.note.title })}
+          onDuplicate={() => doDuplicate(ctxMenu.note)}
+          onPin={() => doPin(ctxMenu.note)}
+          onDelete={() => doDelete(ctxMenu.note)}
         />
       )}
     </div>

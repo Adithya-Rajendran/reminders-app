@@ -1,6 +1,7 @@
 // Pure tree + move logic for the notes sidebar — no React/DOM so the
 // framework-free node tests can exercise it (test/notetree.test.mjs).
 import { parentFolder } from './notepaths.js'
+import { sortNotes } from './notesort.js'
 
 // Build a nested tree of folders (incl. empty) with each note attached to its folder.
 export function buildTree(folderPaths, notes) {
@@ -20,7 +21,7 @@ export function buildTree(folderPaths, notes) {
 }
 
 export const folderKids = (node) => Object.values(node.children).sort((a, b) => a.name.localeCompare(b.name))
-export const noteKids = (node) => (node.notes || []).slice().sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
+export const noteKids = (node, sortKey = 'updated') => sortNotes(node.notes, sortKey)
 export const countNotes = (node) => (node.notes || []).length + folderKids(node).reduce((s, c) => s + countNotes(c), 0)
 
 // Whether `drag` ({ type: 'note'|'folder', path, folder? }) may drop into the

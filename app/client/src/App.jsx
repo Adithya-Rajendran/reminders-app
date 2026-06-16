@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
+import CommandPalette from './CommandPalette.jsx'
+import { useGlobalHotkeys } from './useGlobalHotkeys.js'
 import { usePopover } from './usePopover.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
@@ -198,6 +200,13 @@ export default function App() {
   const openSettings = (opts) => setSettings({ createGroup: opts && opts.createGroup ? String(opts.createGroup) : undefined })
   const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
   const [activeDash, setActiveDash] = useState('main')
+  const [palette, setPalette] = useState(null) // null | { mode: 'notes' | 'commands' }
+
+  // App-wide palette hotkeys (only meaningful once signed in).
+  useGlobalHotkeys({
+    onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'notes' }) },
+    onCommands: () => { if (status === 'ready') setPalette({ mode: 'commands' }) },
+  })
 
   // Theme: persist + reflect on <html data-theme>.
   useEffect(() => {
@@ -298,6 +307,10 @@ export default function App() {
       )}
 
       {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => setSettings(null)} />}
+
+      {status === 'ready' && palette && (
+        <CommandPalette initialMode={palette.mode} onClose={() => setPalette(null)} />
+      )}
     </>
   )
 }

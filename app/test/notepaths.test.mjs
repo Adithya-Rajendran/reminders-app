@@ -38,6 +38,18 @@ ok(withWidth('x.png', 320) === 'x.png#w320', 'withWidth adds a width fragment')
 ok(withWidth('x.png#w100', 320) === 'x.png#w320', 'withWidth replaces an existing width')
 ok(withWidth('x.png#w100', null) === 'x.png', 'withWidth(null) clears the fragment')
 
+// ---- wikilink bracket un-escaping (tiptap-markdown escapes [ and ]) ----
+ok(toDisk('see \\[\\[Roadmap\\]\\] here') === 'see [[Roadmap]] here', 'toDisk un-escapes doubled [[ ]] (wikilinks)')
+ok(toDisk('\\[\\[Note|Alias\\]\\]') === '[[Note|Alias]]', 'toDisk un-escapes a wikilink with alias')
+ok(toDisk('a \\[single\\] bracket') === 'a \\[single\\] bracket', 'toDisk leaves single escaped brackets alone')
+// code-awareness: never touch backslashes inside code (fenced or inline)
+ok(toDisk('```\nregex: \\[\\[a-z\\]\\]\n```') === '```\nregex: \\[\\[a-z\\]\\]\n```', 'toDisk leaves \\[\\[ inside a fenced code block verbatim')
+ok(toDisk('use `grep \\[\\[ file` then \\[\\[Link\\]\\]') === 'use `grep \\[\\[ file` then [[Link]]', 'toDisk skips inline code but un-escapes a wikilink outside it')
+ok(toDisk('~~~\n\\[\\[x\\]\\]\n~~~') === '~~~\n\\[\\[x\\]\\]\n~~~', 'toDisk respects ~~~ fences too')
+// odd/nested bracket runs stay escaped (portable) — never half-mangled
+ok(toDisk('\\[\\[\\[x\\]\\]\\]') === '\\[\\[\\[x\\]\\]\\]', 'toDisk leaves an odd-length bracket run escaped')
+ok(toDisk('text \\[\\[a\\]\\] and \\[\\[b\\]\\]') === 'text [[a]] and [[b]]', 'toDisk un-escapes multiple wikilinks on a line')
+
 // ---- folder path helpers ----
 ok(parentFolder('a/b/c') === 'a/b', 'parentFolder of a nested path')
 ok(parentFolder('a') === '', 'parentFolder of a top-level folder is the root')

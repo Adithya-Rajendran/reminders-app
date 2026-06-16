@@ -20,10 +20,50 @@ export const sceneNameFor = (src) => {
 }
 
 export const toDisplay = (md) => String(md || '').replace(/\]\(_resources\//g, '](' + RES_PREFIX)
-export const toDisk = (md) => String(md || '').replace(
-  /\]\(\/api\/notes\/resources\/([^)\s?#]+)(\?[^)\s#]*)?(#[^)\s]*)?\)/g,
-  (_m, p, _q, frag) => '](_resources/' + p + (frag || '') + ')',
-)
+
+const RES_REWRITE = /\]\(\/api\/notes\/resources\/([^)\s?#]+)(\?[^)\s#]*)?(#[^)\s]*)?\)/g
+// tiptap-markdown escapes [ and ] in plain text; reverse it for a WELL-FORMED
+// `\[\[…\]\]` (no inner brackets/newline → an actual wikilink, never an odd run)
+// so [[wikilinks]] stay portable on disk. Single `\[` and odd runs are left
+// escaped (portable). Applied only outside code (see toDisk) where backslashes
+// in `\[\[` are literal content.
+const WIKI_ESC = /(?<!\\\[)\\\[\\\[([^[\]\n]*?)\\\]\\\](?!\\\])/g
+const unwiki = (s) => s.replace(WIKI_ESC, '[[$1]]')
+
+// Apply unwiki to a line but skip inline-code spans (`…`, ``…``), where the
+// backslashes are verbatim content the user typed.
+function unwikiOutsideInlineCode(line) {
+  let out = ''
+  let i = 0
+  while (i < line.length) {
+    if (line[i] === '`') {
+      let n = 1
+      while (line[i + n] === '`') n++
+      const ticks = line.slice(i, i + n)
+      const close = line.indexOf(ticks, i + n)
+      if (close !== -1) { out += line.slice(i, close + n); i = close + n; continue } // a complete inline-code span — verbatim
+      out += ticks; i += n; continue // unterminated run — treat as text
+    }
+    let j = i
+    while (j < line.length && line[j] !== '`') j++
+    out += unwiki(line.slice(i, j))
+    i = j
+  }
+  return out
+}
+
+export function toDisk(md) {
+  const text = String(md || '').replace(RES_REWRITE, (_m, p, _q, frag) => '](_resources/' + p + (frag || '') + ')')
+  const lines = text.split('\n')
+  let fence = null // active fenced-code marker char (` or ~) while inside a block
+  for (let i = 0; i < lines.length; i++) {
+    const f = /^\s*(`{3,}|~{3,})/.exec(lines[i])
+    if (fence) { if (f && f[1][0] === fence) fence = null; continue } // inside a fence — verbatim
+    if (f) { fence = f[1][0]; continue }                             // opening fence line
+    lines[i] = unwikiOutsideInlineCode(lines[i])
+  }
+  return lines.join('\n')
+}
 
 // The URL #fragment (carries the image width, e.g. "w640").
 const fragOf = (src) => (/#(.*)$/.exec(src || '') || ['', ''])[1]

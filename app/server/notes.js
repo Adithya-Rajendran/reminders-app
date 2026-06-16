@@ -7,9 +7,13 @@ import crypto from 'node:crypto'
 import yaml from 'js-yaml'
 import { getAccount, listAccounts, getNotesConfig, setNotesConfig } from './config.js'
 import * as dav from './webdav.js'
+import * as idx from './noteindex.js'
 import { err } from './util.js'
 
 export const RES = '_resources'
+export const TRASH = '.trash'
+// Folders hidden from the notes tree/list: the resources store and the trash.
+const isHidden = (name) => name === RES || name === TRASH
 const MD = 'text/markdown; charset=utf-8'
 const DEFAULT_ROOT = 'Notes'
 const VALID_RES_NAME_RE = /^[\w.-]{1,160}$/ // safe resource filename (no slashes / traversal)
@@ -21,11 +25,11 @@ const cleanTags = (t) => [...new Set((Array.isArray(t) ? t : []).map((x) => Stri
 const LIST_TTL = 15000
 const listCache = new Map() // userId -> { at, notes }
 const invalidate = (userId) => listCache.delete(userId)
-// Per-(path,etag) front-matter tag cache: re-listing only re-reads notes whose
-// content actually changed (PROPFIND already returns each note's etag). NOT cleared
-// on writes — a changed note gets a new etag and is re-read; the rest are reused,
-// turning the per-note read fan-out into ~0 reads in steady state.
-const tagCache = new Map() // userId -> Map<path, { etag, tags }>
+// Per-(path,etag) front-matter cache (tags + created + pinned): re-listing only
+// re-reads notes whose content actually changed (PROPFIND already returns each
+// note's etag). NOT cleared on writes — a changed note gets a new etag and is
+// re-read; the rest are reused, turning the per-note read fan-out into ~0 reads.
+const tagCache = new Map() // userId -> Map<path, { etag, tags, created, pinned }>
 
 const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
 const join = (...p) => p.map(trimSlashes).filter(Boolean).join('/')
@@ -84,6 +88,7 @@ export async function setConfig(userId, accountId, rootPath) {
   if (!acc) throw err('connect a CalDAV account first', 409)
   const root = sanitizeFolder(rootPath) || DEFAULT_ROOT
   await setNotesConfig(userId, acc.id, root)
+  idx.clearUser(userId) // the search index is per-WebDAV — drop it so it regenerates lazily after a reconnect/retarget
   await dav.ensureCollection(acc, root)
   return { accountId: acc.id, rootPath: root }
 }
@@ -111,7 +116,7 @@ export async function listFolders(userId) {
     const entries = await dav.propfind(c.account, dir, 1)
     for (const e of entries || []) {
       if (trimSlashes(e.path) === trimSlashes(dir)) continue
-      if (e.isDir && e.name !== RES) { const rel = prefix ? prefix + '/' + e.name : e.name; out.push(rel); await walk(e.path, rel) }
+      if (e.isDir && !isHidden(e.name)) { const rel = prefix ? prefix + '/' + e.name : e.name; out.push(rel); await walk(e.path, rel) }
     }
   }
   await walk(c.root, '')
@@ -122,6 +127,7 @@ export async function createFolder(userId, folder) {
   if (!c) throw err('notes not configured', 409)
   const rel = sanitizeFolder(folder)
   if (!rel) throw err('folder name required', 400)
+  if (rel.split('/').includes(TRASH)) throw err('bad path', 400)
   const target = join(c.root, rel)
   if (!inRoot(c.root, target)) throw err('bad path', 400)
   await dav.ensureCollection(c.account, target)
@@ -138,13 +144,14 @@ export async function listNotes(userId) {
   if (cached && Date.now() - cached.at < LIST_TTL) return cached.notes
   const files = [] // a missing root just yields an empty list (created on first write)
   let folderCount = 0
+  let truncated = false // the walk hit a depth/breadth bound → this listing is partial
   const walk = async (dir, depth) => {
-    if (depth > 8 || folderCount > 400) return // bound a pathological tree
+    if (depth > 8 || folderCount > 400) { truncated = true; return } // bound a pathological tree
     const entries = await dav.propfind(c.account, dir, 1)
     const subdirs = []
     for (const e of entries || []) {
       if (trimSlashes(e.path) === trimSlashes(dir)) continue
-      if (e.name === RES) continue
+      if (isHidden(e.name)) continue
       if (e.isDir) subdirs.push(e.path)
       else if (/\.md$/i.test(e.name)) files.push(e)
     }
@@ -158,16 +165,29 @@ export async function listNotes(userId) {
     const fp = trimSlashes(f.path)
     seen.add(fp)
     const rel = fp.slice(c.root.length + 1)
-    let tags = []
+    const folder = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : ''
+    let m = { tags: [], created: null, pinned: false }
     const hit = tc.get(fp)
-    if (hit && f.etag && hit.etag === f.etag) tags = hit.tags // unchanged → reuse, skip the read
+    if (hit && f.etag && hit.etag === f.etag) m = hit // unchanged → reuse, skip the read
     else {
-      try { tags = cleanTags(parseNote(await dav.readText(c.account, fp)).meta.tags) } catch { /* skip a failing read */ }
-      if (f.etag) tc.set(fp, { etag: f.etag, tags })
+      // changed/new → read once; reuse that same body to refresh the search index
+      // (so steady-state indexing adds zero extra reads, like the meta cache).
+      try {
+        const parsed = parseNote(await dav.readText(c.account, fp))
+        m = { tags: cleanTags(parsed.meta.tags), created: parsed.meta.created || null, pinned: parsed.meta.pinned === true }
+        idx.reindexNote(userId, { path: fp, title: titleOf(f.path), folder, body: parsed.body })
+      } catch { /* skip a failing read */ }
+      if (f.etag) tc.set(fp, { etag: f.etag, ...m })
     }
-    return { path: fp, title: titleOf(f.path), folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', tags, updated: f.mtime, etag: f.etag, size: f.size }
+    return { path: fp, title: titleOf(f.path), folder, tags: m.tags, created: m.created, pinned: m.pinned, updated: f.mtime, etag: f.etag, size: f.size }
   }))
-  for (const k of tc.keys()) if (!seen.has(k)) tc.delete(k) // forget notes that no longer exist
+  // Only prune when the walk was COMPLETE — a partial listing (depth/breadth
+  // bound hit) hasn't seen every note, so pruning would wrongly delete the cache
+  // + search-index rows of notes it simply didn't reach.
+  if (!truncated) {
+    for (const k of tc.keys()) if (!seen.has(k)) tc.delete(k) // forget notes that no longer exist
+    idx.pruneMissing(userId, seen) // drop search-index rows for notes that no longer exist (covers delete / move / rename)
+  }
   notes.sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
   listCache.set(userId, { at: Date.now(), notes })
   return notes
@@ -214,6 +234,9 @@ export async function saveNote(userId, path, { body = '', etag, tags } = {}) {
   try {
     const w = await dav.write(c.account, rel, serializeNote(meta, body), { contentType: MD, ifMatch: etag || existing?.etag || undefined })
     invalidate(userId)
+    // refresh the search index with the body we just wrote — no extra read needed.
+    const relToRoot = rel.slice(c.root.length + 1)
+    idx.reindexNote(userId, { path: rel, title: titleOf(rel), folder: relToRoot.includes('/') ? relToRoot.slice(0, relToRoot.lastIndexOf('/')) : '', body })
     return { path: rel, meta, etag: w.etag }
   } catch (e) {
     if (e.status === 412) throw err('This note changed elsewhere — reload before saving.', 409)
@@ -242,6 +265,7 @@ export async function moveNote(userId, path, folder) {
   if (!inRoot(c.root, path)) throw err('bad path', 400)
   const rel = trimSlashes(path)
   const name = rel.split('/').pop()
+  if (sanitizeFolder(folder).split('/').includes(TRASH)) throw err('bad path', 400) // use the trash API, not move
   const dir = join(c.root, sanitizeFolder(folder))
   if (!inRoot(c.root, dir)) throw err('bad path', 400)
   await dav.ensureCollection(c.account, dir)
@@ -252,11 +276,116 @@ export async function moveNote(userId, path, folder) {
   return { path: target, title: titleOf(target), folder: sanitizeFolder(folder) }
 }
 
+// Pin / unpin a note (frontmatter `pinned: true`). Preserves `updated` so a
+// pin doesn't masquerade as an edit; merges only the one key (any other
+// frontmatter an external app added is left intact).
+export async function setPinned(userId, path, pinned) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  if (!inRoot(c.root, path)) throw err('bad path', 400)
+  const rel = trimSlashes(path)
+  const existing = await dav.read(c.account, rel)
+  if (!existing) throw err('not found', 404)
+  const { meta, body } = parseNote(existing.buffer.toString('utf8'))
+  if (pinned) meta.pinned = true; else delete meta.pinned
+  const w = await dav.write(c.account, rel, serializeNote(meta, body), { contentType: MD, ifMatch: existing.etag })
+  invalidate(userId)
+  return { path: rel, pinned: !!pinned, etag: w.etag }
+}
+
+// Duplicate a note into the same folder ("<title> copy", fresh id + created).
+export async function duplicateNote(userId, path) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  const src = await getNote(userId, path)
+  if (!src) throw err('not found', 404)
+  const created = await createNote(userId, { folder: src.folder, title: src.title + ' copy' })
+  await saveNote(userId, created.path, { body: src.body, tags: src.meta?.tags })
+  return { path: created.path, title: created.title, folder: src.folder }
+}
+
 export async function deleteNote(userId, path) {
   const c = await ctx(userId)
   if (!c) throw err('notes not configured', 409)
   if (!inRoot(c.root, path)) throw err('bad path', 400)
   await dav.del(c.account, trimSlashes(path))
+  idx.removeNote(userId, trimSlashes(path))
+  invalidate(userId)
+  return { ok: true }
+}
+
+// ---- trash (soft delete) ----
+// Move a note into <root>/.trash, recording where it came from so it can be
+// restored. The trash folder is filtered out of the normal list/tree/folders.
+export async function trashNote(userId, path) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  if (!inRoot(c.root, path)) throw err('bad path', 400)
+  const rel = trimSlashes(path)
+  const existing = await dav.read(c.account, rel)
+  if (!existing) throw err('not found', 404)
+  const { meta, body } = parseNote(existing.buffer.toString('utf8'))
+  const relToRoot = rel.slice(c.root.length + 1)
+  meta.trashedFrom = relToRoot.includes('/') ? relToRoot.slice(0, relToRoot.lastIndexOf('/')) : ''
+  meta.trashedAt = new Date().toISOString()
+  delete meta.pinned
+  await dav.write(c.account, rel, serializeNote(meta, body), { contentType: MD, ifMatch: existing.etag })
+  const trashDir = join(c.root, TRASH)
+  await dav.ensureCollection(c.account, trashDir)
+  const name = rel.split('/').pop()
+  let target = join(trashDir, name)
+  for (let n = 2; await dav.exists(c.account, target); n++) target = join(trashDir, `${name.replace(/\.md$/i, '')} ${n}.md`)
+  await dav.move(c.account, rel, target)
+  idx.removeNote(userId, rel)
+  invalidate(userId)
+  return { ok: true }
+}
+
+export async function listTrash(userId) {
+  const c = await ctx(userId)
+  if (!c) return null
+  const dir = join(c.root, TRASH)
+  const entries = await dav.propfind(c.account, dir, 1)
+  if (!entries) return []
+  const out = []
+  for (const e of entries) {
+    if (trimSlashes(e.path) === trimSlashes(dir) || e.isDir || !/\.md$/i.test(e.name)) continue
+    const fp = trimSlashes(e.path)
+    let meta = {}
+    try { meta = parseNote(await dav.readText(c.account, fp)).meta } catch { /* skip a failing read */ }
+    out.push({ path: fp, title: titleOf(fp), trashedFrom: meta.trashedFrom || '', trashedAt: meta.trashedAt || null, updated: e.mtime, etag: e.etag })
+  }
+  out.sort((a, b) => String(b.trashedAt || '').localeCompare(String(a.trashedAt || '')))
+  return out
+}
+
+export async function restoreNote(userId, path) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  if (!inRoot(c.root, path)) throw err('bad path', 400)
+  const rel = trimSlashes(path)
+  if (!rel.startsWith(join(c.root, TRASH) + '/')) throw err('not a trashed note', 400) // only restore from .trash
+  const existing = await dav.read(c.account, rel)
+  if (!existing) throw err('not found', 404)
+  const { meta, body } = parseNote(existing.buffer.toString('utf8'))
+  const dest = sanitizeFolder(meta.trashedFrom || '')
+  delete meta.trashedFrom
+  delete meta.trashedAt
+  await dav.write(c.account, rel, serializeNote(meta, body), { contentType: MD, ifMatch: existing.etag })
+  const dir = join(c.root, dest)
+  await dav.ensureCollection(c.account, dir)
+  const name = rel.split('/').pop()
+  let target = join(dir, name)
+  for (let n = 2; await dav.exists(c.account, target); n++) target = join(dir, `${name.replace(/\.md$/i, '')} ${n}.md`)
+  await dav.move(c.account, rel, target)
+  invalidate(userId)
+  return { path: target, title: titleOf(target), folder: dest }
+}
+
+export async function emptyTrash(userId) {
+  const c = await ctx(userId)
+  if (!c) throw err('notes not configured', 409)
+  for (const t of (await listTrash(userId)) || []) { try { await dav.del(c.account, t.path) } catch { /* keep going */ } }
   invalidate(userId)
   return { ok: true }
 }
@@ -271,6 +400,7 @@ export async function moveFolder(userId, from, to) {
   if (!src) throw err('folder required', 400)
   const name = src.split('/').pop()
   const destParent = sanitizeFolder(to) // '' = root
+  if (src.split('/').includes(TRASH) || destParent.split('/').includes(TRASH)) throw err('bad path', 400)
   if (destParent === src || destParent.startsWith(src + '/')) throw err('cannot move a folder into itself', 400)
   const srcParent = src.includes('/') ? src.slice(0, src.lastIndexOf('/')) : ''
   if (destParent === srcParent) return { folder: src } // already there
@@ -301,4 +431,16 @@ export async function getResource(userId, name) {
   if (!c) return null
   if (!VALID_RES_NAME_RE.test(name)) return null
   return dav.read(c.account, join(c.root, RES, name))
+}
+
+// ---- search (full-text over note bodies, served from the local FTS index) ----
+export function searchNotes(userId, q, limit) { return idx.search(userId, q, limit) }
+
+// Notes that [[link]] to the given note (resolved by its current title). A rename
+// changes the title, so old inbound links simply stop resolving (Obsidian default).
+export function backlinksFor(userId, path) {
+  const title = titleOf(trimSlashes(path))
+  return idx.backlinks(userId, title)
+    .filter((b) => b.path !== trimSlashes(path)) // a note never lists itself
+    .map((b) => ({ path: b.path, title: titleOf(b.path), context: b.context || '' }))
 }

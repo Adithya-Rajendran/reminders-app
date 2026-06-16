@@ -136,6 +136,38 @@ export const IconPalette = (p) => (
     <circle cx="6.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
   </Icon>
 )
+export const IconSearch = (p) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M21 21l-4.3-4.3" />
+  </Icon>
+)
+export const IconCornerDownLeft = (p) => <Icon {...p} d="M9 10l-5 5 5 5M20 4v7a4 4 0 0 1-4 4H4" />
+export const IconSort = (p) => (
+  <Icon {...p}>
+    <path d="M7 4v16M7 4l-3 3M7 4l3 3" />
+    <path d="M12 7h9M12 12h6M12 17h3" />
+  </Icon>
+)
+export const IconDots = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none" />
+  </Icon>
+)
+export const IconPin = (p) => (
+  <Icon {...p}>
+    <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5zM12 14v6" />
+  </Icon>
+)
+export const IconCopy = (p) => (
+  <Icon {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Icon>
+)
+
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (
   <Icon {...p} sw={1.6}>

@@ -1,9 +1,14 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import ModalFrame from './ModalFrame.jsx'
 import PromptModal from './PromptModal.jsx'
+import Backlinks from './Backlinks.jsx'
+import Outline from './Outline.jsx'
+import NoteInfoBar from './NoteInfoBar.jsx'
 import { notesApi } from './api.js'
 import { createSaveQueue } from './savequeue.js'
-import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder } from './icons.jsx'
+import { extractOutline } from './outline.js'
+import { loadJson, saveJson } from './storage.js'
+import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder, IconList, IconPin } from './icons.jsx'
 
 // Tiptap is heavy (loaded only when a note is open) — code-split it out.
 const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
@@ -13,18 +18,21 @@ const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
 // inside a pane when `inline` is set (the split-view notes widget). `onChanged` is
 // called after a rename/move so the surrounding tree can refresh; `onDeleted` after
 // a delete.
-export default function NoteEditor({ path: initialPath, onClose, onChanged, onDeleted, inline = false }) {
+export default function NoteEditor({ path: initialPath, onClose, onChanged, onDeleted, inline = false, notes = [] }) {
   const [path, setPath] = useState(initialPath)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [etag, setEtag] = useState(null)
   const [tags, setTags] = useState([])
+  const [meta, setMeta] = useState(null)
   const [folder, setFolder] = useState('')
   const [folders, setFolders] = useState([])
   const [newTag, setNewTag] = useState('')
   const [state, setState] = useState('loading') // loading | ready | error
   const [saving, setSaving] = useState('idle')   // idle | saving | saved | error
   const [folderPrompt, setFolderPrompt] = useState(false)
+  const [showOutline, setShowOutline] = useState(() => loadJson('notes-outline-open', false))
+  const bodyElRef = useRef(null)
   const saveTimer = useRef(null)
   const bodyRef = useRef('')
   const pathRef = useRef(initialPath)
@@ -63,7 +71,7 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     notesApi.get(initialPath)
       // setPath keeps pathRef in sync with what's loaded — without it, autosaves
       // after a switch PUT the new body at the OLD note's path (and 412).
-      .then((n) => { if (!alive) return; setPath(initialPath); setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setFolder(n.folder || ''); setState('ready') })
+      .then((n) => { if (!alive) return; setPath(initialPath); setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setMeta(n.meta || null); setFolder(n.folder || ''); setState('ready') })
       .catch(() => { if (alive) setState('error') })
     notesApi.folders().then((r) => { if (alive) setFolders(r.folders || []) }).catch(() => {})
     return () => { alive = false }
@@ -94,7 +102,7 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   }
   const del = async () => {
     clearTimeout(saveTimer.current)
-    try { await notesApi.del(path); (onDeleted || onClose)?.() } catch { setSaving('error') } // keep open on failure
+    try { await notesApi.trash(path); (onDeleted || onClose)?.() } catch { setSaving('error') } // keep open on failure
   }
 
   // tags + folder edits save immediately (discrete changes)
@@ -108,6 +116,18 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   }
 
   const folderOpts = [...new Set([folder, ...folders].filter(Boolean))].sort()
+  const pinned = !!meta?.pinned
+  const togglePin = async () => {
+    try { await notesApi.setPinned(pathRef.current, !pinned); setMeta((m) => ({ ...(m || {}), pinned: !pinned })); onChanged?.() } catch { /* ignore */ }
+  }
+  const outline = useMemo(() => extractOutline(body), [body])
+  const toggleOutline = (v) => { setShowOutline(v); saveJson('notes-outline-open', v) }
+  // The editor renders headings in document order, so the Nth outline entry is
+  // the Nth heading element — scroll it into view inside the editor's scroller.
+  const scrollToHeading = (i) => {
+    const hs = bodyElRef.current?.querySelectorAll('.tiptap-content h1, .tiptap-content h2, .tiptap-content h3, .tiptap-content h4, .tiptap-content h5, .tiptap-content h6')
+    hs?.[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const inner = (
     <>
@@ -119,7 +139,9 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
         <span className="note-save-state">
           {saving === 'saving' ? <><IconSpinner size={13} /> Saving…</> : saving === 'saved' ? <><IconCheck size={13} /> Saved</> : saving === 'error' ? 'Save failed' : ''}
         </span>
-        <button className="iconbtn sm danger-hover" title="Delete note" aria-label="Delete note" onClick={del}><IconTrash size={16} /></button>
+        <button className={`iconbtn sm${pinned ? ' on' : ''}`} title={pinned ? 'Unpin' : 'Pin to top'} aria-label="Pin note" onClick={togglePin}><IconPin size={16} /></button>
+        <button className={`iconbtn sm${showOutline ? ' on' : ''}`} title="Outline" aria-label="Toggle outline" onClick={() => toggleOutline(!showOutline)}><IconList size={16} /></button>
+        <button className="iconbtn sm danger-hover" title="Move to Trash" aria-label="Move note to trash" onClick={del}><IconTrash size={16} /></button>
         <button className="iconbtn sm" title="Close" aria-label="Close note" onClick={close}><IconX size={16} /></button>
       </div>
       {state === 'ready' && (
@@ -148,15 +170,20 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
           </div>
         </div>
       )}
-      <div className="note-edit-body">
-        {state === 'loading' ? <div className="note-loading"><IconSpinner size={20} /></div>
-          : state === 'error' ? <div className="note-loading">Couldn’t load this note.</div>
-            : (
-              <Suspense fallback={<div className="note-loading"><IconSpinner size={20} /></div>}>
-                <NoteRichEditor value={body} onChange={onBody} />
-              </Suspense>
-            )}
+      <div className="note-edit-body-wrap">
+        <div className="note-edit-body" ref={bodyElRef}>
+          {state === 'loading' ? <div className="note-loading"><IconSpinner size={20} /></div>
+            : state === 'error' ? <div className="note-loading">Couldn’t load this note.</div>
+              : (
+                <Suspense fallback={<div className="note-loading"><IconSpinner size={20} /></div>}>
+                  <NoteRichEditor value={body} onChange={onBody} notes={notes} folder={folder} />
+                </Suspense>
+              )}
+        </div>
+        {state === 'ready' && showOutline && <Outline items={outline} onPick={scrollToHeading} onClose={() => toggleOutline(false)} />}
       </div>
+      {state === 'ready' && <NoteInfoBar meta={meta} body={body} />}
+      {state === 'ready' && <Backlinks path={path} />}
       {folderPrompt && (
         <PromptModal
           title="New folder" placeholder="Folder name" confirmLabel="Move here"
