@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFlame, IconTarget, IconFrog } from '../icons.jsx'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog } from '../icons.jsx'
 
 // Widgets are lazy: each becomes its own build chunk, fetched the first time it
 // appears on a board. Heavy dependencies (FullCalendar, the notes editor) stay
@@ -11,8 +11,6 @@ const CalendarWidget = lazy(() => import('./CalendarWidget.jsx'))
 const NotesWidget = lazy(() => import('./NotesWidget.jsx'))
 const ReviewWidget = lazy(() => import('./ReviewWidget.jsx'))
 const CuesWidget = lazy(() => import('./CuesWidget.jsx'))
-const HabitsWidget = lazy(() => import('./HabitsWidget.jsx'))
-const GoalsWidget = lazy(() => import('./GoalsWidget.jsx'))
 const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
 
 // Every dashboard widget is declared here; the Dashboard itself is generic.
@@ -70,21 +68,11 @@ export const WIDGETS = [
   },
   {
     type: 'cues',
-    label: 'Cues (if-then)',
+    label: 'Cues (flow)',
     icon: IconCue,
-    render: (_w, ctx) => <CuesWidget projects={ctx.projects} />,
-  },
-  {
-    type: 'habits',
-    label: 'Habits',
-    icon: IconFlame,
-    render: () => <HabitsWidget />,
-  },
-  {
-    type: 'goals',
-    label: 'Goals',
-    icon: IconTarget,
-    render: (_w, ctx) => <GoalsWidget projects={ctx.projects} />,
+    pickGroup: true,
+    defaultSize: { w: 14, h: 11 },
+    render: (w, ctx) => <CuesWidget projects={ctx.projects} group={w.group || ''} onNewGroup={ctx.onNewGroup} />,
   },
   {
     type: 'frog',

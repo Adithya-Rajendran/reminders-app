@@ -7,7 +7,7 @@ import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
-import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal } from './vtodo_meta.js'
+import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -46,6 +46,7 @@ export function serializeVtodo(vt, listId, objectUrl) {
     cue: readCue(vt),
     habit_log: readHabitLog(vt),
     is_goal: readGoalFlag(vt), goal: readParentGoal(vt), goal_plan: readGoalPlan(vt),
+    flow: readFlow(vt),
     reminders: readReminders(vt), labels: readCategories(vt),
     created: created ? outTs(created.toJSDate()) : ZERO, updated: updated ? outTs(updated.toJSDate()) : ZERO,
   }
@@ -193,6 +194,7 @@ export async function createTask(req, res) {
     if (b.is_goal) writeGoalFlag(vt, true)
     if (b.goal_plan) writeGoalPlan(vt, b.goal_plan)
     if (b.goal_uid) writeParentGoal(vt, b.goal_uid)
+    if (b.flow) writeFlow(vt, b.flow)
     const pr = clampPriority(b.priority); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr])
     const due = inDue(b.due_date); if (due) setDue(vt, due)
     if (Array.isArray(b.labels) && b.labels.length) setCategories(vt, b.labels.map((l) => l.title || l).filter(Boolean))
@@ -225,6 +227,7 @@ export async function patchTask(req, res) {
       if ('is_goal' in b) writeGoalFlag(vt, !!b.is_goal)
       if ('goal_plan' in b) writeGoalPlan(vt, b.goal_plan)
       if ('goal_uid' in b) writeParentGoal(vt, b.goal_uid)
+      if ('flow' in b) writeFlow(vt, b.flow)
       if ('priority' in b) { const pr = clampPriority(b.priority); vt.removeAllProperties('priority'); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr]) }
       if ('due_date' in b) setDue(vt, inDue(b.due_date))
       if ('repeat_after' in b || 'repeat_mode' in b) { const cur = repeatFieldsFromVtodo(vt); applyRepeatFields(vt, 'repeat_after' in b ? b.repeat_after : cur.repeat_after, 'repeat_mode' in b ? b.repeat_mode : cur.repeat_mode) }

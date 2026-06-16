@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -112,6 +112,18 @@ ok(isQuickWin({ labels: [{ title: 'Work' }] }) === false, 'isQuickWin: no 2min l
   ]
   ok(selectQuickWins(qw).map((t) => t.id).join() === 'q1,q4', 'selectQuickWins: open, 2min-tagged only')
 }
+
+// ---- selectFlowSource (Cues canvas source) ----
+const flowTasks = [
+  { id: 'f1', done: false, reminders: [{ reminder: iso(DAY) }] },               // reminder -> included
+  { id: 'f2', done: false, cue: 'after standup' },                              // cue -> included
+  { id: 'f3', done: false, flow: { x: 10, y: 20, to: [] } },                    // already placed -> included
+  { id: 'f4', done: false },                                                    // nothing -> excluded
+  { id: 'f5', done: true, reminders: [{ reminder: iso(DAY) }] },                // done -> excluded
+  { id: 'f6', done: false, reminders: [{ reminder: iso(DAY) }], labels: [{ title: 'Work' }] },
+]
+ok(selectFlowSource(flowTasks).map((t) => t.id).join() === 'f1,f2,f3,f6', 'selectFlowSource: open reminders/cued/placed only')
+ok(selectFlowSource(flowTasks, 'Work').map((t) => t.id).join() === 'f6', 'selectFlowSource: filters to a group')
 
 // ---- dueBucket ----
 ok(dueBucket(iso(-2 * DAY)).k === 'overdue', 'dueBucket: past -> overdue')

@@ -34,6 +34,15 @@ export function selectCued(tasks) {
   return tasks.filter((t) => !t.done && hasCue(t))
 }
 
+// Cues mindmap source: open tasks worth putting on the canvas — those carrying a
+// reminder or a cue, plus any already placed (t.flow) so a placed node never
+// vanishes if it later loses its reminder. Optionally limited to one group.
+export function selectFlowSource(tasks, group) {
+  let list = (tasks || []).filter((t) => !t.done && ((t.reminders || []).length > 0 || hasCue(t) || t.flow))
+  if (group) list = list.filter((t) => hasGroup(t, group))
+  return list
+}
+
 // Habits view: open recurring tasks (RRULE-backed or custom-from-completion).
 // Their completion history lives in X-REMINDERS-HABIT-LOG (see habitstats.js).
 export const isRecurringTask = (t) => (Number(t.repeat_after) > 0) || t.repeat_mode === 1 || t.repeat_mode === 2

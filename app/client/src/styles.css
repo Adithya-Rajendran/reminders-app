@@ -1057,6 +1057,16 @@ body {
 .due-chip svg { opacity: .8; }
 .label-chip { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
+/* subtasks (folded-in Goals): expand/progress chip on a parent + nested rows */
+.task-wrap { display: flex; flex-direction: column; }
+.task-children { margin: 2px 0 6px 30px; padding-left: 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+.subtask-chip { cursor: pointer; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 3px; }
+.subtask-chip:hover { border-color: var(--accent); }
+.subtask-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
+.subtask-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.subtask-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+.subtask-add { margin-top: 4px; }
+
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 70;
   background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 12px;
@@ -1599,23 +1609,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
 .habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
 
-/* Goals widget — progress + new-goal (WOOP) form */
-.goal-new { margin-bottom: 10px; }
-.goal-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: color-mix(in oklab, var(--panel-solid) 40%, transparent); }
-.goal-type { display: flex; gap: 6px; }
-.goal-type .chip { cursor: pointer; }
-.goal-type .chip.active { color: #fff; background: var(--accent-grad); border-color: transparent; }
-.goal-form-row { display: flex; justify-content: flex-end; gap: 6px; }
-.goal { padding: 10px 0; border-bottom: 1px solid var(--line); }
-.goal:last-child { border-bottom: none; }
-.goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.goal-title { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.goal-pct { font-size: 12px; font-weight: 700; color: var(--accent); }
-.goal-bar { height: 7px; border-radius: 4px; background: var(--line-strong); overflow: hidden; margin: 6px 0 4px; }
-.goal-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 4px; transition: width .25s ease; }
-.goal-sub { font-size: 11.5px; color: var(--muted); }
-.goal-plan { font-size: 11.5px; color: var(--faint); margin-top: 4px; font-style: italic; }
-.goal-add { margin-top: 6px; }
+/* Inline habit consistency strip shown under a recurring task's row in Reminders. */
+.habit-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.habit-strip .habit-streak { margin-left: 0; }
+.habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
+.habit-strip .chip { font-size: 11px; }
 
 /* Today's Frog + Eisenhower matrix */
 .frog { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
@@ -1648,3 +1646,41 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .up-filter { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
 .qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }
+
+/* Cues mindmap/flowchart canvas */
+.flow-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.flow-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex: 0 0 auto; }
+.flow-hint { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-body { flex: 1; display: flex; min-height: 0; gap: 8px; }
+.flow-queue { flex: 0 0 158px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; border-right: 1px solid var(--line); }
+.flow-queue-head { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); padding: 2px; }
+.flow-queue-empty { font-size: 12px; color: var(--faint); padding: 4px 2px; }
+.flow-qitem { text-align: left; cursor: grab; display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border-radius: var(--r-chip); border: 1px solid var(--line-strong); background: color-mix(in oklab, var(--panel-solid) 45%, transparent); color: var(--text); }
+.flow-qitem:hover { border-color: var(--accent); }
+.flow-qitem-t { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-qitem-cue { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-canvas { flex: 1; overflow: auto; position: relative; border: 1px solid var(--line); border-radius: var(--r-btn); background:
+  radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--bg2); }
+.flow-content { position: relative; }
+.flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.flow-edge { pointer-events: auto; cursor: pointer; }
+.flow-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.flow-edge-line { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .85; }
+.flow-edge:hover .flow-edge-line { stroke: var(--danger); }
+.flow-edge-line.temp { stroke-dasharray: 5 4; opacity: .7; pointer-events: none; }
+.flow-edges marker path { fill: var(--accent); }
+.flow-node { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: var(--r-btn); border: 1px solid var(--line-strong); background: var(--panel-solid); box-shadow: var(--shadow-sm); cursor: grab; touch-action: none; user-select: none; }
+.flow-node:hover { border-color: var(--accent); }
+.flow-node.dragging { cursor: grabbing; box-shadow: var(--shadow); border-color: var(--accent); z-index: 5; }
+.flow-node.done { opacity: .6; }
+.flow-node.done .flow-node-title { text-decoration: line-through; }
+.flow-node-body { flex: 1; min-width: 0; }
+.flow-node-title { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-node-cue { font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-cue-add { color: var(--faint); }
+.flow-cue-input { font-size: 11.5px; padding: 2px 6px; margin-top: 3px; width: 100%; }
+.flow-unplace { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
+.flow-node:hover .flow-unplace { display: inline-flex; }
+.flow-unplace:hover { color: var(--danger); border-color: var(--danger); }
+.flow-handle { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel-solid); cursor: crosshair; }
+.flow-handle:hover { filter: brightness(1.2); }
