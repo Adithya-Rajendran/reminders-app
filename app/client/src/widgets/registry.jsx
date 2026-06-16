@@ -68,9 +68,11 @@ export const WIDGETS = [
   },
   {
     type: 'cues',
-    label: 'Cues (if-then)',
+    label: 'Cues (flow)',
     icon: IconCue,
-    render: (_w, ctx) => <CuesWidget projects={ctx.projects} />,
+    pickGroup: true,
+    defaultSize: { w: 14, h: 11 },
+    render: (w, ctx) => <CuesWidget projects={ctx.projects} group={w.group || ''} onNewGroup={ctx.onNewGroup} />,
   },
   {
     type: 'frog',
