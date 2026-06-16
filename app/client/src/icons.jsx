@@ -187,6 +187,13 @@ export const IconFlame = (p) => (
     <path d="M12 2c2.5 4 5 5.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2.5-5C10.5 7 11.5 5 12 2z" />
   </Icon>
 )
+export const IconTarget = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </Icon>
+)
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

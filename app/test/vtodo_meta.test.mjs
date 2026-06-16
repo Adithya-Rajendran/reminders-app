@@ -3,7 +3,7 @@
 // not clobber foreign properties/alarms. Imports only ical.js (no SQLite).
 // Run with: node test/vtodo_meta.test.mjs
 import ICAL from 'ical.js'
-import { readCue, writeCue, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog } from '../server/vtodo_meta.js'
+import { readCue, writeCue, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal } from '../server/vtodo_meta.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -112,6 +112,48 @@ function roundtrip(vcal) {
   const { vt } = makeVtodo()
   vt.updatePropertyWithValue('x-reminders-habit-log', '2026-02-02,2026-02-01')
   ok(JSON.stringify(readHabitLog(vt)) === JSON.stringify(['2026-02-01', '2026-02-02']), 'readHabitLog tolerates comma separators')
+}
+
+// ---- goal flag + plan round-trip ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeGoalFlag(vt, true)
+  writeGoalPlan(vt, 'Learning goal. Obstacle: time, energy; If-then: if tired → 10 min only')
+  const vt2 = roundtrip(vcal)
+  ok(readGoalFlag(vt2) === true, 'goal flag survives round-trip')
+  ok(readGoalPlan(vt2) === 'Learning goal. Obstacle: time, energy; If-then: if tired → 10 min only', 'goal plan (with commas/semicolons/arrow) round-trips')
+}
+{
+  const { vt } = makeVtodo()
+  writeGoalFlag(vt, true); writeGoalFlag(vt, false)
+  ok(readGoalFlag(vt) === false, 'writeGoalFlag(false) clears the flag')
+  ok(vt.getAllProperties('x-reminders-goal').length === 0, 'cleared goal flag removes the X-prop')
+}
+
+// ---- RELATED-TO;RELTYPE=PARENT link, foreign related-to preserved ----
+{
+  const { vcal, vt } = makeVtodo()
+  const sib = new ICAL.Property('related-to'); sib.setParameter('reltype', 'SIBLING'); sib.setValue('sib-1'); vt.addProperty(sib)
+  writeParentGoal(vt, 'goal-123')
+  const vt2 = roundtrip(vcal)
+  ok(readParentGoal(vt2) === 'goal-123', 'parent goal link survives round-trip')
+  const all = vt2.getAllProperties('related-to').map((p) => String(p.getFirstValue()))
+  ok(all.includes('sib-1'), 'foreign SIBLING RELATED-TO preserved')
+  ok(all.length === 2, 'exactly one PARENT + one SIBLING link')
+}
+{
+  // RFC 5545: RELATED-TO with no RELTYPE defaults to PARENT
+  const { vcal, vt } = makeVtodo()
+  const p = new ICAL.Property('related-to'); p.setValue('parent-default'); vt.addProperty(p)
+  ok(readParentGoal(roundtrip(vcal)) === 'parent-default', 'RELATED-TO without RELTYPE is treated as PARENT')
+}
+{
+  // clearing the parent keeps a foreign sibling
+  const { vt } = makeVtodo()
+  const sib = new ICAL.Property('related-to'); sib.setParameter('reltype', 'SIBLING'); sib.setValue('sib-9'); vt.addProperty(sib)
+  writeParentGoal(vt, 'g'); writeParentGoal(vt, '')
+  ok(readParentGoal(vt) === '', 'writeParentGoal("") clears the parent link')
+  ok(vt.getAllProperties('related-to').map((p) => String(p.getFirstValue())).join() === 'sib-9', 'clearing parent leaves the foreign sibling intact')
 }
 
 console.log(`\nvtodo_meta.test: ${pass} passed, ${fail} failed`)

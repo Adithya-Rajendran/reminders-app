@@ -7,7 +7,7 @@ import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
-import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog } from './vtodo_meta.js'
+import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -36,6 +36,7 @@ export function serializeVtodo(vt, listId, objectUrl) {
   const rep = repeatFieldsFromVtodo(vt)
   return {
     id: encodeTaskId(listId, objectUrl), project_id: listId,
+    uid: String(vt.getFirstPropertyValue('uid') || ''),
     title: String(vt.getFirstPropertyValue('summary') || '(untitled)'),
     description: cleanDescription(vt),
     done, done_at: done ? outTs(compV ? compV.toJSDate() : new Date()) : ZERO,
@@ -44,6 +45,7 @@ export function serializeVtodo(vt, listId, objectUrl) {
     repeat_after: rep.repeat_after, repeat_mode: rep.repeat_mode,
     cue: readCue(vt),
     habit_log: readHabitLog(vt),
+    is_goal: readGoalFlag(vt), goal: readParentGoal(vt), goal_plan: readGoalPlan(vt),
     reminders: readReminders(vt), labels: readCategories(vt),
     created: created ? outTs(created.toJSDate()) : ZERO, updated: updated ? outTs(updated.toJSDate()) : ZERO,
   }
@@ -188,6 +190,9 @@ export async function createTask(req, res) {
     vt.updatePropertyWithValue('status', 'NEEDS-ACTION')
     if (b.description) vt.updatePropertyWithValue('description', String(b.description))
     if (b.cue) writeCue(vt, b.cue)
+    if (b.is_goal) writeGoalFlag(vt, true)
+    if (b.goal_plan) writeGoalPlan(vt, b.goal_plan)
+    if (b.goal_uid) writeParentGoal(vt, b.goal_uid)
     const pr = clampPriority(b.priority); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr])
     const due = inDue(b.due_date); if (due) setDue(vt, due)
     if (Array.isArray(b.labels) && b.labels.length) setCategories(vt, b.labels.map((l) => l.title || l).filter(Boolean))
@@ -217,6 +222,9 @@ export async function patchTask(req, res) {
       if ('title' in b) { const t = (b.title || '').trim(); if (!t) { const e = new Error('title cannot be empty'); e.status = 400; throw e } vt.updatePropertyWithValue('summary', t) }
       if ('description' in b) { if (b.description) vt.updatePropertyWithValue('description', String(b.description)); else vt.removeAllProperties('description') }
       if ('cue' in b) writeCue(vt, b.cue)
+      if ('is_goal' in b) writeGoalFlag(vt, !!b.is_goal)
+      if ('goal_plan' in b) writeGoalPlan(vt, b.goal_plan)
+      if ('goal_uid' in b) writeParentGoal(vt, b.goal_uid)
       if ('priority' in b) { const pr = clampPriority(b.priority); vt.removeAllProperties('priority'); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr]) }
       if ('due_date' in b) setDue(vt, inDue(b.due_date))
       if ('repeat_after' in b || 'repeat_mode' in b) { const cur = repeatFieldsFromVtodo(vt); applyRepeatFields(vt, 'repeat_after' in b ? b.repeat_after : cur.repeat_after, 'repeat_mode' in b ? b.repeat_mode : cur.repeat_mode) }

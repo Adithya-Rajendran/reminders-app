@@ -7,6 +7,7 @@
 // A DESCRIPTION-fenced fallback is supported for READS so that, if a particular
 // server is ever found to strip unknown X-props, flipping STRATEGY to 'fence'
 // keeps the feature working without touching call sites or the wire shape.
+import ICAL from 'ical.js'
 
 // 'xprop' (default) | 'fence'. Reads always check both; only writes branch.
 const STRATEGY = 'xprop'
@@ -108,4 +109,37 @@ export function writeHabitLog(vt, dates, cap = HABIT_CAP) {
 export function appendHabitLog(vt, ymd, cap = HABIT_CAP) {
   if (!YMD_RE.test(String(ymd))) return
   writeHabitLog(vt, [...readHabitLog(vt), String(ymd)], cap)
+}
+
+// ---- goals ----
+// A goal is just a VTODO flagged X-REMINDERS-GOAL=1, with an optional WOOP-style
+// plan in X-REMINDERS-GOAL-PLAN. Child tasks link UP to it via the standard
+// RELATED-TO;RELTYPE=PARENT property (value = the goal's UID).
+export const readGoalFlag = (vt) => readMeta(vt, 'is_goal') === '1'
+export const writeGoalFlag = (vt, on) => writeMeta(vt, 'is_goal', on ? '1' : '')
+export const readGoalPlan = (vt) => readMeta(vt, 'goal_plan')
+export const writeGoalPlan = (vt, plan) => writeMeta(vt, 'goal_plan', String(plan || '').trim())
+
+// RFC 5545: RELTYPE defaults to PARENT when the parameter is absent.
+const relIsParent = (p) => {
+  const rt = p.getParameter && p.getParameter('reltype')
+  return !rt || String(rt).toUpperCase() === 'PARENT'
+}
+export function readParentGoal(vt) {
+  for (const p of vt.getAllProperties('related-to')) {
+    if (relIsParent(p)) { const v = p.getFirstValue(); if (v) return String(v) }
+  }
+  return ''
+}
+// Replace only the PARENT link; preserve any foreign RELATED-TO (SIBLING/CHILD).
+export function writeParentGoal(vt, uid) {
+  const keep = vt.getAllProperties('related-to').filter((p) => !relIsParent(p))
+  vt.removeAllProperties('related-to')
+  for (const p of keep) vt.addProperty(p)
+  const u = String(uid || '').trim()
+  if (!u) return
+  const p = new ICAL.Property('related-to')
+  p.setParameter('reltype', 'PARENT')
+  p.setValue(u)
+  vt.addProperty(p)
 }
