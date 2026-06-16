@@ -21,6 +21,11 @@ const cleanTags = (t) => [...new Set((Array.isArray(t) ? t : []).map((x) => Stri
 const LIST_TTL = 15000
 const listCache = new Map() // userId -> { at, notes }
 const invalidate = (userId) => listCache.delete(userId)
+// Per-(path,etag) front-matter tag cache: re-listing only re-reads notes whose
+// content actually changed (PROPFIND already returns each note's etag). NOT cleared
+// on writes — a changed note gets a new etag and is re-read; the rest are reused,
+// turning the per-note read fan-out into ~0 reads in steady state.
+const tagCache = new Map() // userId -> Map<path, { etag, tags }>
 
 const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
 const join = (...p) => p.map(trimSlashes).filter(Boolean).join('/')
@@ -147,12 +152,22 @@ export async function listNotes(userId) {
     await Promise.all(subdirs.slice(0, 400).map((d) => walk(d, depth + 1))) // siblings in parallel
   }
   await walk(c.root, 0)
+  let tc = tagCache.get(userId); if (!tc) { tc = new Map(); tagCache.set(userId, tc) }
+  const seen = new Set()
   const notes = await Promise.all(files.map(async (f) => {
-    const rel = trimSlashes(f.path).slice(c.root.length + 1)
+    const fp = trimSlashes(f.path)
+    seen.add(fp)
+    const rel = fp.slice(c.root.length + 1)
     let tags = []
-    try { tags = cleanTags(parseNote(await dav.readText(c.account, trimSlashes(f.path))).meta.tags) } catch { /* skip a failing read */ }
-    return { path: trimSlashes(f.path), title: titleOf(f.path), folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', tags, updated: f.mtime, etag: f.etag, size: f.size }
+    const hit = tc.get(fp)
+    if (hit && f.etag && hit.etag === f.etag) tags = hit.tags // unchanged → reuse, skip the read
+    else {
+      try { tags = cleanTags(parseNote(await dav.readText(c.account, fp)).meta.tags) } catch { /* skip a failing read */ }
+      if (f.etag) tc.set(fp, { etag: f.etag, tags })
+    }
+    return { path: fp, title: titleOf(f.path), folder: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', tags, updated: f.mtime, etag: f.etag, size: f.size }
   }))
+  for (const k of tc.keys()) if (!seen.has(k)) tc.delete(k) // forget notes that no longer exist
   notes.sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
   listCache.set(userId, { at: Date.now(), notes })
   return notes

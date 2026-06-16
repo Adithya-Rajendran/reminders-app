@@ -45,11 +45,36 @@ async function assertEgressAllowed(urlStr) {
   else { try { addrs = await dns.lookup(host, { all: true }) } catch { const e = new Error('host did not resolve'); e.status = 400; throw e } }
   for (const a of addrs) if (ipBlocked(a.address)) { const e = new Error('destination address not allowed'); e.status = 400; throw e }
 }
+// Bound every outbound CalDAV/WebDAV call so a hung Nextcloud can't pin a request
+// (or a poller tick) open indefinitely. 0 disables. (tsdav's own reads use undici's
+// default timeouts; this covers all the raw safeFetch GET/PUT/DELETE/PROPFIND paths.)
+const FETCH_TIMEOUT_MS = Number(process.env.CALDAV_TIMEOUT_MS) || 15000
+
 // Guarded fetch: vet the destination, and never follow redirects (a redirect
 // could bounce an allowed host to a blocked internal one / enable DNS rebinding).
 export async function safeFetch(url, opts = {}) {
   await assertEgressAllowed(url)
-  return fetch(url, { ...opts, redirect: 'error' })
+  // Honor a caller-supplied signal (don't double-arm); otherwise apply the timeout.
+  if (opts.signal || FETCH_TIMEOUT_MS <= 0) return fetch(url, { ...opts, redirect: 'error' })
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
+  try { return await fetch(url, { ...opts, redirect: 'error', signal: ac.signal }) }
+  finally { clearTimeout(timer) }
+}
+
+// Collection ctag (CalendarServer getctag, sync-token fallback) — a cheap Depth:0
+// PROPFIND whose value changes whenever ANY object in the collection changes. Lets
+// the task cache skip a full REPORT+parse for an unchanged list. Returns null if the
+// server reports neither (caller then falls back to a full fetch — fail open).
+export async function collectionCtag(acc, url) {
+  const body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">'
+    + '<d:prop><cs:getctag/><d:sync-token/></d:prop></d:propfind>'
+  const r = await safeFetch(url, { method: 'PROPFIND', headers: { Authorization: authHeader(acc), Depth: '0', 'Content-Type': 'application/xml' }, body })
+  if (!r.ok && r.status !== 207) return null
+  const t = await r.text()
+  const m = /<(?:[a-z0-9]+:)?getctag[^>]*>([^<]+)<\/(?:[a-z0-9]+:)?getctag>/i.exec(t)
+    || /<(?:[a-z0-9]+:)?sync-token[^>]*>([^<]+)<\/(?:[a-z0-9]+:)?sync-token>/i.exec(t)
+  return m ? m[1].trim() : null
 }
 
 // tsdav's fetchCalendarObjects defaults to a VEVENT filter, which excludes

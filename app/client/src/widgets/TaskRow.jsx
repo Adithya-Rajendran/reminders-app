@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
 import { usePopover } from '../usePopover.js'
 import { IconTrash, IconBell } from '../icons.jsx'
@@ -11,8 +11,10 @@ const ClockMini = () => (
 )
 
 // An interactive task row: animated complete, inline priority menu + scheduler
-// popover, and a hover-revealed delete affordance.
-export default function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority }) {
+// popover, and a hover-revealed delete affordance. Memoized: the handlers from
+// useTaskList are stable, so a row only re-renders when its own `task` changes —
+// editing/typing elsewhere in a list no longer re-renders every sibling row.
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority }) {
   const [burst, setBurst] = useState(false)
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
@@ -55,6 +57,8 @@ export default function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPri
     </div>
   )
 }
+
+export default memo(TaskRow)
 
 function PriorityControl({ value, onSet }) {
   const [open, setOpen] = useState(false)

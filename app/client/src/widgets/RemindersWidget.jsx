@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { tk, reminderGroups } from '../api.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { reminderGroups } from '../api.js'
 import { useTaskList } from '../useTasks.js'
+import { selectReminders, labelGroup } from '../taskviews.js'
 import { createTask, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { recentGroups, pushRecentGroup } from '../groups.js'
@@ -13,28 +14,18 @@ import { IconBell, IconClock, IconPlus, IconChevR } from '../icons.jsx'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
 
-function nextRemind(t) {
-  const times = (t.reminders || []).map((r) => new Date(r.reminder).getTime()).filter((n) => !isNaN(n))
-  return times.length ? Math.min(...times) : Infinity
-}
 function defaultWhen() {
   const d = new Date(Date.now() + 3600e3); d.setSeconds(0, 0); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5); return d.toISOString()
 }
-const groupOf = (t) => (t.labels && t.labels[0] && t.labels[0].title) || ''
-const hasGroup = (t, g) => (t.labels || []).some((l) => (l.title || '') === g)
 
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
 export default function RemindersWidget({ events, projects, group, onNewGroup }) {
   const inboxId = projects?.[0]?.id
-  const loader = useCallback(async () => {
-    const all = await tk('/tasks?per_page=200')
-    let list = (Array.isArray(all) ? all : []).filter((t) => !t.done && (t.reminders || []).length > 0)
-    if (group) list = list.filter((t) => hasGroup(t, group))
-    return list.sort((a, b) => nextRemind(a) - nextRemind(b))
-  }, [group])
-  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(loader)
+  // Derive from the shared task store (one /api/tasks fetch for the whole board).
+  const selector = useCallback((all) => selectReminders(all, group), [group])
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
 
   const [draft, setDraft] = useState('')
   const [qaGroup, setQaGroup] = useState('')
@@ -79,23 +70,39 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     }
   }
 
-  const fired = new Set()
-  ;(events || []).forEach((e) => { const ev = e?.data?.event; const t = ev?.data?.task; if (t && /reminder|overdue/i.test(ev?.event_name || '')) fired.add(t.id) })
+  // Reminders the SSE feed has already fired, so the matching rows can flash.
+  const fired = useMemo(() => {
+    const s = new Set()
+    ;(events || []).forEach((e) => { const ev = e?.data?.event; const t = ev?.data?.task; if (t && /reminder|overdue/i.test(ev?.event_name || '')) s.add(t.id) })
+    return s
+  }, [events])
 
   const chip = dueChip(when); const t = timeLabel(when)
   // Only calendar-coupled groups count; uncoupled tags fold into the default group.
-  const isGroup = (name) => knownGroups.includes(name)
-  const displayGroup = (task) => { const g = groupOf(task); return isGroup(g) ? g : '' }
+  const isGroup = useCallback((name) => knownGroups.includes(name), [knownGroups])
   const allGroups = [...knownGroups].sort()
   const recent = recentGroups().filter((g) => allGroups.includes(g))
 
-  // Hide chips for tags that aren't real (coupled) groups so a folded reminder
-  // doesn't show a stray group chip while sitting in "No group". The handlers don't
-  // read labels, so passing the chip-filtered copy is safe.
-  const shown = (task) => ({ ...task, labels: (task.labels || []).filter((l) => isGroup(l.title || l)) })
-  const row = (task) => (
-    <div key={task.id} className={fired.has(task.id) ? 'reminding' : ''}>
-      <TaskRow task={shown(task)} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
+  // Pre-filter chips (hide tags that aren't real, coupled groups) and bucket by
+  // group ONCE per task/groups change, so rows keep stable identity across
+  // unrelated re-renders (typing in the quick-add box no longer re-renders rows).
+  // The handlers don't read labels, so passing the chip-filtered copy is safe.
+  const shownTasks = useMemo(() => tasks.map((task) => {
+    const raw = labelGroup(task)
+    return {
+      st: { ...task, labels: (task.labels || []).filter((l) => isGroup(l.title || l)) },
+      key: isGroup(raw) ? raw : '',
+    }
+  }), [tasks, isGroup])
+  const groups = useMemo(() => {
+    const g = {}
+    for (const { st, key } of shownTasks) (g[key] ||= []).push(st)
+    return g
+  }, [shownTasks])
+
+  const renderRow = (st) => (
+    <div key={st.id} className={fired.has(st.id) ? 'reminding' : ''}>
+      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
     </div>
   )
 
@@ -105,10 +112,8 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   else if (tasks.length === 0) {
     body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, pick a group and a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
   } else if (group) {
-    body = <div className="task-stream">{tasks.map(row)}</div> // locked → flat list
+    body = <div className="task-stream">{shownTasks.map(({ st }) => renderRow(st))}</div> // locked → flat list
   } else {
-    const groups = {}
-    for (const task of tasks) (groups[displayGroup(task)] ||= []).push(task)
     const groupKeys = Object.keys(groups).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
     body = groupKeys.map((g) => {
       const key = g || '__none'; const isCol = collapsed.has(key)
@@ -119,7 +124,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
             <span className="g-title">{g || 'No group'}</span>
             <span className="g-count">{groups[g].length}</span>
           </button>
-          {!isCol && <div className="task-stream">{groups[g].map(row)}</div>}
+          {!isCol && <div className="task-stream">{groups[g].map(renderRow)}</div>}
         </div>
       )
     })
