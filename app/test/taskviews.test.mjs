@@ -126,11 +126,14 @@ ok(selectFlowSource(flowTasks).map((t) => t.id).join() === 'f1,f2,f3,f6', 'selec
 ok(selectFlowSource(flowTasks, 'Work').map((t) => t.id).join() === 'f6', 'selectFlowSource: filters to a group')
 
 // ---- dueBucket ----
-ok(dueBucket(iso(-2 * DAY)).k === 'overdue', 'dueBucket: past -> overdue')
-ok(dueBucket(iso(2 * 3600e3)).k === 'today', 'dueBucket: later today -> today')
-ok(dueBucket(iso(1 * DAY + 3600e3)).k === 'tomorrow', 'dueBucket: ~+1 day -> tomorrow')
-ok(dueBucket(iso(3 * DAY)).k === 'week', 'dueBucket: +3 days -> this week')
-ok(dueBucket(iso(10 * DAY)).k === 'later', 'dueBucket: +10 days -> later')
+// Anchor to local noon N days out so the buckets don't flip near midnight (a raw
+// now+offset crosses the day boundary in the last hours of the day -> flaky CI).
+const atDay = (n) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.toISOString() }
+ok(dueBucket(atDay(-2)).k === 'overdue', 'dueBucket: past -> overdue')
+ok(dueBucket(atDay(0)).k === 'today', 'dueBucket: later today -> today')
+ok(dueBucket(atDay(1)).k === 'tomorrow', 'dueBucket: ~+1 day -> tomorrow')
+ok(dueBucket(atDay(3)).k === 'week', 'dueBucket: +3 days -> this week')
+ok(dueBucket(atDay(10)).k === 'later', 'dueBucket: +10 days -> later')
 ok(UPCOMING_ORDER.join() === 'overdue,today,tomorrow,week,later', 'UPCOMING_ORDER is the display order')
 
 console.log(`\ntaskviews.test: ${pass} passed, ${fail} failed`)

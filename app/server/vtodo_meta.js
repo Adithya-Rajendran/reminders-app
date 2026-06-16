@@ -31,11 +31,20 @@ function getXText(vt, name) {
   return v == null ? '' : String(v)
 }
 function setXText(vt, name, value) {
-  // Store verbatim like the existing x-reminders-repeat-* props: unknown X-props
-  // round-trip as a single opaque value (no comma-splitting / escaping surprises).
   vt.removeAllProperties(name)
   const s = value == null ? '' : String(value)
-  if (s) vt.updatePropertyWithValue(name, s)
+  if (!s) return
+  // Force VALUE=TEXT so ical.js escapes commas/semicolons on the wire (\, \;).
+  // Without this, updatePropertyWithValue emits the value unescaped: ical.js can
+  // still read it back, but RFC-compliant CalDAV servers (e.g. Radicale) treat an
+  // unescaped comma in a TEXT value as a value separator and TRUNCATE it on
+  // re-serialize — silently losing everything after the first comma. That breaks
+  // any value that can contain commas: a cue/goal_plan with prose, and the flow
+  // JSON ({"x":..,"y":..,"to":[..]}) which always has them.
+  const p = new ICAL.Property(name)
+  p.resetType('text')
+  p.setValue(s)
+  vt.addProperty(p)
 }
 
 // ---- DESCRIPTION fence (fallback storage) ----
