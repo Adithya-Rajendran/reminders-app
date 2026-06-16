@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -52,6 +52,17 @@ const cueTasks = [
 ]
 ok(hasCue({ cue: 'x' }) === true && hasCue({ cue: '  ' }) === false && hasCue({}) === false, 'hasCue: non-empty trimmed cue only')
 ok(selectCued(cueTasks).map((t) => t.id).join() === 'c1,c5', 'selectCued: open tasks with a real cue')
+
+// ---- selectHabits / isRecurringTask ----
+const habitTasks = [
+  { id: 'h1', done: false, repeat_after: 86400 },     // daily -> habit
+  { id: 'h2', done: false, repeat_mode: 1 },           // monthly mode -> habit
+  { id: 'h3', done: false, repeat_mode: 2 },           // custom-from-completion -> habit
+  { id: 'h4', done: false, repeat_after: 0 },          // not recurring
+  { id: 'h5', done: true, repeat_after: 86400 },       // recurring but done (COUNT exhausted) -> excluded
+]
+ok(isRecurringTask({ repeat_after: 86400 }) === true && isRecurringTask({ repeat_after: 0 }) === false, 'isRecurringTask: repeat_after > 0')
+ok(selectHabits(habitTasks).map((t) => t.id).join() === 'h1,h2,h3', 'selectHabits: open recurring tasks only')
 
 // ---- dueBucket ----
 ok(dueBucket(iso(-2 * DAY)).k === 'overdue', 'dueBucket: past -> overdue')

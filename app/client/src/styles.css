@@ -1582,3 +1582,19 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cue-pop { padding: 8px; min-width: 230px; }
 .cue-input { width: 100%; }
 .cue-pop-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+
+/* Habits widget — streak / consistency dots / automaticity bar */
+.habit { display: flex; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+.habit:last-child { border-bottom: none; }
+.habit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.habit-title { display: flex; align-items: center; gap: 8px; }
+.habit-title .t { font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.habit-streak { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--faint); }
+.habit-streak.on { color: var(--warn); }
+.habit-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.hdot { width: 12px; height: 12px; border-radius: 4px; background: var(--line-strong); }
+.hdot.done { background: var(--green); }
+.habit-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.habit-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }

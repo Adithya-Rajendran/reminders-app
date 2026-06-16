@@ -84,3 +84,28 @@ export function writeMeta(vt, key, value) {
 // ---- cue (implementation intention) ----
 export const readCue = (vt) => readMeta(vt, 'cue')
 export const writeCue = (vt, cue) => writeMeta(vt, 'cue', String(cue || '').trim())
+
+// ---- habit completion log ----
+// A recurring task's completions are NOT otherwise recoverable: advancing a
+// recurrence date-shifts the master and reopens it (no STATUS:COMPLETED, no
+// RECURRENCE-ID overrides). We append the completion DAY to X-REMINDERS-HABIT-LOG
+// so streak/consistency can be reconstructed from CalDAV alone. Stored as a
+// space-separated list of YYYY-MM-DD, deduped, sorted, capped to the last N days.
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+const HABIT_CAP = 400
+
+export function readHabitLog(vt) {
+  const raw = readMeta(vt, 'habit_log')
+  if (!raw) return []
+  // tolerate space- or comma-separated (forward/back compatible)
+  return [...new Set(String(raw).split(/[\s,]+/).map((s) => s.trim()).filter((s) => YMD_RE.test(s)))].sort()
+}
+export function writeHabitLog(vt, dates, cap = HABIT_CAP) {
+  const uniq = [...new Set((dates || []).map(String).filter((s) => YMD_RE.test(s)))].sort()
+  writeMeta(vt, 'habit_log', uniq.slice(-cap).join(' '))
+}
+// Append one completion day (idempotent per day). `ymd` is 'YYYY-MM-DD'.
+export function appendHabitLog(vt, ymd, cap = HABIT_CAP) {
+  if (!YMD_RE.test(String(ymd))) return
+  writeHabitLog(vt, [...readHabitLog(vt), String(ymd)], cap)
+}

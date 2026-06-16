@@ -34,6 +34,13 @@ export function selectCued(tasks) {
   return tasks.filter((t) => !t.done && hasCue(t))
 }
 
+// Habits view: open recurring tasks (RRULE-backed or custom-from-completion).
+// Their completion history lives in X-REMINDERS-HABIT-LOG (see habitstats.js).
+export const isRecurringTask = (t) => (Number(t.repeat_after) > 0) || t.repeat_mode === 1 || t.repeat_mode === 2
+export function selectHabits(tasks) {
+  return tasks.filter((t) => !t.done && isRecurringTask(t))
+}
+
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 // Relative day bucket for the Upcoming list.
 export function dueBucket(due) {

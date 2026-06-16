@@ -7,7 +7,7 @@ import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
-import { readCue, writeCue, cleanDescription } from './vtodo_meta.js'
+import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -43,6 +43,7 @@ export function serializeVtodo(vt, listId, objectUrl) {
     priority: icalToOur(vt.getFirstPropertyValue('priority')),
     repeat_after: rep.repeat_after, repeat_mode: rep.repeat_mode,
     cue: readCue(vt),
+    habit_log: readHabitLog(vt),
     reminders: readReminders(vt), labels: readCategories(vt),
     created: created ? outTs(created.toJSDate()) : ZERO, updated: updated ? outTs(updated.toJSDate()) : ZERO,
   }
@@ -223,7 +224,17 @@ export async function patchTask(req, res) {
       if ('reminders' in b) applyReminders(vt, b.reminders)
       if ('done' in b) {
         const curDone = String(vt.getFirstPropertyValue('status') || '').toUpperCase() === 'COMPLETED'
-        if (b.done && !curDone && isRecurring(vt)) { registerTimezones(vcal); advanceRecurringVtodo(vt, ICAL.Time.now()) }
+        if (b.done && !curDone && isRecurring(vt)) {
+          registerTimezones(vcal)
+          const now = ICAL.Time.now()
+          const res = advanceRecurringVtodo(vt, now)
+          // Record the completion day for habit streaks — but only when an
+          // occurrence was actually completed (advanced to the next one, or the
+          // final one for a finite recurrence). A no-op advance (e.g. no anchor)
+          // didn't complete anything, so it must not be logged. Fires exactly
+          // once per real completion → no double-count against the wire path.
+          if (res.advanced || res.done) appendHabitLog(vt, now.toJSDate().toISOString().slice(0, 10))
+        }
         else if (b.done) { vt.updatePropertyWithValue('status', 'COMPLETED'); vt.updatePropertyWithValue('percent-complete', 100); vt.updatePropertyWithValue('completed', ICAL.Time.now()) }
         else { vt.updatePropertyWithValue('status', 'NEEDS-ACTION'); vt.updatePropertyWithValue('percent-complete', 0); vt.removeAllProperties('completed') }
       }
