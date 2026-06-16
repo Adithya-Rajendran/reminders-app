@@ -28,6 +28,12 @@ export function selectUpcoming(tasks) {
   return tasks.filter((t) => !t.done && isRealDate(t.due_date))
 }
 
+// Cues view: open tasks carrying an implementation-intention cue ("when X -> do Y").
+export const hasCue = (t) => !!(t && typeof t.cue === 'string' && t.cue.trim())
+export function selectCued(tasks) {
+  return tasks.filter((t) => !t.done && hasCue(t))
+}
+
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 // Relative day bucket for the Upcoming list.
 export function dueBucket(due) {

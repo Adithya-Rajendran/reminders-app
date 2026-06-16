@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -41,6 +41,17 @@ const upTasks = [
   { id: 'd', done: false, due_date: '' },                 // no date -> excluded
 ]
 ok(selectUpcoming(upTasks).map((t) => t.id).join() === 'a', 'selectUpcoming: open, real-dated only')
+
+// ---- selectCued / hasCue ----
+const cueTasks = [
+  { id: 'c1', done: false, cue: 'after morning erg' },
+  { id: 'c2', done: false, cue: '   ' },          // whitespace-only -> not a cue
+  { id: 'c3', done: false },                       // no cue
+  { id: 'c4', done: true, cue: 'after lunch' },    // done -> excluded
+  { id: 'c5', done: false, cue: 'before bed' },
+]
+ok(hasCue({ cue: 'x' }) === true && hasCue({ cue: '  ' }) === false && hasCue({}) === false, 'hasCue: non-empty trimmed cue only')
+ok(selectCued(cueTasks).map((t) => t.id).join() === 'c1,c5', 'selectCued: open tasks with a real cue')
 
 // ---- dueBucket ----
 ok(dueBucket(iso(-2 * DAY)).k === 'overdue', 'dueBucket: past -> overdue')

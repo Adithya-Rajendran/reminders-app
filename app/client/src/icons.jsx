@@ -175,6 +175,13 @@ export const IconChart = (p) => (
     <path d="M8 17v-5M13 17V8M18 17v-8" />
   </Icon>
 )
+export const IconCue = (p) => (
+  <Icon {...p}>
+    <path d="M4 12h12" />
+    <path d="M13 7l5 5-5 5" />
+    <circle cx="4" cy="12" r="1.7" fill="currentColor" stroke="none" />
+  </Icon>
+)
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

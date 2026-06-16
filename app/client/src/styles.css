@@ -1573,3 +1573,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rv-prompt-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .rv-prompt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .rv-reviewed { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green); }
+
+/* If-then cue chip + inline editor (TaskRow + Cues widget) */
+.cue-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 220px; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); cursor: pointer; }
+.cue-chip .cue-arrow { font-weight: 800; line-height: 1; }
+.cue-chip > :not(.cue-arrow) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cue-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
+.cue-pop { padding: 8px; min-width: 230px; }
+.cue-input { width: 100%; }
+.cue-pop-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }

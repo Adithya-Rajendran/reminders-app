@@ -14,10 +14,11 @@ const ClockMini = () => (
 // popover, and a hover-revealed delete affordance. Memoized: the handlers from
 // useTaskList are stable, so a row only re-renders when its own `task` changes —
 // editing/typing elsewhere in a list no longer re-renders every sibling row.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue }) {
   const [burst, setBurst] = useState(false)
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
+  const cue = (task.cue || '').trim()
 
   const toggle = () => {
     if (!task.done) { setBurst(true); setTimeout(() => setBurst(false), 480) }
@@ -41,6 +42,9 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority }) {
         <div className="task-sub">
           <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />
           <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
+          {onSetCue
+            ? <CueControl task={task} onSetCue={onSetCue} />
+            : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>}
           {(task.labels || []).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
         </div>
       </div>
@@ -75,6 +79,40 @@ function PriorityControl({ value, onSet }) {
               <span className={`pdot ${p.cls}`} /> {p.label}
             </button>
           ))}
+        </div>
+      )}
+    </span>
+  )
+}
+
+// Inline editor for a task's implementation-intention cue ("after X -> do Y").
+// Shown when a widget passes onSetCue; otherwise TaskRow renders a static chip.
+function CueControl({ task, onSetCue }) {
+  const [open, setOpen] = useState(false)
+  const ref = usePopover(open, setOpen)
+  const [val, setVal] = useState(task.cue || '')
+  const cue = (task.cue || '').trim()
+  const openEdit = () => { setVal(task.cue || ''); setOpen(true) }
+  const save = () => { onSetCue(task, val.trim()); setOpen(false) }
+  return (
+    <span className="inline-ctl" ref={ref}>
+      <button className={`chip cue-chip${cue ? '' : ' empty'}`} title="If-then cue" onClick={() => (open ? setOpen(false) : openEdit())}>
+        <span className="cue-arrow">→</span> {cue || 'cue'}
+      </button>
+      {open && (
+        <div className="mini-menu cue-pop" role="dialog">
+          <input
+            className="input cue-input"
+            autoFocus
+            value={val}
+            placeholder="after morning erg…"
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') setOpen(false) }}
+          />
+          <div className="cue-pop-row">
+            {cue && <button className="btn ghost sm" onClick={() => { onSetCue(task, ''); setOpen(false) }}>Clear</button>}
+            <button className="btn primary sm" onClick={save}>Save</button>
+          </div>
         </div>
       )}
     </span>

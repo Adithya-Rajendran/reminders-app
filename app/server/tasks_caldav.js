@@ -7,6 +7,7 @@ import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
+import { readCue, writeCue, cleanDescription } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -36,11 +37,12 @@ export function serializeVtodo(vt, listId, objectUrl) {
   return {
     id: encodeTaskId(listId, objectUrl), project_id: listId,
     title: String(vt.getFirstPropertyValue('summary') || '(untitled)'),
-    description: String(vt.getFirstPropertyValue('description') || ''),
+    description: cleanDescription(vt),
     done, done_at: done ? outTs(compV ? compV.toJSDate() : new Date()) : ZERO,
     due_date: dueV ? outTs(dueV.toJSDate()) : ZERO,
     priority: icalToOur(vt.getFirstPropertyValue('priority')),
     repeat_after: rep.repeat_after, repeat_mode: rep.repeat_mode,
+    cue: readCue(vt),
     reminders: readReminders(vt), labels: readCategories(vt),
     created: created ? outTs(created.toJSDate()) : ZERO, updated: updated ? outTs(updated.toJSDate()) : ZERO,
   }
@@ -184,6 +186,7 @@ export async function createTask(req, res) {
     vt.updatePropertyWithValue('summary', title)
     vt.updatePropertyWithValue('status', 'NEEDS-ACTION')
     if (b.description) vt.updatePropertyWithValue('description', String(b.description))
+    if (b.cue) writeCue(vt, b.cue)
     const pr = clampPriority(b.priority); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr])
     const due = inDue(b.due_date); if (due) setDue(vt, due)
     if (Array.isArray(b.labels) && b.labels.length) setCategories(vt, b.labels.map((l) => l.title || l).filter(Boolean))
@@ -212,6 +215,7 @@ export async function patchTask(req, res) {
     const out = await getModifyPut(resolved, dec.objectUrl, (vcal, vt) => {
       if ('title' in b) { const t = (b.title || '').trim(); if (!t) { const e = new Error('title cannot be empty'); e.status = 400; throw e } vt.updatePropertyWithValue('summary', t) }
       if ('description' in b) { if (b.description) vt.updatePropertyWithValue('description', String(b.description)); else vt.removeAllProperties('description') }
+      if ('cue' in b) writeCue(vt, b.cue)
       if ('priority' in b) { const pr = clampPriority(b.priority); vt.removeAllProperties('priority'); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr]) }
       if ('due_date' in b) setDue(vt, inDue(b.due_date))
       if ('repeat_after' in b || 'repeat_mode' in b) { const cur = repeatFieldsFromVtodo(vt); applyRepeatFields(vt, 'repeat_after' in b ? b.repeat_after : cur.repeat_after, 'repeat_mode' in b ? b.repeat_mode : cur.repeat_mode) }
