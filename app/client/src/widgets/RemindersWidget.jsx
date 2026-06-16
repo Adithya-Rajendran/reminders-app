@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { reminderGroups } from '../api.js'
 import { useTaskList } from '../useTasks.js'
-import { selectReminders, selectHabits, isRecurringTask, hasGroup, labelGroup } from '../taskviews.js'
-import { createTask, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
+import { selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind } from '../taskviews.js'
+import { createTask, parseQuickAdd, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { recentGroups, pushRecentGroup } from '../groups.js'
 import GroupPicker from '../GroupPicker.jsx'
@@ -29,11 +29,57 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   // tasks carrying a reminder) — so habits live here instead of a separate widget.
   const selector = useCallback((all) => all, [])
   const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
-  const reminders = useMemo(() => selectReminders(allTasks, group).filter((t) => !isRecurringTask(t)), [allTasks, group])
+
+  // Index tasks by UID and group subtasks under their parent (RELATED-TO ⇒
+  // task.goal === parent.uid), so a parent reminder can show progress + nest its
+  // children — the standalone Goals widget folded in here as plain subtasks.
+  const byUid = useMemo(() => {
+    const m = new Map()
+    for (const t of allTasks) if (t.uid) m.set(t.uid, t)
+    return m
+  }, [allTasks])
+  const childrenByParent = useMemo(() => {
+    const m = new Map()
+    for (const t of allTasks) {
+      if (t.goal && byUid.has(t.goal)) { if (!m.has(t.goal)) m.set(t.goal, []); m.get(t.goal).push(t) }
+    }
+    for (const arr of m.values()) arr.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0)) // open first, done last
+    return m
+  }, [allTasks, byUid])
+  const isChild = useCallback((t) => !!(t.goal && byUid.has(t.goal)), [byUid])
+
+  // Top-level reminder rows: open, non-recurring, not a subtask, and either
+  // carrying a reminder, parenting subtasks, or flagged as a goal (so goals show
+  // here with their progress instead of in a separate widget). Soonest first.
+  const reminders = useMemo(() => {
+    let list = allTasks.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal))
+    if (group) list = list.filter((t) => hasGroup(t, group))
+    return list.sort((a, b) => nextRemind(a) - nextRemind(b))
+  }, [allTasks, group, isChild, childrenByParent])
   const habits = useMemo(() => {
-    const h = selectHabits(allTasks)
-    return group ? h.filter((t) => hasGroup(t, group)) : h
-  }, [allTasks, group])
+    let h = selectHabits(allTasks).filter((t) => !isChild(t))
+    if (group) h = h.filter((t) => hasGroup(t, group))
+    return h
+  }, [allTasks, group, isChild])
+
+  // Add a subtask under a parent reminder via RELATED-TO (goal_uid). Reuses the
+  // NL quick-add parser so subtasks accept the same date/priority/label/cue tokens.
+  const addSubtask = useCallback(async (parent, text) => {
+    if (!inboxId || !parent?.uid) return
+    const parsed = parseQuickAdd(text)
+    if (!parsed.title) return
+    try {
+      await createTask(inboxId, {
+        title: parsed.title,
+        priority: parsed.priority || 0,
+        ...(parsed.due_date ? { due_date: parsed.due_date } : {}),
+        ...(parsed.labels?.length ? { labels: parsed.labels } : {}),
+        ...(parsed.cue ? { cue: parsed.cue } : {}),
+        goal_uid: parent.uid,
+      })
+      emitTasksChanged(); load()
+    } catch { /* the list refresh surfaces the result */ }
+  }, [inboxId, load])
 
   const [draft, setDraft] = useState('')
   const [qaGroup, setQaGroup] = useState('')
@@ -105,7 +151,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
 
   const renderRow = (st, showHabit) => (
     <div key={st.id} className={fired.has(st.id) ? 'reminding' : ''}>
-      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} showHabit={showHabit} />
+      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} showHabit={showHabit} childTasks={childrenByParent.get(st.uid)} onAddSubtask={addSubtask} />
     </div>
   )
   const renderSection = (key, title, items, showHabit) => {

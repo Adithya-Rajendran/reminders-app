@@ -3,7 +3,7 @@ import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../taskviews.js'
 import { computeHabitStats, recentDays } from '../habitstats.js'
 import { usePopover } from '../usePopover.js'
-import { IconTrash, IconBell, IconFlame } from '../icons.jsx'
+import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 
 const HABIT_DOTS = 14
@@ -43,52 +43,86 @@ const ClockMini = () => (
 // popover, and a hover-revealed delete affordance. Memoized: the handlers from
 // useTaskList are stable, so a row only re-renders when its own `task` changes —
 // editing/typing elsewhere in a list no longer re-renders every sibling row.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, showHabit }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, showHabit, childTasks, onAddSubtask }) {
   const [burst, setBurst] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [subDraft, setSubDraft] = useState('')
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
   const cue = (task.cue || '').trim()
   const habit = showHabit && isRecurringTask(task)
+  const kids = childTasks || []
+  const total = kids.length
+  const doneKids = kids.filter((k) => k.done).length
+  const pct = total ? Math.round((doneKids / total) * 100) : 0
+  const canSubtask = !!onAddSubtask
 
   const toggle = () => {
     if (!task.done) { setBurst(true); setTimeout(() => setBurst(false), 480) }
     onToggle(task)
   }
+  const submitSub = (e) => {
+    e.preventDefault()
+    const v = subDraft.trim()
+    if (!v) return
+    setSubDraft('')
+    onAddSubtask(task, v)
+  }
 
   return (
-    <div className={`task${task.done ? ' checked' : ''}`}>
-      <button
-        className={`check-btn${task.done ? ' on' : ''}${burst ? ' burst' : ''}`}
-        role="checkbox"
-        aria-checked={!!task.done}
-        aria-label={`Complete: ${task.title}`}
-        onClick={toggle}
-      />
-      <div className="task-main">
-        <div className="task-title">
-          <span className="t">{task.title}</span>
-          {repeats && <span className="repeat-badge" title="Repeating task">↻</span>}
-        </div>
-        <div className="task-sub">
-          <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />
-          <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
-          {onSetCue
-            ? <CueControl task={task} onSetCue={onSetCue} />
-            : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>}
-          {isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
-          {(task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
-        </div>
-        {habit && <HabitStrip task={task} />}
-      </div>
-      {onDelete && (
+    <div className="task-wrap">
+      <div className={`task${task.done ? ' checked' : ''}`}>
         <button
-          className="iconbtn sm task-del danger-hover"
-          title="Delete task"
-          aria-label={`Delete: ${task.title}`}
-          onClick={() => onDelete(task)}
-        >
-          <IconTrash size={15} />
-        </button>
+          className={`check-btn${task.done ? ' on' : ''}${burst ? ' burst' : ''}`}
+          role="checkbox"
+          aria-checked={!!task.done}
+          aria-label={`Complete: ${task.title}`}
+          onClick={toggle}
+        />
+        <div className="task-main">
+          <div className="task-title">
+            <span className="t">{task.title}</span>
+            {repeats && <span className="repeat-badge" title="Repeating task">↻</span>}
+          </div>
+          <div className="task-sub">
+            <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />
+            <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
+            {onSetCue
+              ? <CueControl task={task} onSetCue={onSetCue} />
+              : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>}
+            {isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
+            {(task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
+            {canSubtask && (
+              <button type="button" className={`chip subtask-chip${total ? '' : ' empty'}`} aria-expanded={expanded} title={total ? `${doneKids}/${total} subtasks done` : 'Add a subtask'} onClick={() => setExpanded((e) => !e)}>
+                <IconChevR size={11} className={`rem-chev${expanded ? ' open' : ''}`} />
+                {total ? `${doneKids}/${total}` : '+ subtask'}
+              </button>
+            )}
+            {total > 0 && <span className="subtask-bar" aria-hidden="true"><span className="subtask-fill" style={{ width: `${pct}%` }} /></span>}
+          </div>
+          {habit && <HabitStrip task={task} />}
+        </div>
+        {onDelete && (
+          <button
+            className="iconbtn sm task-del danger-hover"
+            title="Delete task"
+            aria-label={`Delete: ${task.title}`}
+            onClick={() => onDelete(task)}
+          >
+            <IconTrash size={15} />
+          </button>
+        )}
+      </div>
+      {expanded && canSubtask && (
+        <div className="task-children">
+          {kids.map((c) => (
+            <TaskRow key={c.id} task={c} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} />
+          ))}
+          <form className="add-row qa subtask-add" onSubmit={submitSub}>
+            <input className="rem-text" value={subDraft} onChange={(e) => setSubDraft(e.target.value)} placeholder="Add a subtask…" aria-label="Add a subtask" />
+            <button type="submit" className="iconbtn sm" aria-label="Add subtask" title="Add subtask"><IconPlus size={15} /></button>
+          </form>
+        </div>
       )}
     </div>
   )

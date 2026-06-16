@@ -1057,6 +1057,16 @@ body {
 .due-chip svg { opacity: .8; }
 .label-chip { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
+/* subtasks (folded-in Goals): expand/progress chip on a parent + nested rows */
+.task-wrap { display: flex; flex-direction: column; }
+.task-children { margin: 2px 0 6px 30px; padding-left: 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+.subtask-chip { cursor: pointer; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 3px; }
+.subtask-chip:hover { border-color: var(--accent); }
+.subtask-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
+.subtask-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.subtask-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+.subtask-add { margin-top: 4px; }
+
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 70;
   background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 12px;
