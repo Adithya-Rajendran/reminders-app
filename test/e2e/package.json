@@ -1,0 +1,14 @@
+{
+  "name": "reminders-app-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "End-to-end (Playwright) harness for reminders-app. Isolated from app/ so the app lockfile and the framework-free node unit tests are untouched.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "e2e": "bash run.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

@@ -72,7 +72,16 @@ export default function FrogWidget() {
               <div className="eq-head"><span className="eq-label">{q.label}</span><span className="eq-count">{quads[q.k].length}</span></div>
               <div className="eq-sub">{q.sub}</div>
               <div className="eq-list">
-                {quads[q.k].slice(0, 8).map((t) => <div className="eq-item" key={t.id} title={t.title}>{t.title}</div>)}
+                {quads[q.k].slice(0, 8).map((t) => {
+                  const c = dueChip(t.due_date)
+                  return (
+                    <div className="eq-item" key={t.id} title={t.title}>
+                      <span className={`pdot ${pdotClass(t.priority || 0)}`} />
+                      <span className="eq-item-t">{t.title}</span>
+                      {c && <span className={`chip ${c.cls}`}>{c.label}</span>}
+                    </div>
+                  )
+                })}
                 {quads[q.k].length === 0 && <div className="eq-empty">—</div>}
               </div>
             </div>

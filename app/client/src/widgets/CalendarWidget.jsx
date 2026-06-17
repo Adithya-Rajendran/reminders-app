@@ -142,7 +142,7 @@ export default function CalendarWidget() {
   // Drag / resize of an event -> PATCH in place; revert tasks and on failure.
   const onEventChange = async (arg) => {
     const p = arg.event.extendedProps
-    // Drag a Vikunja task on the calendar -> reschedule its due date.
+    // Drag a task on the calendar -> reschedule its due date.
     if (p.kind === 'task' && p.source === 'local') {
       try { await tk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }); emitTasksChanged() }
       catch { arg.revert() }

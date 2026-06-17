@@ -1,0 +1,7 @@
+# e2e harness runtime artifacts (generated; never committed)
+.state/
+.venv/
+node_modules/
+playwright-report/
+test-results/
+.cache/

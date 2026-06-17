@@ -108,16 +108,31 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
 
   const add = async (e) => {
     e.preventDefault()
-    const title = draft.trim()
-    if (!title || !inboxId) return
+    const raw = draft.trim()
+    if (!raw || !inboxId) return
     setErr(''); setDraft('')
+    // Parse the same Quick-Add tokens subtasks already accept (date word, !priority,
+    // *label, "-> cue") so capture is one keystroke-friendly line. A typed date wins
+    // over the When picker; otherwise the picker time is used. Inline *labels merge
+    // with the picked group (group first, so server group-routing still applies).
+    const parsed = parseQuickAdd(raw)
+    const title = parsed.title || raw
+    const due = parsed.due_date || when
     const g = group || qaGroup.trim() // locked widget forces its group
+    const labels = [...new Set([...(g ? [g] : []), ...(parsed.labels || [])])]
     try {
-      await createTask(inboxId, { title, due_date: when, reminders: [{ reminder: when }], ...(g ? { labels: [g] } : {}) })
+      await createTask(inboxId, {
+        title,
+        priority: parsed.priority || 0,
+        due_date: due,
+        reminders: [{ reminder: due }],
+        ...(labels.length ? { labels } : {}),
+        ...(parsed.cue ? { cue: parsed.cue } : {}),
+      })
       if (g) pushRecentGroup(g)
       setWhen(defaultWhen()); emitTasksChanged(); load()
     } catch (e2) {
-      setDraft(title)
+      setDraft(raw)
       let msg = 'Could not add reminder.'
       try { msg = JSON.parse(e2.message).error || msg } catch { /* keep default */ }
       setErr(msg)
