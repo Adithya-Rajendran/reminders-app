@@ -8,6 +8,8 @@ import { api, tk } from '../api.js'
 import { ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged } from '../tasksbus.js'
 import { subscribe, ensureLoaded } from '../taskstore.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atMostW, atLeastW } from '../widgetsize.js'
 import { IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../icons.jsx'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
@@ -36,7 +38,12 @@ export default function CalendarWidget() {
   const wrapRef = useRef(null)
   const [accounts, setAccounts] = useState([])
   const [modal, setModal] = useState(null) // null | { mode, key, initial }
-  const [size, setSize] = useState('full') // 'full' | 'compact' | 'mini' — by widget width
+
+  // Size class comes from the shared widget-size system (one observer in the
+  // frame), so the toolbar, view, and compact styling adapt with the widget.
+  const sz = useWidgetSize()
+  const mini = atMostW(sz, 'sm')  // narrow column: agenda + minimal toolbar
+  const full = atLeastW(sz, 'lg') // roomy: full view switcher, no compaction
 
   // Enabled CalDAV lists, flattened, for the create-modal <select>.
   const calendars = useMemo(() => {
@@ -54,24 +61,29 @@ export default function CalendarWidget() {
     api('/api/caldav/accounts').then((r) => setAccounts(r.accounts || [])).catch(() => {})
   }, [])
 
-  // Keep FullCalendar's internal sizing in sync with the resizable widget frame,
-  // and collapse the header toolbar (view switcher) when the widget gets narrow.
+  // FullCalendar sizes to its container but only re-measures on WINDOW resize, so
+  // nudge it whenever the (container-only) widget frame resizes. This observer is
+  // purely that imperative sync — all size-class/content decisions come from the
+  // shared hook above, so the classification logic isn't duplicated here.
   useEffect(() => {
     const el = wrapRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver((entries) => {
-      calRef.current?.getApi().updateSize()
-      const w = entries[0]?.contentRect?.width || el.clientWidth
-      setSize(w < 360 ? 'mini' : w < 540 ? 'compact' : 'full')
-    })
+    const ro = new ResizeObserver(() => calRef.current?.getApi().updateSize())
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
+  // A month grid is unreadable in a narrow column, so switch to the agenda list
+  // when mini and back to the month grid otherwise (the view switcher is hidden
+  // while mini, so this is the only way to pick a view at that size).
+  useEffect(() => {
+    calRef.current?.getApi().changeView(mini ? 'listWeek' : 'dayGridMonth')
+  }, [mini])
+
   // As the widget narrows, first shrink the toolbar (compact CSS) so the view
   // buttons fit on one row and stay out of the way; only when it's really small
-  // (<360px) drop the view switcher entirely, leaving prev/next + the title.
-  const headerToolbar = size === 'mini'
+  // drop the view switcher entirely, leaving prev/next + the title.
+  const headerToolbar = mini
     ? { left: 'prev,next', center: 'title', right: 'today' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
 
@@ -195,7 +207,7 @@ export default function CalendarWidget() {
   }
 
   return (
-    <div className={`cal-wrap${size !== 'full' ? ' cal-compact' : ''}`} ref={wrapRef}>
+    <div className={`cal-wrap${!full ? ' cal-compact' : ''}`} ref={wrapRef}>
       <FullCalendar
         ref={calRef}
         plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}

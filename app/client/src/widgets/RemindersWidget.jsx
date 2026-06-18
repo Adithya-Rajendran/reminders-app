@@ -5,6 +5,8 @@ import { selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind } from 
 import { createTask, parseQuickAdd, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { recentGroups, pushRecentGroup } from '../groups.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atMostW, atLeastH } from '../widgetsize.js'
 import GroupPicker from '../GroupPicker.jsx'
 import TaskRow from './TaskRow.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
@@ -90,6 +92,13 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   const [collapsed, setCollapsed] = useState(() => loadStringSet(COLLAPSE_KEY))
   const whenRef = useRef(null)
 
+  // Narrow: trim the quick-add to one capture line (the group + time pickers don't
+  // fit and have sensible defaults) and drop the collapsible section chrome for a
+  // single flat stream. Tall: ignore the saved collapse state so everything's open.
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm')
+  const forceExpand = atLeastH(sz, 'lg')
+
   const toggleGroup = (key) => setCollapsed((prev) => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
@@ -170,7 +179,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     </div>
   )
   const renderSection = (key, title, items, showHabit) => {
-    const isCol = collapsed.has(key)
+    const isCol = !forceExpand && collapsed.has(key)
     return (
       <div key={key} className="rem-group-sec">
         <button type="button" className="group-head rem-head" aria-expanded={!isCol} title={isCol ? 'Expand section' : 'Minimize section'} onClick={() => toggleGroup(key)}>
@@ -185,12 +194,16 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   // Recurring tasks surface as a Habits section (with an inline consistency strip)
   // above the reminder groups — the standalone Habits widget folded in here.
   const habitsSec = shownHabits.length ? renderSection('__habits', <><IconFlame size={13} /> Habits</>, shownHabits, true) : null
+  const flatHabits = shownHabits.length ? <div className="task-stream">{shownHabits.map((st) => renderRow(st, true))}</div> : null
 
   let body
   if (state === 'loading') body = <SkeletonRows />
   else if (state === 'error') body = <ErrorState onRetry={load} />
   else if (reminders.length === 0 && habits.length === 0) {
     body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, pick a group and a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
+  } else if (compact) {
+    // Narrow: one flat stream (habits then reminders), no section headers.
+    body = <>{flatHabits}<div className="task-stream">{shownTasks.map(({ st }) => renderRow(st))}</div></>
   } else if (group) {
     body = <>{habitsSec}<div className="task-stream">{shownTasks.map(({ st }) => renderRow(st))}</div></> // locked → flat list
   } else {
@@ -204,7 +217,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
         <form className="add-row qa rem-add" onSubmit={add}>
           <IconBell size={16} />
           <input className="rem-text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={group ? `Add to ${group}…` : 'Remind me to…'} aria-label="Add a reminder" />
-          {!group && (
+          {!group && !compact && (
             <GroupPicker
               value={qaGroup}
               groups={allGroups}
@@ -214,14 +227,16 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
               neutral={{ label: 'No group', value: '' }}
             />
           )}
-          <span className="inline-ctl">
-            <button type="button" ref={whenRef} className="chip due-chip due-soon" aria-haspopup="dialog" title="When to remind me" onClick={() => setPickOpen((o) => !o)}>
-              <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}
-            </button>
-            {pickOpen && (
-              <DateTimePicker anchorRef={whenRef} value={when} hasReminder onApply={({ due_date }) => { if (due_date && due_date !== ZERO_DATE) setWhen(due_date); setPickOpen(false) }} onClose={() => setPickOpen(false)} />
-            )}
-          </span>
+          {!compact && (
+            <span className="inline-ctl">
+              <button type="button" ref={whenRef} className="chip due-chip due-soon" aria-haspopup="dialog" title="When to remind me" onClick={() => setPickOpen((o) => !o)}>
+                <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}
+              </button>
+              {pickOpen && (
+                <DateTimePicker anchorRef={whenRef} value={when} hasReminder onApply={({ due_date }) => { if (due_date && due_date !== ZERO_DATE) setWhen(due_date); setPickOpen(false) }} onClose={() => setPickOpen(false)} />
+              )}
+            </span>
+          )}
           <button type="submit" className="iconbtn sm" aria-label="Add reminder" title="Add reminder"><IconPlus size={16} /></button>
         </form>
       )}

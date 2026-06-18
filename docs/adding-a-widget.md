@@ -40,6 +40,48 @@ Conventions worth reusing:
   (`var(--muted)`, `var(--accent)`, …) so light/dark themes and accents work.
   The widget body scrolls on its own; don't fight the frame.
 
+## Make it size-responsive (optional but encouraged)
+
+Like Apple/Android home-screen widgets, a widget should change *what it shows* —
+not just scale — as it grows or shrinks. The frame measures every widget body
+once (a single `ResizeObserver`) and broadcasts a size class; a widget opts in
+with one hook call. Ignore it and the widget renders the same at every size.
+
+```jsx
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atLeastW } from '../widgetsize.js'
+
+export default function StatWidget() {
+  const sz = useWidgetSize()                 // { w, h, name, width, height }
+  return (
+    <div className="stat">
+      <div className="stat-big">42</div>
+      {atLeastW(sz, 'md') && <div className="stat-label">tasks done this week</div>}
+      {atLeastW(sz, 'lg') && <Sparkline />}
+    </div>
+  )
+}
+```
+
+- **Tiers** (`widgetsize.js`): width `w` is `xs < sm < md < lg < xl`, height `h`
+  is `xs < sm < md < lg`. `name` is a friendly 1-D label (`mini`/`compact`/
+  `standard`/`wide`/`tall`/`large`) for coarse branches; `width`/`height` are the
+  raw px for the rare case you need them.
+- **Comparators** read as intent: `atLeastW(sz,'lg')`, `atMostW(sz,'sm')`,
+  `atLeastH(sz,'md')`, `atMostH(sz,'xs')`. Branch your render on these — the
+  default widget (~10×9) sits around `md`/`md`, so build "standard" for that and
+  add detail above / shed it below.
+- **CSS escape hatch** — the body carries `data-wsize` / `data-hsize`, so purely
+  cosmetic tweaks need no JS or re-render:
+  `.widget-body[data-wsize="xs"] .stat-label { display: none }`.
+- **Floors** — set `minSize: { w, h }` on the registry entry (next to
+  `defaultSize`) so a user can't shrink the widget below its smallest legible
+  tier. Default floor is 4×4.
+
+Re-renders fire only when a *tier* changes (not per pixel), so branching freely
+is cheap. Put any non-trivial size→content mapping in a plain `.js` helper if
+it's worth a node test (see `widgetsize.js` itself).
+
 ## 2. Register it
 
 Append an entry to `WIDGETS` in `app/client/src/widgets/registry.jsx`:

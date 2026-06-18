@@ -3,7 +3,7 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyMins,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -83,6 +83,25 @@ ok(next.lg[3].y === 9, 'new item lands below the tallest existing item')
 ok(Number.isFinite(next.lg[3].y), 'y stays finite (Infinity would persist as null)')
 const fromEmpty = appendToLayouts({}, 'w-1', DEFAULT_SIZE)
 ok(Object.keys(fromEmpty).length === Object.keys(COLS).length && fromEmpty.lg[0].y === 0, 'append works on an empty board at every breakpoint')
+
+// --- applyMins (per-widget size floors) ---
+{
+  const mins = { a: { w: 4, h: 4 }, b: { w: 6, h: 5 } }
+  const minFor = (type) => mins[type]
+  const base = { lg: [{ i: 'w-1', x: 0, y: 0, w: 10, h: 9 }, { i: 'w-2', x: 10, y: 0, w: 10, h: 9 }] }
+  const withMins = applyMins(base, board, minFor)
+  ok(withMins.lg[0].minW === 4 && withMins.lg[0].minH === 4, 'type a gets its floor')
+  ok(withMins.lg[1].minW === 6 && withMins.lg[1].minH === 5, 'type b gets its floor')
+  ok(base.lg[0].minW === undefined, 'applyMins is non-mutating')
+  ok(withMins.lg[0].w === 10 && withMins.lg[0].h === 9, 'x/y/w/h preserved')
+  // a floor must never exceed the item's current size (would force RGL to grow it)
+  const tiny = { lg: [{ i: 'w-1', x: 0, y: 0, w: 3, h: 2 }] }
+  const clamped = applyMins(tiny, [{ i: 'w-1', type: 'b' }], minFor)
+  ok(clamped.lg[0].minW === 3 && clamped.lg[0].minH === 2, 'floor clamps down to current size')
+  // unknown type / missing floor -> minimum of 1, no throw
+  const unknown = applyMins({ lg: [{ i: 'x', x: 0, y: 0, w: 5, h: 5 }] }, [{ i: 'x', type: 'gone' }], minFor)
+  ok(unknown.lg[0].minW === 1 && unknown.lg[0].minH === 1, 'unknown type floors to 1')
+}
 
 console.log(`dashlayout: ${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

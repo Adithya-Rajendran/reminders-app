@@ -29,6 +29,10 @@ const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
 //                and stores the pick as w.group (null/undefined = all groups)
 //   defaultSize  optional { w, h } in grid units when first added (default 10×9
 //                — about a third of the board wide at the lg breakpoint)
+//   minSize      optional { w, h } in grid units — the smallest a user can resize
+//                this widget to (Apple-style floor, so its content never breaks).
+//                Default 4×4 (see DEFAULT_MIN_SIZE in Dashboard.jsx). Set this to
+//                the widget's smallest legible tier.
 
 export const WIDGETS = [
   {
@@ -36,6 +40,7 @@ export const WIDGETS = [
     label: 'Reminders',
     icon: IconBell,
     pickGroup: true,
+    minSize: { w: 5, h: 5 },
     title: (w) => w.group || 'Reminders', // a group-locked widget shows the group name
     render: (w, ctx) => (
       <RemindersWidget events={ctx.events} projects={ctx.projects} group={w.group || null} onNewGroup={ctx.onNewGroup} />
@@ -51,12 +56,14 @@ export const WIDGETS = [
     type: 'calendar',
     label: 'Calendar',
     icon: IconCalendar,
+    minSize: { w: 5, h: 5 },
     render: () => <CalendarWidget />,
   },
   {
     type: 'notes',
     label: 'Notes',
     icon: IconNote,
+    minSize: { w: 6, h: 6 },
     render: (_w, ctx) => <NotesWidget onOpenSettings={ctx.onOpenSettings} />,
   },
   {
@@ -72,6 +79,7 @@ export const WIDGETS = [
     icon: IconCue,
     pickGroup: true,
     defaultSize: { w: 14, h: 11 },
+    minSize: { w: 6, h: 6 },
     render: (w, ctx) => <CuesWidget projects={ctx.projects} group={w.group || ''} onNewGroup={ctx.onNewGroup} />,
   },
   {

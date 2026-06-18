@@ -1,5 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { notesApi } from '../api.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atMostW, atLeastW, atLeastH } from '../widgetsize.js'
 import NoteEditor from '../NoteEditor.jsx'
 import PromptModal from '../PromptModal.jsx'
 import { buildTree, folderKids, noteKids, countNotes, canDropInto } from '../notetree.js'
@@ -16,7 +18,6 @@ import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconCh
 
 const EXPAND_KEY = 'notes-expanded-folders'
 const RECENT_KEY = 'notes-recent'
-const NARROW = 520 // below this widget width, collapse to a single (master-detail) column
 
 // One note row in the tree / pinned / recent lists. dnd is omitted for the
 // pinned/recent virtual sections (those aren't drop sources).
@@ -84,7 +85,6 @@ export default function NotesWidget({ onOpenSettings }) {
   const [contentHits, setContentHits] = useState([]) // full-text body matches (server FTS)
   const [openPath, setOpenPath] = useState(null)
   const [folderPrompt, setFolderPrompt] = useState(false)
-  const [narrow, setNarrow] = useState(false)
   const [sort, setSort] = useState(() => loadJson('notes-sort', 'updated'))
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = usePopover(sortOpen, setSortOpen)
@@ -98,15 +98,14 @@ export default function NotesWidget({ onOpenSettings }) {
   const [tplOpen, setTplOpen] = useState(false)
   const tplRef = usePopover(tplOpen, setTplOpen)
 
-  // Track widget width so the layout can collapse to one column when small.
-  const roRef = useRef(null)
-  const setWrap = useCallback((el) => {
-    if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
-    if (el && typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect.width || 0; setNarrow(w > 0 && w < NARROW) })
-      ro.observe(el); roRef.current = ro
-    }
-  }, [])
+  // Size class from the shared widget-size system (one observer lives in the
+  // frame). Narrow collapses to a single master-detail column; a very wide widget
+  // gets a roomier sidebar; a short widget drops the Pinned/Recent shortcuts so
+  // the folder tree gets the vertical space.
+  const sz = useWidgetSize()
+  const narrow = atMostW(sz, 'md')
+  const wide = atLeastW(sz, 'xl')
+  const showAux = atLeastH(sz, 'sm')
 
   const load = useCallback(async () => {
     setState((s) => (s === 'ready' ? s : 'loading'))
@@ -258,7 +257,7 @@ export default function NotesWidget({ onOpenSettings }) {
   const showMain = !narrow || !!openPath || trashOpen
 
   return (
-    <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}`} ref={setWrap}>
+    <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}${wide ? ' notes-wide' : ''}`}>
       {showSidebar && (
         <aside className="notes-sidebar">
           <div className="note-toolbar">
@@ -341,13 +340,13 @@ export default function NotesWidget({ onOpenSettings }) {
                 )
                 : (
                   <>
-                    {pinnedNotes.length > 0 && (
+                    {showAux && pinnedNotes.length > 0 && (
                       <div className="tree-section">
                         <div className="tree-head"><IconPin size={11} /> Pinned</div>
                         {pinnedNotes.map((n) => <NoteRow key={'pin:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
                       </div>
                     )}
-                    {recentNotes.length > 0 && (
+                    {showAux && recentNotes.length > 0 && (
                       <div className="tree-section">
                         <div className="tree-head">Recent</div>
                         {recentNotes.map((n) => <NoteRow key={'rec:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
