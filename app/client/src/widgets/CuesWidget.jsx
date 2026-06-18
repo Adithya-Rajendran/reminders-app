@@ -52,7 +52,7 @@ function FlowNode({ task, pos, dragging, onMoveStart, onLinkStart, onToggle, onU
   )
 }
 
-export default function CuesWidget({ projects: _projects, group: initialGroup, onNewGroup }) {
+export default function CuesWidget({ group: initialGroup, onNewGroup }) {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, onSetCue, undo, dismissUndo } = useTaskList(selector)
   const [group, setGroup] = useState(initialGroup || '')

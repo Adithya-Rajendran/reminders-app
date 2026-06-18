@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'rea
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
+import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
 import { SkeletonRows } from './widgets/parts.jsx'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
@@ -179,10 +180,22 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   }
 
   // Group creation happens only in Settings now — open it with the typed name.
-  const onNewGroup = (name) => onOpenSettings?.({ createGroup: name })
+  const onNewGroup = useCallback((name) => onOpenSettings?.({ createGroup: name }), [onOpenSettings])
 
-  // Shared context handed to every widget's render() (see widgets/registry.jsx).
-  const widgetCtx = { events, projects, onNewGroup, onOpenSettings }
+  // The app slots: every interface the canvas provides, with its live value. A
+  // widget receives only the subset it plugs into (see connections.js) — the
+  // dashboard never hands a widget app state it didn't declare a dependency on.
+  const appCtx = useMemo(() => ({ events, projects, onNewGroup, onOpenSettings }), [events, projects, onNewGroup, onOpenSettings])
+  const slots = useMemo(() => appSlots(appCtx), [appCtx])
+
+  // Dev sanity check: warn once if a widget plugs into an interface the app
+  // doesn't define (a typo'd / retired interface name) — caught at the registry,
+  // not per saved widget, so it fires once regardless of how many are on the board.
+  useEffect(() => {
+    for (const r of describeConnections(WIDGETS, slots)) {
+      if (r.unknown.length) console.warn(`[connections] widget "${r.type}" plugs into unknown interface(s): ${r.unknown.join(', ')}`)
+    }
+  }, [slots])
 
   // Stamp each item's resize floor (minW/minH) from the registry at render time,
   // so saved layouts never need migrating and floors track the current registry.
@@ -240,13 +253,20 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
             resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
             onLayoutChange={onLayoutChange}
           >
-            {widgets.map((w) => (
-              <div key={w.i}>
-                <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
-                  {WIDGET_TYPES.get(w.type)?.render(w, widgetCtx)}
-                </WidgetFrame>
-              </div>
-            ))}
+            {widgets.map((w) => {
+              const spec = WIDGET_TYPES.get(w.type)
+              // Auto-connect the widget's declared plugs to the app slots, then
+              // hand it ONLY the connected interfaces (least privilege).
+              const { connections } = resolveConnections(spec?.plugs, slots)
+              const ctx = selectCtx(appCtx, connections)
+              return (
+                <div key={w.i}>
+                  <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
+                    {spec?.render(w, ctx)}
+                  </WidgetFrame>
+                </div>
+              )
+            })}
           </Grid>
         )}
       </div>

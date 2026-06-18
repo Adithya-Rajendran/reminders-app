@@ -95,6 +95,7 @@ const ClockWidget = lazy(() => import('./ClockWidget.jsx')) // next to the other
   icon: IconClock,          // menu + frame icon
   render: () => <ClockWidget />,
   // optional:
+  // plugs: ['tasks'],              // app interfaces this widget connects to (see below)
   // title: (w) => 'Custom header text',
   // defaultSize: { w: 5, h: 5 },   // grid units when first added (default 10×9)
   // pickGroup: true,               // "Add widget" asks for a reminder group -> w.group
@@ -112,9 +113,9 @@ chunk loads), so there's nothing extra to do.
 Notes on the entry:
 
 - `render(w, ctx)` receives the **saved widget instance** `w` (put per-instance
-  options on it, like the reminders widget's `w.group`) and the **shared
-  context** `ctx = { events, projects, onNewGroup, onOpenSettings }`
-  (live SSE reminder events, the task projects list, and settings callbacks).
+  options on it, like the reminders widget's `w.group`) and a **connected
+  context** `ctx` — see "Connect it to the app (plugs)" below. `ctx` holds **only**
+  the interfaces this widget declared in `plugs`, nothing more.
 - `type` is written into every user's persisted layout. Renaming or removing a
   type makes the dashboard silently drop those widgets on next load (that's the
   intended cleanup path for retired widgets — see `WIDGET_TYPES.has()` in
@@ -126,6 +127,41 @@ Notes on the entry:
   ultra-wide canvas. The extra width on wide screens fits *more widgets per row*
   (and lets lower widgets move up) rather than enlarging each one. Pick a `w`
   that reads well at `lg`.
+
+## Connect it to the app (plugs)
+
+Widgets get app data through **connections** — a Snap/Juju-style interface layer
+(`app/client/src/connections.js`, full reference in
+[`widget-connections.md`](./widget-connections.md)). The app provides named
+interfaces ("slots"); a widget declares the ones it needs in `plugs`; the
+dashboard **auto-connects** them and passes **only** those into `ctx`.
+
+| interface | what you get | `ctx` key |
+|---|---|---|
+| `tasks` | the shared task store (use the `useTaskList` hook) | — (ambient) |
+| `reminder-events` | live reminder/overdue SSE events | `ctx.events` |
+| `projects` | the user's task projects/lists | `ctx.projects` |
+| `reminder-groups` | the "new group" affordance | `ctx.onNewGroup` |
+| `settings` | open the Settings panel | `ctx.onOpenSettings` |
+
+```jsx
+{ type: 'clock', label: 'Clock', icon: IconClock,
+  plugs: ['reminder-events'],                       // auto-connected to ctx.events
+  render: (_w, ctx) => <ClockWidget events={ctx.events} /> }
+```
+
+Rules of thumb:
+
+- **Declare every interface whose `ctx` key you read.** Omit it and the key is
+  simply absent (`undefined`) — least privilege, like a Snap that didn't plug an
+  interface. Reading the shared task store via `useTaskList` works without a plug,
+  but declare `tasks` anyway so the dependency shows up in **Settings →
+  Connections**.
+- A plug can be **optional**: `plugs: [{ interface: 'projects', optional: true }]`.
+- A typo'd / retired interface name shows as **unknown** in the connections viewer
+  and logs a dev `console.warn` on load.
+- Widget→widget connections use the same model and are coming — see
+  [`widget-connections.md`](./widget-connections.md).
 
 ## 3. If it needs server data
 
