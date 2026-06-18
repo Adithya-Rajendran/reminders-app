@@ -6,6 +6,8 @@ import { updateTask } from '../tasklib.js'
 import { patchTask as storePatch } from '../taskstore.js'
 import { emitTasksChanged } from '../tasksbus.js'
 import { recentGroups } from '../groups.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atMostW, atLeastW } from '../widgetsize.js'
 import GroupPicker from '../GroupPicker.jsx'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
 import { IconCue } from '../icons.jsx'
@@ -56,7 +58,15 @@ export default function CuesWidget({ projects: _projects, group: initialGroup, o
   const [group, setGroup] = useState(initialGroup || '')
   const [knownGroups, setKnownGroups] = useState([])
   const [drag, setDrag] = useState(null)
+  const [queueOpen, setQueueOpen] = useState(false)
   const canvasRef = useRef(null)
+
+  // In a narrow column the side queue + the verbose hint crowd out the board, so
+  // hide the hint and tuck the queue behind a toolbar toggle (the board itself
+  // stays the focus); roomier widths show both inline.
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm')
+  const showHint = atLeastW(sz, 'md')
 
   useEffect(() => {
     reminderGroups().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
@@ -153,16 +163,18 @@ export default function CuesWidget({ projects: _projects, group: initialGroup, o
   } else {
     body = (
       <div className="flow-body">
-        <div className="flow-queue">
-          <div className="flow-queue-head">Queue · {queue.length}</div>
-          {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
-          {queue.map((t) => (
-            <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
-              <span className="flow-qitem-t">{t.title}</span>
-              {(t.cue || '').trim() && <span className="flow-qitem-cue"><span className="cue-arrow">→</span> {t.cue.trim()}</span>}
-            </button>
-          ))}
-        </div>
+        {(!compact || queueOpen) && (
+          <div className="flow-queue">
+            <div className="flow-queue-head">Queue · {queue.length}</div>
+            {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
+            {queue.map((t) => (
+              <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
+                <span className="flow-qitem-t">{t.title}</span>
+                {(t.cue || '').trim() && <span className="flow-qitem-cue"><span className="cue-arrow">→</span> {t.cue.trim()}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flow-canvas" ref={canvasRef}>
           <div className="flow-content" style={{ width: CONTENT_W, height: CONTENT_H }}>
             <svg className="flow-edges" width={CONTENT_W} height={CONTENT_H}>
@@ -193,7 +205,12 @@ export default function CuesWidget({ projects: _projects, group: initialGroup, o
     <div className="tasklist flow-wrap">
       <div className="flow-toolbar">
         <GroupPicker value={group} groups={allGroups} recent={recent} onChange={setGroup} onNew={(name) => onNewGroup?.(name)} neutral={{ label: 'All reminders', value: '' }} placeholder="All reminders" />
-        <span className="flow-hint">Drag a card onto the board · drag ● to link · click a line to remove · double-click to edit the cue</span>
+        {showHint && <span className="flow-hint">Drag a card onto the board · drag ● to link · click a line to remove · double-click to edit the cue</span>}
+        {compact && source.length > 0 && (
+          <button type="button" className="btn ghost sm" aria-pressed={queueOpen} onClick={() => setQueueOpen((o) => !o)}>
+            Queue · {queue.length}
+          </button>
+        )}
       </div>
       {body}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}

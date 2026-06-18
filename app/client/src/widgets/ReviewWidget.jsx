@@ -3,6 +3,8 @@ import { useTaskList } from '../useTasks.js'
 import { computeReview, parseYmd } from '../reviewstats.js'
 import { loadJson, saveJson } from '../storage.js'
 import { emitTasksChanged } from '../tasksbus.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atLeastH, atMostW } from '../widgetsize.js'
 import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
 import { IconChart, IconCheck } from '../icons.jsx'
 
@@ -17,6 +19,7 @@ const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 export default function ReviewWidget() {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load } = useTaskList(selector)
+  const sz = useWidgetSize()
 
   const [lastReviewed, setLastReviewed] = useState(() => loadJson(REVIEWED_KEY, null))
   const review = useMemo(() => computeReview(tasks, new Date(), lastReviewed), [tasks, lastReviewed])
@@ -42,6 +45,15 @@ export default function ReviewWidget() {
   const up = review.deltaPct >= 0
   const deltaCls = review.thisWeek === review.lastWeek ? '' : up ? 'rv-up' : 'rv-down'
 
+  // Content grows with vertical room (the layout stacks top -> spark -> meta ->
+  // prompt). Very short: just the headline number + delta. A bit taller: add the
+  // sparkline. At the default height and up: day labels, the 30/7-day chips, and
+  // the weekly-review prompt. A narrow widget also trims the delta to arrow + %.
+  const showSpark = atLeastH(sz, 'sm')
+  const showDetails = atLeastH(sz, 'md')
+  const showPrompt = atLeastH(sz, 'md')
+  const compactDelta = atMostW(sz, 'xs')
+
   return (
     <div className="review">
       <div className="rv-top">
@@ -51,28 +63,34 @@ export default function ReviewWidget() {
         </div>
         <div className={`rv-delta ${deltaCls}`}>
           {review.thisWeek === review.lastWeek
-            ? 'same as last week'
-            : `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}% vs last week (${review.lastWeek})`}
+            ? (compactDelta ? '=' : 'same as last week')
+            : compactDelta
+              ? `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}%`
+              : `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}% vs last week (${review.lastWeek})`}
         </div>
       </div>
 
-      <div className="rv-spark" role="img" aria-label={`Completions over the last 7 days, ${review.last7Total} total`}>
-        {review.last7.map((d) => (
-          <div className="rv-bar-col" key={d.date} title={`${d.date}: ${d.count}`}>
-            <div className="rv-bar-track">
-              <div className={`rv-bar${d.count === 0 ? ' empty' : ''}`} style={{ height: `${d.count === 0 ? 4 : Math.round((d.count / max) * 100)}%` }} />
+      {showSpark && (
+        <div className="rv-spark" role="img" aria-label={`Completions over the last 7 days, ${review.last7Total} total`}>
+          {review.last7.map((d) => (
+            <div className="rv-bar-col" key={d.date} title={`${d.date}: ${d.count}`}>
+              <div className="rv-bar-track">
+                <div className={`rv-bar${d.count === 0 ? ' empty' : ''}`} style={{ height: `${d.count === 0 ? 4 : Math.round((d.count / max) * 100)}%` }} />
+              </div>
+              {showDetails && <div className="rv-bar-lbl">{DOW1[parseYmd(d.date).getDay()]}</div>}
             </div>
-            <div className="rv-bar-lbl">{DOW1[parseYmd(d.date).getDay()]}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <div className="rv-meta">
-        <span className="chip">{review.last30Total} in 30 days</span>
-        <span className="chip">{review.last7Total} this week’s 7 days</span>
-      </div>
+      {showDetails && (
+        <div className="rv-meta">
+          <span className="chip">{review.last30Total} in 30 days</span>
+          <span className="chip">{review.last7Total} this week’s 7 days</span>
+        </div>
+      )}
 
-      {review.promptDue ? (
+      {showPrompt && (review.promptDue ? (
         <div className="rv-prompt">
           <div className="rv-prompt-body">
             <div className="rv-prompt-title">Weekly review &amp; re-plan</div>
@@ -82,7 +100,7 @@ export default function ReviewWidget() {
         </div>
       ) : (
         <div className="rv-reviewed"><IconCheck size={14} /> Reviewed this week</div>
-      )}
+      ))}
     </div>
   )
 }

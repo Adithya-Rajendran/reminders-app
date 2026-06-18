@@ -3,6 +3,8 @@ import { useTaskList } from '../useTasks.js'
 import { selectFrog, groupEisenhower } from '../taskviews.js'
 import { dueChip, timeLabel, pdotClass } from '../tasklib.js'
 import { loadJson, saveJson } from '../storage.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atLeastW, atLeastH } from '../widgetsize.js'
 import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
 import { IconFrog, IconGrid, IconList } from '../icons.jsx'
 
@@ -23,6 +25,17 @@ export default function FrogWidget() {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(selector)
   const [view, setView] = useState('frog')
+  const sz = useWidgetSize()
+
+  // The Eisenhower matrix is a 2×2 grid — illegible in a very narrow column, so
+  // it's only offered (and the toggle only shown) once there's a bit of horizontal
+  // room; below that the widget is the single "frog" highlight. Wider still, each
+  // quadrant shows more items and its urgency caption. Short drops the meta chips.
+  const allowMatrix = atLeastW(sz, 'sm')
+  const effectiveView = allowMatrix ? view : 'frog'
+  const showMeta = atLeastH(sz, 'sm')
+  const wideMatrix = atLeastW(sz, 'lg')
+  const perQuad = wideMatrix ? 12 : 8
 
   const open = useMemo(() => tasks.filter((t) => !t.done && !t.is_goal), [tasks])
   const todayKey = ymd(new Date())
@@ -43,23 +56,27 @@ export default function FrogWidget() {
 
   return (
     <div className="frog">
-      <div className="frog-toggle">
-        <button className={`seg${view === 'frog' ? ' on' : ''}`} onClick={() => setView('frog')} title="Today's frog"><IconList size={14} /> Frog</button>
-        <button className={`seg${view === 'matrix' ? ' on' : ''}`} onClick={() => setView('matrix')} title="Eisenhower matrix"><IconGrid size={14} /> Matrix</button>
-      </div>
+      {allowMatrix && (
+        <div className="frog-toggle">
+          <button className={`seg${view === 'frog' ? ' on' : ''}`} onClick={() => setView('frog')} title="Today's frog"><IconList size={14} /> Frog</button>
+          <button className={`seg${view === 'matrix' ? ' on' : ''}`} onClick={() => setView('matrix')} title="Eisenhower matrix"><IconGrid size={14} /> Matrix</button>
+        </div>
+      )}
 
-      {view === 'frog' ? (
+      {effectiveView === 'frog' ? (
         frog ? (
           <div className="frog-card">
             <div className="frog-eyebrow"><IconFrog size={15} /> Start here today</div>
             <button className="frog-check" aria-label={`Complete: ${frog.title}`} onClick={() => onToggle(frog)} />
             <div className="frog-body">
               <div className="frog-title">{frog.title}</div>
-              <div className="frog-meta">
-                <span className={`pdot ${pdotClass(frog.priority || 0)}`} />
-                {dueChip(frog.due_date) && <span className={`chip ${dueChip(frog.due_date).cls}`}>{dueChip(frog.due_date).label}{timeLabel(frog.due_date) ? ' · ' + timeLabel(frog.due_date) : ''}</span>}
-                {frog.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {frog.cue}</span>}
-              </div>
+              {showMeta && (
+                <div className="frog-meta">
+                  <span className={`pdot ${pdotClass(frog.priority || 0)}`} />
+                  {dueChip(frog.due_date) && <span className={`chip ${dueChip(frog.due_date).cls}`}>{dueChip(frog.due_date).label}{timeLabel(frog.due_date) ? ' · ' + timeLabel(frog.due_date) : ''}</span>}
+                  {frog.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {frog.cue}</span>}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -70,9 +87,9 @@ export default function FrogWidget() {
           {QUADS.map((q) => (
             <div className={`eq eq-${q.k}`} key={q.k}>
               <div className="eq-head"><span className="eq-label">{q.label}</span><span className="eq-count">{quads[q.k].length}</span></div>
-              <div className="eq-sub">{q.sub}</div>
+              {wideMatrix && <div className="eq-sub">{q.sub}</div>}
               <div className="eq-list">
-                {quads[q.k].slice(0, 8).map((t) => {
+                {quads[q.k].slice(0, perQuad).map((t) => {
                   const c = dueChip(t.due_date)
                   return (
                     <div className="eq-item" key={t.id} title={t.title}>

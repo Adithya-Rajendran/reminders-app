@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { SkeletonRows } from './widgets/parts.jsx'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyMins,
 } from './dashlayout.js'
+import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './GroupPicker.jsx'
@@ -23,6 +24,12 @@ const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
+
+// Apple-style size floor: the smallest grid w/h a widget can be resized to, so a
+// widget's content never has to render below its smallest legible tier. Per-type
+// override via the registry's minSize; otherwise this default (~mini tier).
+const DEFAULT_MIN_SIZE = { w: 4, h: 4 }
+const minFor = (type) => ({ ...DEFAULT_MIN_SIZE, ...(WIDGET_TYPES.get(type)?.minSize || {}) })
 
 const newId = () => 'w-' + crypto.randomUUID()
 
@@ -177,6 +184,10 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // Shared context handed to every widget's render() (see widgets/registry.jsx).
   const widgetCtx = { events, projects, onNewGroup, onOpenSettings }
 
+  // Stamp each item's resize floor (minW/minH) from the registry at render time,
+  // so saved layouts never need migrating and floors track the current registry.
+  const layoutsWithMins = useMemo(() => applyMins(layouts, widgets, minFor), [layouts, widgets])
+
   if (!loaded) {
     return (
       <div className="grid-wrap">
@@ -219,7 +230,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         ) : (
           <Grid
             className="layout"
-            layouts={layouts}
+            layouts={layoutsWithMins}
             breakpoints={BREAKPOINTS}
             cols={COLS}
             rowHeight={30}
@@ -349,6 +360,11 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
 /* ---------- Widget frame ---------- */
 function WidgetFrame({ type, title, onRemove, children }) {
   const Ic = WIDGET_TYPES.get(type)?.icon || IconList
+  // One ResizeObserver per widget, on the body (the real scroll container). The
+  // resulting size class is broadcast through context so any widget can adapt its
+  // *content* to its size (see useWidgetSize.js); data-* mirrors it for CSS-only
+  // tweaks. This is the single place size is measured — every widget gets it free.
+  const [bodyRef, size] = useElementSize()
   return (
     <div className="widget">
       <div className="widget-head" title="Drag to move">
@@ -367,12 +383,14 @@ function WidgetFrame({ type, title, onRemove, children }) {
           </button>
         </span>
       </div>
-      <div className="widget-body">
+      <div className="widget-body" ref={bodyRef} data-wsize={size.w} data-hsize={size.h}>
         {/* widgets are lazy (see registry.jsx) — skeleton while a chunk loads, and a
             boundary so a failed chunk/render can't blank the whole board */}
-        <WidgetBoundary>
-          <Suspense fallback={<SkeletonRows n={4} />}>{children}</Suspense>
-        </WidgetBoundary>
+        <WidgetSizeContext.Provider value={size}>
+          <WidgetBoundary>
+            <Suspense fallback={<SkeletonRows n={4} />}>{children}</Suspense>
+          </WidgetBoundary>
+        </WidgetSizeContext.Provider>
       </div>
     </div>
   )

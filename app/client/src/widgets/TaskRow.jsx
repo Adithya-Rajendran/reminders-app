@@ -3,6 +3,8 @@ import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../taskviews.js'
 import { computeHabitStats, recentDays } from '../habitstats.js'
 import { usePopover } from '../usePopover.js'
+import { useWidgetSize } from '../useWidgetSize.js'
+import { atMostW } from '../widgetsize.js'
 import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 
@@ -42,11 +44,17 @@ const ClockMini = () => (
 // An interactive task row: animated complete, inline priority menu + scheduler
 // popover, and a hover-revealed delete affordance. Memoized: the handlers from
 // useTaskList are stable, so a row only re-renders when its own `task` changes —
-// editing/typing elsewhere in a list no longer re-renders every sibling row.
+// editing/typing elsewhere in a list no longer re-renders every sibling row. It
+// also re-renders when the enclosing widget crosses a size tier (context bypasses
+// memo), which is what lets it shed secondary controls in a very narrow column.
 function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, showHabit, childTasks, onAddSubtask }) {
   const [burst, setBurst] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [subDraft, setSubDraft] = useState('')
+  // In a very narrow column there's no room for the full control strip, so keep
+  // the title + the due/schedule chip and drop the rest (priority, cue, labels,
+  // quick-win, subtasks) — the row stays tappable and legible instead of wrapping.
+  const dense = atMostW(useWidgetSize(), 'xs')
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
   const cue = (task.cue || '').trim()
@@ -85,20 +93,20 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             {repeats && <span className="repeat-badge" title="Repeating task">↻</span>}
           </div>
           <div className="task-sub">
-            <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />
+            {!dense && <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />}
             <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
-            {onSetCue
+            {!dense && (onSetCue
               ? <CueControl task={task} onSetCue={onSetCue} />
-              : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>}
-            {isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
-            {(task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
-            {canSubtask && (
+              : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>)}
+            {!dense && isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
+            {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
+            {!dense && canSubtask && (
               <button type="button" className={`chip subtask-chip${total ? '' : ' empty'}`} aria-expanded={expanded} title={total ? `${doneKids}/${total} subtasks done` : 'Add a subtask'} onClick={() => setExpanded((e) => !e)}>
                 <IconChevR size={11} className={`rem-chev${expanded ? ' open' : ''}`} />
                 {total ? `${doneKids}/${total}` : '+ subtask'}
               </button>
             )}
-            {total > 0 && <span className="subtask-bar" aria-hidden="true"><span className="subtask-fill" style={{ width: `${pct}%` }} /></span>}
+            {!dense && total > 0 && <span className="subtask-bar" aria-hidden="true"><span className="subtask-fill" style={{ width: `${pct}%` }} /></span>}
           </div>
           {habit && <HabitStrip task={task} />}
         </div>

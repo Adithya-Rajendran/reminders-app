@@ -1364,6 +1364,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
 .notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
 .notes-split .notes-main { padding-left: 12px; }
+/* On a very wide widget, give the tree more room so deep paths don't truncate. */
+.notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
 .notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
 .notes-main-empty .state-ic { margin-bottom: 4px; }
 .notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }

@@ -87,6 +87,28 @@ export function fillBreakpoints(layouts) {
   return out
 }
 
+// Stamp per-widget minimum sizes (Apple-style floors, so content never breaks)
+// onto every layout item, keyed by widget type via `widgets` ({ i, type }). The
+// floor comes from minFor(type) -> { w, h }; react-grid-layout reads minW/minH
+// off each item and won't let a resize go below them. Derived at render from the
+// registry rather than persisted — floors are cheap to recreate and should track
+// the current registry, so saved layouts never need migrating. Non-mutating.
+export function applyMins(layouts, widgets, minFor) {
+  const typeById = new Map((widgets || []).map((w) => [w.i, w.type]))
+  const out = {}
+  for (const bp of Object.keys(layouts || {})) {
+    out[bp] = (layouts[bp] || []).map((it) => {
+      const m = minFor(typeById.get(it.i)) || {}
+      const minW = Math.max(1, Math.round(m.w || 1))
+      const minH = Math.max(1, Math.round(m.h || 1))
+      // Never let a floor exceed the item's current size (that would force RGL to
+      // grow it on load); clamp the floor to what's already placed.
+      return { ...it, minW: Math.min(minW, it.w || minW), minH: Math.min(minH, it.h || minH) }
+    })
+  }
+  return out
+}
+
 // Shelf-pack `items` into `cols` columns at their existing size. Walk them in
 // reading order (top rows first, then left-to-right) and lay each on the current
 // shelf; once the next item won't fit, start a new shelf below the tallest item
