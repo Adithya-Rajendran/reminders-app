@@ -84,26 +84,41 @@ it's worth a node test (see `widgetsize.js` itself).
 
 ## 2. Register it
 
-Append an entry to `WIDGETS` in `app/client/src/widgets/registry.jsx`:
+A widget is declared in two halves, keyed by the same `type`: its **pure
+metadata** (node-testable, no JSX) in `app/client/src/widgets/manifest.js`, and
+its **render half** (icon + `render`) in `app/client/src/widgets/registry.jsx`.
+The split keeps the widget↔app connection contract testable without a renderer
+(see [`widget-connections.md`](./widget-connections.md)).
 
-```jsx
-const ClockWidget = lazy(() => import('./ClockWidget.jsx')) // next to the other lazy() lines
-// ...
+**a. Add a descriptor** to `WIDGET_MANIFEST` in `widgets/manifest.js`:
+
+```js
 {
   type: 'clock',            // stable id, persisted in layouts — never rename/reuse
   label: 'Clock',           // shown in the "Add widget" menu
-  icon: IconClock,          // menu + frame icon
-  render: () => <ClockWidget />,
   // optional:
   // plugs: ['tasks'],              // app interfaces this widget connects to (see below)
-  // title: (w) => 'Custom header text',
   // defaultSize: { w: 5, h: 5 },   // grid units when first added (default 10×9)
+  // minSize: { w: 4, h: 4 },       // resize floor (default 4×4)
   // pickGroup: true,               // "Add widget" asks for a reminder group -> w.group
 }
 ```
 
+**b. Add a renderer** to `RENDERERS` in `widgets/registry.jsx` (same `type` key):
+
+```jsx
+const ClockWidget = lazy(() => import('./ClockWidget.jsx')) // next to the other lazy() lines
+// ...
+clock: {
+  icon: IconClock,                 // menu + frame icon
+  render: () => <ClockWidget />,
+  // title: (w) => 'Custom header text',  // optional frame header override
+},
+```
+
 That's it — the widget appears in the "Add widget" menu, renders in the grid,
-persists in saved layouts, and gets a frame with your icon and title.
+persists in saved layouts, and gets a frame with your icon and title. (A
+descriptor with no matching renderer throws at load, so the two can't drift.)
 
 The `lazy()` import makes the widget its own build chunk, fetched the first
 time it's on a board — heavy dependencies don't bloat the initial bundle. The
@@ -183,9 +198,13 @@ The BFF keeps one module per feature in `app/server/` (see `notes.js`,
 cd app
 npm run lint     # ESLint (client + server)
 npm run build    # Vite build catches bad imports/JSX
-for t in test/*.test.mjs; do node "$t"; done   # unit tests, plain node
+npm run check    # server syntax check
+npm test         # unit tests (plain node) — includes the widget↔app contract
 ```
 
-Tests are framework-free `node` scripts and can't import JSX — put any logic
-worth testing in a plain `.js` module (like `tasklib.js`) and test that.
-CI (`.github/workflows/ci.yml`) runs the same steps on every push/PR.
+`npm test` runs the widget contract test (`test/widget-contract.test.mjs`), which
+fails CI if your `plugs` name an interface the app doesn't provide — so a typo is
+caught here, not at runtime. Tests are framework-free `node` scripts and can't
+import JSX: put logic worth testing in a plain `.js` module (the manifest, or a
+helper like `tasklib.js`) and test that. Or run the whole suite in a container
+with `docker build --target test app/`. CI runs the same steps on every push/PR.

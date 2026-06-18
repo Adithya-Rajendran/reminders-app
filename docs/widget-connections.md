@@ -13,8 +13,9 @@ declared, validated, visible data dependencies.
 - The **app / canvas provides slots** — named *interfaces* it can supply
   (`tasks`, `reminder-events`, …). The catalog lives in
   `app/client/src/connections.js` (`APP_INTERFACES`).
-- A **widget declares plugs** — the interfaces it needs — in its registry entry
-  (`app/client/src/widgets/registry.jsx`):
+- A **widget declares plugs** — the interfaces it needs — in its manifest
+  descriptor (`app/client/src/widgets/manifest.js`, the pure/node-testable half;
+  the JSX render lives in `registry.jsx`):
 
   ```js
   { type: 'reminders', /* … */ plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'] }
@@ -65,7 +66,17 @@ viewer) and a *provided interface*.
 2. Supply its value in `Dashboard.jsx`'s `appCtx` (so `appSlots` sees it).
 3. Add the interface name to the relevant widgets' `plugs`.
 
-The pure logic (`connections.js`) is covered by `test/connections.test.mjs`.
+## Testing
+
+Two framework-free node tests, both run by `npm test`:
+
+- `test/connections.test.mjs` — the resolver logic in `connections.js`
+  (normalize / resolve / select / appSlots / describe), including a custom-catalog
+  case that exercises the generic widget→widget path.
+- `test/widget-contract.test.mjs` — the **contract**: every widget's declared
+  `plugs` (from `manifest.js`) resolves against the app catalog, so an unknown or
+  unsatisfiable interface fails CI instead of silently dropping a widget. This is
+  what the decoupling buys — the contract is verified from data, with no renderer.
 
 ## Widget → widget (the future)
 

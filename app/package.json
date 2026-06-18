@@ -15,7 +15,9 @@
     "build": "vite build",
     "start": "node server/index.js",
     "dev": "vite",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node test/run.mjs",
+    "check": "for f in server/*.js; do node --check \"$f\"; done"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",

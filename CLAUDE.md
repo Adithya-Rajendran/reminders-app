@@ -12,12 +12,20 @@ npm run dev      # Vite dev server (proxies /api & /auth to a running BFF)
 npm run build    # build the SPA into app/public
 npm run lint     # ESLint over client + server
 npm start        # run the BFF (needs SESSION_SECRET; serves app/public)
-for t in test/*.test.mjs; do node "$t"; done   # unit tests (plain node, no framework)
-for f in server/*.js; do node --check "$f"; done  # server syntax check
+npm test         # unit tests — runs every test/*.test.mjs (plain node, no framework)
+npm run check    # server syntax check (node --check over server/*.js)
+
+# CI parity in a container (no local toolchain needed): lint + build + syntax + tests
+docker build --target test app/
 ```
 
+`npm test` (test/run.mjs) discovers and runs all `test/*.test.mjs` and aggregates
+the result, so a new test file is picked up with no wiring. Add `-- <substr>` to
+filter (e.g. `npm test -- connections`).
+
 CI (`.github/workflows/ci.yml`) runs exactly these: lint, build, syntax check,
-tests. Keep all four green. Lint is warning-free — don't add new warnings.
+tests (the `docker` job also runs them in the image's `test` stage). Keep all
+four green. Lint is warning-free — don't add new warnings.
 
 ## Map
 
@@ -26,8 +34,10 @@ app/client/src/
   main.jsx, App.jsx        # bootstrap, auth gate, top bar, dashboard tabs
   Dashboard.jsx            # generic widget grid (react-grid-layout) — widget-agnostic
   dashlayout.js            # pure grid math (cols, scaling, placement) — node-tested
-  widgets/registry.jsx     # THE widget registry: every widget is declared here (lazy chunks)
+  widgets/manifest.js      # pure widget metadata (type/label/plugs/sizing) — node-tested
+  widgets/registry.jsx     # the render layer: pairs each manifest entry with its icon + render
   widgets/*.jsx            # one file per widget + shared parts (TaskRow, parts.jsx)
+  connections.js           # widget↔app interface layer (Snap/Juju-style plugs/slots) — node-tested
   usePopover.js            # shared outside-click/Esc popover hook
   notetree.js, savequeue.js, notepaths.js, storage.js  # pure logic (node-tested)
   api.js                   # fetch helpers (api/tk/notesApi), 401 -> login redirect
