@@ -66,10 +66,17 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         // up to the new grid. Persist whichever cleanup happened so it sticks.
         const original = saved.layout.widgets || []
         const sw = original.filter((w) => WIDGET_TYPES.has(w.type))
+        const storedV = saved.layout.gridV || 1
         let lay = saved.layout.layouts || {}
-        const f = SCALE_TO_CURRENT[saved.layout.gridV || 1] ?? 2.5
+        const f = SCALE_TO_CURRENT[storedV] ?? 2.5
         const needsGrid = f !== 1
         if (needsGrid) lay = scaleLayouts(lay, f)
+        // Boards stamped before gridV 4 may carry the old ultrawide tiers that
+        // scaled widgets proportionally (so they grew on wide screens). Drop those
+        // tiers — keeping the base layout (lg…xxs) — so fillBreakpoints rebuilds
+        // them at constant widget size. Runs once: the PUT below stamps GRID_V.
+        const staleWide = storedV < 4
+        if (staleWide) { lay = { ...lay }; for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp] }
         // Fill in any breakpoints the saved board lacks (e.g. the ultrawide tiers
         // on a board that predates them) so a wide canvas shows a full layout, not
         // a top-left cluster. Persist below so the fill sticks (idempotent after).
@@ -78,7 +85,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)
-        if (sw.length !== original.length || needsGrid || addedBp) {
+        if (sw.length !== original.length || needsGrid || addedBp || staleWide) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),

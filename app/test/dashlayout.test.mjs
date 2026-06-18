@@ -3,14 +3,14 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
 
 // --- invariants the persistence format depends on ---
-ok(GRID_V === 3, 'GRID_V is 3 (bump SCALE_TO_CURRENT when changing the grid)')
+ok(GRID_V === 4, 'GRID_V is 4 (bump SCALE_TO_CURRENT when changing the grid)')
 ok(Object.keys(SCALE_TO_CURRENT).length === GRID_V, 'every historical gridV has a scale factor')
 ok(SCALE_TO_CURRENT[GRID_V] === 1, 'the current gridV scales by 1 (no-op)')
 for (const [v, f] of Object.entries(SCALE_TO_CURRENT)) {
@@ -31,14 +31,26 @@ for (const bp of byWidth) {
   ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
 }
 
-// --- fillBreakpoints ---
+// --- fillBreakpoints (constant-size repack into the wider tiers) ---
 const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
 const filled = fillBreakpoints(partial)
 ok(Object.keys(filled).sort().join() === Object.keys(COLS).sort().join(), 'fills every missing breakpoint from the densest present one')
-ok(partial.lg.length === 2 && !partial.xxxxl, 'fillBreakpoints is non-mutating')
+ok(partial.lg.length === 2 && partial.lg[1].x === 20 && !partial.xxxxl, 'fillBreakpoints is non-mutating')
 ok(filled.lg === partial.lg, 'present breakpoints are reused untouched')
-ok(filled.xxxxl[1].x === Math.round(20 * (COLS.xxxxl / COLS.lg)) && filled.xxxxl[1].w === Math.round(10 * (COLS.xxxxl / COLS.lg)), 'missing breakpoint is scaled proportionally (x & w)')
-ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w >= 2), 'scaled items are clamped within the target column range')
+// Widgets keep their size on a wider tier (no proportional growth)...
+ok(filled.xxxxl.every((it) => it.w === 10 && it.h === 9), 'widget size (w/h) is unchanged on a wider tier')
+// ...and the extra columns just fit more per row: two 10-wide widgets share row 0.
+ok(filled.xxxxl[0].y === 0 && filled.xxxxl[1].y === 0 && filled.xxxxl.map((it) => it.x).sort((a, b) => a - b).join() === '0,10', 'widgets repack left-to-right into the wider tier')
+ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w >= 2), 'repacked items stay within the target column range')
+// A widget on a lower row moves up when the wider tier has room beside the first.
+const stacked = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 9 }] })
+ok(stacked.xxxxl.find((it) => it.i === 'b').y === 0, 'a lower widget moves up into the freed horizontal space')
+// Wrapping: at md (25 cols) two 10-wide widgets fit a shelf, the third wraps below.
+const wrapped = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 10, y: 0, w: 10, h: 9 }, { i: 'c', x: 20, y: 0, w: 10, h: 9 }] }).md
+ok(wrapped.filter((it) => it.y === 0).length === 2 && wrapped.find((it) => it.i === 'c').x === 0 && wrapped.find((it) => it.i === 'c').y === 9, 'a third widget wraps to a new shelf below (shelf height = max h)')
+// repack is idempotent (so onLayoutChange echoes don't drift) and array-safe.
+ok(JSON.stringify(repack(repack(partial.lg, 64), 64)) === JSON.stringify(repack(partial.lg, 64)), 'repack is idempotent')
+ok(repack([], 30).length === 0 && repack(null, 30).length === 0, 'repack handles empty/null input')
 const allThere = defaultLayouts([{ i: 'w-1', type: 'a' }], () => ({ ...DEFAULT_SIZE }))
 ok(fillBreakpoints(allThere) !== allThere && Object.keys(fillBreakpoints(allThere)).length === Object.keys(allThere).length, 'a fully-populated layout gains no breakpoints (returns a copy)')
 ok(Object.keys(fillBreakpoints(null)).length === 0 && Object.keys(fillBreakpoints({})).length === 0, 'null/empty input -> empty object (no throw)')

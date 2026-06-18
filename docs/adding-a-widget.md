@@ -77,11 +77,13 @@ Notes on the entry:
   type makes the dashboard silently drop those widgets on next load (that's the
   intended cleanup path for retired widgets — see `WIDGET_TYPES.has()` in
   `Dashboard.jsx`).
-- `defaultSize` is in **grid columns**, and the column count grows with screen
-  width (a responsive ladder in `dashlayout.js`: 30 at `lg`, up to 128 on
-  ultra-wide displays). So a width is a *proportion* — `w: 10` is ~⅓ at `lg` but
-  narrower on a wide canvas, where the extra width becomes more columns rather
-  than wider ones. Pick a `w` that reads well as a fraction, not a pixel size.
+- `defaultSize` is in **grid columns**, on a responsive ladder in `dashlayout.js`
+  (30 columns at `lg`, up to 128 on ultra-wide displays). Every tier holds a
+  ~40px column pitch, so a given `w` is roughly a **constant pixel size** across
+  breakpoints — `w: 10` is ~⅓ of an `lg` board and stays about that wide on an
+  ultra-wide canvas. The extra width on wide screens fits *more widgets per row*
+  (and lets lower widgets move up) rather than enlarging each one. Pick a `w`
+  that reads well at `lg`.
 
 ## 3. If it needs server data
 
