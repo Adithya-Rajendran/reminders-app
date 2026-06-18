@@ -24,9 +24,27 @@ jobs:
       - name: Build SPA
         run: npm run build
       - name: Server syntax check
-        run: for f in server/*.js; do node --check "$f"; done
+        run: npm run check
+      # One entry point (test/run.mjs) runs every test/*.test.mjs and aggregates
+      # the result — new tests (e.g. the widget↔app connection contract in
+      # connections.test.mjs / widget-contract.test.mjs) are picked up automatically.
       - name: Unit tests
-        run: for t in test/*.test.mjs; do node "$t"; done
+        run: npm test
+
+  docker:
+    # Runs the same checks inside the image's `test` stage (CI parity in a
+    # container) and confirms the production image still builds. Independent of
+    # lint-build so the two run in parallel.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint, build, syntax check & unit tests in the Docker test stage
+        run: docker build --target test -t reminders-app:test .
+      - name: Build the production runtime image
+        run: docker build --target runtime -t reminders-app:runtime .
 
   e2e:
     # End-to-end: real SPA + BFF driven by Playwright against a real CalDAV

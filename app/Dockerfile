@@ -1,13 +1,28 @@
-# ---- build the SPA + install deps ----
-FROM node:22-bookworm-slim AS build
+# ---- deps: install all deps (incl. dev) + copy source ----
+# Shared base for the test and build stages so npm ci (and the native
+# better-sqlite3 compile) happens once.
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 # Toolchain for native deps (better-sqlite3) in case a prebuilt binary isn't
-# available; the compiled node_modules is copied into the slim runtime stage.
+# available; the compiled node_modules is reused by the build & test stages.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
+
+# ---- test: CI parity in a container (lint, build, server syntax, unit tests). ----
+# Run with `docker build --target test .` — any failing check fails the build.
+# Mirrors the .github/workflows/ci.yml lint-build job; e2e (Playwright + real
+# CalDAV/WebDAV backends) is a separate job and not run here.
+FROM deps AS test
+RUN npm run lint \
+  && npm run build \
+  && npm run check \
+  && npm test
+
+# ---- build: production SPA + prod-only deps ----
+FROM deps AS build
 RUN npm run build && npm prune --omit=dev
 
 # ---- runtime: BFF serves the built SPA ----

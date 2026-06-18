@@ -3,6 +3,7 @@ import { api } from './api.js'
 import { useModalRef } from './useModalRef.js'
 import ReminderGroupsSection from './settings/ReminderGroupsSection.jsx'
 import NotesFolderSection from './settings/NotesFolderSection.jsx'
+import ConnectionsSection from './settings/ConnectionsSection.jsx'
 import { PROVIDER_PRESETS, ProviderIcon, deriveName, swatchFor } from './settings/providers.jsx'
 import {
   IconCloud, IconX, IconPlus, IconTrash, IconRefresh, IconSpinner,
@@ -213,6 +214,8 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                 </button>
                 {accounts.length > 0 && <NotesFolderSection accounts={accounts} />}
                 {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
+                {/* Widget wiring exists regardless of linked accounts — always shown. */}
+                <ConnectionsSection />
               </div>
             )
           )}
