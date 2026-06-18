@@ -5,7 +5,7 @@ import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { SkeletonRows } from './widgets/parts.jsx'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints,
 } from './dashlayout.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
@@ -70,9 +70,15 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         const f = SCALE_TO_CURRENT[saved.layout.gridV || 1] ?? 2.5
         const needsGrid = f !== 1
         if (needsGrid) lay = scaleLayouts(lay, f)
+        // Fill in any breakpoints the saved board lacks (e.g. the ultrawide tiers
+        // on a board that predates them) so a wide canvas shows a full layout, not
+        // a top-left cluster. Persist below so the fill sticks (idempotent after).
+        const before = Object.keys(lay).length
+        lay = fillBreakpoints(lay)
+        const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)
-        if (sw.length !== original.length || needsGrid) {
+        if (sw.length !== original.length || needsGrid || addedBp) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),

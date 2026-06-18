@@ -2,8 +2,8 @@
 // (fresh-board placement), appendToLayouts (add-widget placement). Run with:
 //   node test/dashlayout.test.mjs
 import {
-  COLS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts,
+  COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -16,6 +16,32 @@ ok(SCALE_TO_CURRENT[GRID_V] === 1, 'the current gridV scales by 1 (no-op)')
 for (const [v, f] of Object.entries(SCALE_TO_CURRENT)) {
   ok(COLS.lg === Math.round(COLS.lg / f) * f, `gridV ${v}: lg col count survives a round-trip through factor ${f}`)
 }
+
+// --- breakpoint ladder (COLS <-> BREAKPOINTS) ---
+ok(Object.keys(COLS).sort().join() === Object.keys(BREAKPOINTS).sort().join(), 'COLS and BREAKPOINTS define the same breakpoints')
+// Ascending by width, column counts must strictly increase (a wider canvas only
+// ever gets MORE columns) so react-grid-layout picks a denser grid as it grows.
+const byWidth = Object.keys(BREAKPOINTS).sort((a, b) => BREAKPOINTS[a] - BREAKPOINTS[b])
+ok(byWidth.every((bp, i) => i === 0 || COLS[bp] > COLS[byWidth[i - 1]]), 'columns strictly increase with breakpoint width')
+// Every breakpoint above 0 keeps roughly the ~40px column-pitch floor, so widgets
+// never balloon on an uncapped ultra-wide canvas (width / cols stays in band).
+for (const bp of byWidth) {
+  if (!BREAKPOINTS[bp]) continue
+  const pitch = BREAKPOINTS[bp] / COLS[bp]
+  ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
+}
+
+// --- fillBreakpoints ---
+const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
+const filled = fillBreakpoints(partial)
+ok(Object.keys(filled).sort().join() === Object.keys(COLS).sort().join(), 'fills every missing breakpoint from the densest present one')
+ok(partial.lg.length === 2 && !partial.xxxxl, 'fillBreakpoints is non-mutating')
+ok(filled.lg === partial.lg, 'present breakpoints are reused untouched')
+ok(filled.xxxxl[1].x === Math.round(20 * (COLS.xxxxl / COLS.lg)) && filled.xxxxl[1].w === Math.round(10 * (COLS.xxxxl / COLS.lg)), 'missing breakpoint is scaled proportionally (x & w)')
+ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w >= 2), 'scaled items are clamped within the target column range')
+const allThere = defaultLayouts([{ i: 'w-1', type: 'a' }], () => ({ ...DEFAULT_SIZE }))
+ok(fillBreakpoints(allThere) !== allThere && Object.keys(fillBreakpoints(allThere)).length === Object.keys(allThere).length, 'a fully-populated layout gains no breakpoints (returns a copy)')
+ok(Object.keys(fillBreakpoints(null)).length === 0 && Object.keys(fillBreakpoints({})).length === 0, 'null/empty input -> empty object (no throw)')
 
 // --- scaleLayouts ---
 const old12 = { lg: [{ i: 'a', x: 4, y: 0, w: 4, h: 9 }, { i: 'b', x: 8, y: 9, w: 1, h: 5 }] }

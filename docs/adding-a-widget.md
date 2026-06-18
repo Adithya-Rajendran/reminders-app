@@ -77,6 +77,11 @@ Notes on the entry:
   type makes the dashboard silently drop those widgets on next load (that's the
   intended cleanup path for retired widgets — see `WIDGET_TYPES.has()` in
   `Dashboard.jsx`).
+- `defaultSize` is in **grid columns**, and the column count grows with screen
+  width (a responsive ladder in `dashlayout.js`: 30 at `lg`, up to 128 on
+  ultra-wide displays). So a width is a *proportion* — `w: 10` is ~⅓ at `lg` but
+  narrower on a wide canvas, where the extra width becomes more columns rather
+  than wider ones. Pick a `w` that reads well as a fraction, not a pixel size.
 
 ## 3. If it needs server data
 

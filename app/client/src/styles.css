@@ -51,6 +51,12 @@
   --glass-blur: 12px;
   --glow-strength: 1;
   --density: 1;
+
+  /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). `none`
+     lets it fill the display — the grid stays usable on ultra-wide screens via
+     the breakpoint ladder in dashlayout.js (more columns, not wider columns).
+     Set a px value here to re-cap and center the canvas. */
+  --canvas-max: none;
 }
 
 [data-theme="light"] {
@@ -1165,13 +1171,15 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
 .cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
 
-/* Cap + center the dashboard so the grid columns don't stretch absurdly wide on
-   ultra-wide (1440p+) screens. The grid measures .grid-wrap, so this also keeps
-   per-column widths sane and resizing usefully fine. */
-.toolbar, .grid-wrap { width: 100%; max-width: 1800px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+/* The dashboard canvas fills the display by default (--canvas-max: none). The
+   grid measures .grid-wrap, so on ultra-wide screens the breakpoint ladder in
+   dashlayout.js keeps per-column widths sane (extra width => more columns, not
+   wider ones). Setting --canvas-max to a px value re-caps and centers the canvas
+   (the auto margins below kick in once a max-width applies). */
+.toolbar, .grid-wrap { width: 100%; max-width: var(--canvas-max); margin-left: auto; margin-right: auto; box-sizing: border-box; }
 
 /* ---------- Dashboard switcher (multiple dashboards) ---------- */
-.dash-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; max-width: 1800px; margin: 0 auto; padding: 14px 24px 0; box-sizing: border-box; }
+.dash-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; max-width: var(--canvas-max); margin: 0 auto; padding: 14px 24px 0; box-sizing: border-box; }
 .dash-tab { display: inline-flex; align-items: center; }
 .dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
 .dash-tab-btn:hover { color: var(--text); }
