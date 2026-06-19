@@ -80,6 +80,17 @@ export function selectFrog(tasks) {
   return open.slice().sort(byImportanceThenDue)[0]
 }
 
+// Frog selection that also weighs DREAD (the optional avoidance score): an
+// important-but-dreaded task surfaces ahead of an equally-important easy one, so
+// the day's frog is the thing you'd otherwise put off (KC & Staats 2020). Ties
+// fall back to nearest due. Reduces to selectFrog when no task carries dread.
+export function selectFrogScored(tasks) {
+  const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
+  if (!open.length) return null
+  const score = (t) => (t.priority || 0) + (t.dread || 0)
+  return open.slice().sort((a, b) => score(b) - score(a) || dueMs(a) - dueMs(b))[0]
+}
+
 const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)
 // Eisenhower quadrant from importance (PRIORITY ≥ 3) × urgency (due-proximity).
 export function eisenhowerQuadrant(task, now = new Date()) {

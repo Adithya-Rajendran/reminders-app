@@ -24,7 +24,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   // shown with an inline consistency strip) and the reminder groups (non-recurring
   // tasks carrying a reminder) — so habits live here instead of a separate widget.
   const selector = useCallback((all) => all, [])
-  const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
   // Sort order, persisted per instance. "soonest" = next reminder first;
   // "priority" = importance-first (counters the mere-urgency effect — see taskviews).
@@ -76,6 +76,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         ...(parsed.due_date ? { due_date: parsed.due_date } : {}),
         ...(parsed.labels?.length ? { labels: parsed.labels } : {}),
         ...(parsed.cue ? { cue: parsed.cue } : {}),
+        ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
         goal_uid: parent.uid,
       })
       tasksCap.emitChanged(); load()
@@ -136,6 +137,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         reminders: [{ reminder: due }],
         ...(labels.length ? { labels } : {}),
         ...(parsed.cue ? { cue: parsed.cue } : {}),
+        ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
       })
       if (g) groupsCap.pushRecent(g)
       setWhen(defaultWhen()); tasksCap.emitChanged(); load()
@@ -174,7 +176,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
 
   const renderRow = (st, showHabit) => (
     <div key={st.id} className={fired.has(st.id) ? 'reminding' : ''}>
-      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} showHabit={showHabit} childTasks={childrenByParent.get(st.uid)} onAddSubtask={addSubtask} />
+      <TaskRow task={st} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} showHabit={showHabit} childTasks={childrenByParent.get(st.uid)} onAddSubtask={addSubtask} />
     </div>
   )
   const renderSection = (key, title, items, showHabit) => {

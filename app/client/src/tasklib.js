@@ -30,6 +30,20 @@ function parseDate(text) {
 
 const PRI_RE = /(^|\s)!([1-5])\b/
 const LABEL_RE = /(^|\s)\*([\w-]+)/g
+// Classify a free-text cue into a typed implementation-intention trigger so it can
+// be filtered by kind (e.g. the Focus widget matching time cues to "now"). "after"
+// is the safe default (habit-stacking). Order matters: an explicit "after …" wins,
+// then place-like phrases, then clock/time-of-day phrases.
+const TIME_CUE_RE = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b|\b\d{1,2}:\d{2}\b|\b(morning|noon|midday|afternoon|evening|tonight)\b/i
+const LOC_CUE_RE = /\b(when i (arrive|leave|get (to|home))|at (the )?(home|office|work|desk|gym|store|school|kitchen|car))\b/i
+export function cueTriggerOf(cue) {
+  const v = String(cue || '').trim()
+  if (!v) return null
+  if (/^after\b/i.test(v)) return { kind: 'after', value: v }
+  if (LOC_CUE_RE.test(v)) return { kind: 'location', value: v }
+  if (TIME_CUE_RE.test(v)) return { kind: 'time', value: v }
+  return { kind: 'after', value: v }
+}
 // Implementation-intention cue: "after morning erg -> draft figure". The text
 // left of the first arrow (-> or →) is the trigger; the task (with its own
 // date/priority/label tokens) is on the right.
@@ -55,7 +69,7 @@ export function parseQuickAdd(input) {
   const { date, matched } = parseDate(title)
   if (matched) title = title.replace(new RegExp('\\b' + matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), ' ')
   title = title.replace(/\s+/g, ' ').trim()
-  return { title, priority, due_date: date || undefined, labels, ...(cue ? { cue } : {}) }
+  return { title, priority, due_date: date || undefined, labels, ...(cue ? { cue, cue_trigger: cueTriggerOf(cue) } : {}) }
 }
 
 // ---- due chip label + urgency class ----

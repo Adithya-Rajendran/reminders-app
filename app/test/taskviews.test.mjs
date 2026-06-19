@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -76,6 +76,18 @@ ok(selectFrog(frogTasks).id === 'c', 'selectFrog: highest priority, then nearest
 ok(selectFrog([]) === null, 'selectFrog: empty -> null')
 ok(selectFrog([{ id: 'z', done: true, priority: 5 }]) === null, 'selectFrog: all done -> null')
 ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, priority: 4 }]).id === 'y', 'selectFrog: no due dates -> highest priority wins')
+
+// ---- selectFrogScored (priority + dread) ----
+{
+  const t = [
+    { id: 'a', done: false, priority: 4, dread: 0, due_date: iso(1 * DAY) }, // score 4
+    { id: 'b', done: false, priority: 3, dread: 3, due_date: iso(2 * DAY) }, // score 6 -> frog
+    { id: 'c', done: false, priority: 5, dread: 0, due_date: iso(3 * DAY) }, // score 5
+  ]
+  ok(selectFrogScored(t).id === 'b', 'selectFrogScored: dread lifts an important-but-avoided task to the top')
+  ok(selectFrogScored([]) === null, 'selectFrogScored: empty -> null')
+  ok(selectFrogScored(frogTasks).id === selectFrog(frogTasks).id, 'selectFrogScored reduces to selectFrog when no dread present')
+}
 
 // ---- byImportanceThenDue (anti-urgency sort) ----
 {

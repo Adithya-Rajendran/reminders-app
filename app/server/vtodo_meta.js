@@ -19,10 +19,13 @@ const FENCE_END = '-----END-REMINDERS-META-----'
 // separately below — it's a standard iCal property, not an X-prop.)
 const XPROP = {
   cue: 'x-reminders-cue',
+  cue_trigger: 'x-reminders-cue-trigger',
   habit_log: 'x-reminders-habit-log',
   is_goal: 'x-reminders-goal',
   goal_plan: 'x-reminders-goal-plan',
   flow: 'x-reminders-flow',
+  dread: 'x-reminders-dread',
+  time_estimate: 'x-reminders-estimate',
 }
 
 // ---- low-level text accessors ----
@@ -95,6 +98,45 @@ export function writeMeta(vt, key, value) {
 // ---- cue (implementation intention) ----
 export const readCue = (vt) => readMeta(vt, 'cue')
 export const writeCue = (vt, cue) => writeMeta(vt, 'cue', String(cue || '').trim())
+
+// ---- typed cue trigger (the machine-readable "when" of an if-then plan) ----
+// Pairs with the free-text `cue`: a structured trigger so a cue can be surfaced
+// and filtered by kind (e.g. the Focus widget picking time-triggered cues for
+// "now"). Implementation intentions ("when X, then Y") are the best-evidenced
+// productivity lever (Gollwitzer & Sheeran 2006, d≈.65). Shape stored as opaque
+// JSON: { kind: 'time'|'location'|'after', value: string }. Null = no trigger.
+const CUE_KINDS = new Set(['time', 'location', 'after'])
+export function readCueTrigger(vt) {
+  const raw = readMeta(vt, 'cue_trigger')
+  if (!raw) return null
+  let o
+  try { o = JSON.parse(raw) } catch { return null }
+  if (!o || typeof o !== 'object' || !CUE_KINDS.has(o.kind)) return null
+  const value = String(o.value == null ? '' : o.value).trim()
+  return value ? { kind: o.kind, value } : null
+}
+export function writeCueTrigger(vt, trig) {
+  if (trig == null) return writeMeta(vt, 'cue_trigger', '')
+  const kind = CUE_KINDS.has(trig.kind) ? trig.kind : 'after'
+  const value = String(trig.value == null ? '' : trig.value).trim()
+  writeMeta(vt, 'cue_trigger', value ? JSON.stringify({ kind, value }) : '')
+}
+
+// ---- dread (avoidance weight, 0..5) ----
+// An optional "how much do I want to avoid this" weight. Surfaces a dreaded-but-
+// important task as the day's frog so a user doesn't quietly default to easier
+// work (KC & Staats 2020). Modeled after Amazing Marvin's graded "frog" strategy.
+const clampDread = (v) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0 }
+export const readDread = (vt) => clampDread(readMeta(vt, 'dread'))
+export const writeDread = (vt, v) => writeMeta(vt, 'dread', clampDread(v) ? String(clampDread(v)) : '')
+
+// ---- time estimate (minutes) ----
+// Optional minutes-to-complete. Enumerating/estimating work counters the planning
+// fallacy (Kruger & Evans 2004) and feeds the Daily Planning roll-up so a day
+// doesn't get over-committed. 0 / absent = no estimate.
+const clampEstimate = (v) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0 }
+export const readEstimate = (vt) => clampEstimate(readMeta(vt, 'time_estimate'))
+export const writeEstimate = (vt, v) => writeMeta(vt, 'time_estimate', clampEstimate(v) ? String(clampEstimate(v)) : '')
 
 // ---- habit completion log ----
 // A recurring task's completions are NOT otherwise recoverable: advancing a

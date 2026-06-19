@@ -34,6 +34,14 @@ export function useTaskList(tasks, selector) {
     update(task.id, { priority }).then(emitChanged).catch(() => refresh())
   }, [storePatch, update, emitChanged, refresh])
 
+  // Generic optimistic field patch (cue_trigger / dread / time_estimate / …):
+  // patch the shared store immediately, then persist; on failure, refetch to
+  // reconcile. Keeps widgets from each needing a bespoke setter per field.
+  const onPatch = useCallback((task, patch) => {
+    storePatch(task.id, patch)
+    update(task.id, patch).then(emitChanged).catch(() => refresh())
+  }, [storePatch, update, emitChanged, refresh])
+
   // Set/clear the implementation-intention cue ("after X -> do Y").
   const onSetCue = useCallback((task, cue) => {
     storePatch(task.id, { cue })
@@ -95,5 +103,5 @@ export function useTaskList(tasks, selector) {
     } catch { replaceTasks(snapshot); refresh() }
   }, [storeRemove, replaceTasks, del, create, update, attachLabels, emitChanged, isRealDate, refresh, getTasks, showUndo])
 
-  return { tasks: view, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, undo, dismissUndo }
+  return { tasks: view, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo }
 }

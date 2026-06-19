@@ -18,7 +18,7 @@ function todayDefault() {
 export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }) {
   const inboxId = projects?.[0]?.id
   const selector = useCallback((all) => selectUpcoming(all), [])
-  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const [quickOnly, setQuickOnly] = useState(false)
   const [draft, setDraft] = useState('')
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
@@ -71,6 +71,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
         due_date: parsed.due_date || todayDefault(),
         ...(parsed.labels?.length ? { labels: parsed.labels } : {}),
         ...(parsed.cue ? { cue: parsed.cue } : {}),
+        ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
       })
       tasksCap.emitChanged(); load()
     } catch { setDraft(raw) }
@@ -79,7 +80,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
   const rows = (items) => (
     <div className="task-stream">
       {items.map((t) => (
-        <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} />
+        <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} />
       ))}
     </div>
   )

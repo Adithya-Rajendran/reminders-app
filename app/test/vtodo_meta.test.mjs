@@ -3,7 +3,7 @@
 // not clobber foreign properties/alarms. Imports only ical.js (no SQLite).
 // Run with: node test/vtodo_meta.test.mjs
 import ICAL from 'ical.js'
-import { readCue, writeCue, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow } from '../server/vtodo_meta.js'
+import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from '../server/vtodo_meta.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -182,6 +182,46 @@ function roundtrip(vcal) {
   const f = readFlow(vt)
   ok(f.x === 0 && f.y === 0, 'non-finite coords coerce to 0')
   ok(JSON.stringify(f.to) === JSON.stringify(['ok']), 'blank/null edges are dropped')
+}
+
+// ---- typed cue trigger: round-trips, validates kind, clears, drops junk ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeCueTrigger(vt, { kind: 'time', value: 'at 9am, sharp' }) // comma must survive
+  const t = readCueTrigger(roundtrip(vcal))
+  ok(t && t.kind === 'time' && t.value === 'at 9am, sharp', 'cue_trigger round-trips (with a comma intact)')
+}
+{
+  const { vt } = makeVtodo()
+  writeCueTrigger(vt, { kind: 'bogus', value: 'x' })
+  ok(readCueTrigger(vt).kind === 'after', 'unknown kind falls back to "after"')
+  writeCueTrigger(vt, { kind: 'time', value: '   ' })
+  ok(readCueTrigger(vt) === null, 'blank value -> no trigger')
+  writeCueTrigger(vt, { kind: 'location', value: 'office' })
+  writeCueTrigger(vt, null)
+  ok(readCueTrigger(vt) === null && vt.getAllProperties('x-reminders-cue-trigger').length === 0, 'writeCueTrigger(null) clears the prop')
+}
+ok(readCueTrigger(makeVtodo().vt) === null, 'absent cue_trigger reads as null')
+
+// ---- dread: clamps to 0..5, round-trips, 0 clears ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeDread(vt, 4)
+  ok(readDread(roundtrip(vcal)) === 4, 'dread round-trips')
+  writeDread(vt, 9); ok(readDread(vt) === 5, 'dread clamps above 5')
+  writeDread(vt, -3); ok(readDread(vt) === 0, 'dread clamps below 0 (and 0 clears)')
+  ok(vt.getAllProperties('x-reminders-dread').length === 0, 'dread 0 removes the X-prop')
+  ok(readDread(makeVtodo().vt) === 0, 'absent dread reads as 0')
+}
+
+// ---- time estimate: positive integer minutes, round-trips, 0/junk clears ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeEstimate(vt, 45)
+  ok(readEstimate(roundtrip(vcal)) === 45, 'time_estimate round-trips')
+  writeEstimate(vt, 0); ok(readEstimate(vt) === 0 && vt.getAllProperties('x-reminders-estimate').length === 0, 'estimate 0 clears the prop')
+  writeEstimate(vt, 'nope'); ok(readEstimate(vt) === 0, 'non-numeric estimate -> 0')
+  ok(readEstimate(makeVtodo().vt) === 0, 'absent estimate reads as 0')
 }
 
 console.log(`\nvtodo_meta.test: ${pass} passed, ${fail} failed`)
