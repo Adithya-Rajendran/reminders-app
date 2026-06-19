@@ -5,6 +5,14 @@ generic and learns about widgets only through the registry at
 `app/client/src/widgets/registry.jsx`. Adding a widget is **one component file
 plus one registry entry** — no dashboard changes.
 
+> **Read `docs/widget-sdk.md` first** — it's the authoritative contract. In short:
+> a widget imports **only** from `../widget-sdk` (+ `react` + its own siblings),
+> and gets all app data through `ctx` capabilities (`ctx.tasks`, `ctx.groups`,
+> `ctx.notes`, `ctx.calendar`, `ctx.events`, `ctx.projects`, `ctx.onOpenSettings`)
+> — **not** by importing `api.js`/the store/the buses. ESLint enforces this. The
+> snippets below predate the SDK; treat them as illustrative and prefer the SDK
+> imports + ctx capabilities shown in `docs/widget-sdk.md`.
+
 ## 1. Create the component
 
 Add `app/client/src/widgets/MyWidget.jsx`. A minimal client-only widget:
