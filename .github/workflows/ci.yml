@@ -30,6 +30,12 @@ jobs:
       # connections.test.mjs / widget-contract.test.mjs) are picked up automatically.
       - name: Unit tests
         run: npm test
+      # Component render tests (vitest + jsdom + Testing Library) — *.test.jsx,
+      # separate from the framework-free node runner above. Covers the high-risk
+      # logic that lives in JSX (Calendar/Notes/Cues/Reminders) + the
+      # manifest↔registry parity gate and the widget-SDK surface tripwire.
+      - name: Component tests
+        run: npm run test:component
 
   docker:
     # Runs the same checks inside the image's `test` stage (CI parity in a

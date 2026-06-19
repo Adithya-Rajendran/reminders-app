@@ -19,7 +19,8 @@ FROM deps AS test
 RUN npm run lint \
   && npm run build \
   && npm run check \
-  && npm test
+  && npm test \
+  && npm run test:component
 
 # ---- build: production SPA + prod-only deps ----
 FROM deps AS build

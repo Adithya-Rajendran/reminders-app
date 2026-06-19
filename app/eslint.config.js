@@ -35,6 +35,31 @@ export default [
     },
   },
   {
+    // Component-test harness (vitest + jsdom + Testing Library): JSX test files
+    // and the jsdom setup shim. Browser + node globals; vitest primitives are
+    // imported explicitly (no magic globals).
+    files: ['test/**/*.jsx', 'client/src/**/*.test.jsx', 'test/setup.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: { ...globals.browser, ...globals.node, ...sharedGlobals },
+    },
+    plugins: { react, 'react-hooks': reactHooks },
+    settings: { react: { version: 'detect' } },
+    rules: {
+      'react/jsx-uses-react': 'off',
+      'react/jsx-uses-vars': 'error',
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      'react/no-unknown-property': 'off',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'off',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
+  },
+  {
     files: ['server/**/*.js', 'test/**/*.{js,mjs}', '*.js'],
     languageOptions: {
       ecmaVersion: 2023,
