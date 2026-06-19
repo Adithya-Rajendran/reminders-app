@@ -18,7 +18,8 @@
 .focus-dur-val { font-size: 13px; font-weight: 700; color: var(--muted); min-width: 34px; text-align: center; }
 .focus-timer-actions { display: flex; gap: 8px; }
 
-.focus-parked { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: 12px; color: var(--warn); }
+.focus-parked { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: 12px; color: var(--muted); }
+.focus-breakthrough { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: 12px; font-weight: 600; color: var(--warn); }
 .focus-brain { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 .focus-brain-head { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
 .focus-brain-head:hover { color: var(--accent); }

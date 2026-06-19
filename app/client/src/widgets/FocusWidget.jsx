@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, widgetStore, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, partitionByTier, widgetStore, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -43,7 +43,10 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
   const startTimer = () => { if (remaining <= 0) setRemaining(durationMin * 60); setSessionStart(Date.now()); setRunning(true) }
   const resetTimer = () => { setRunning(false); setRemaining(durationMin * 60) }
 
-  const parked = running ? (events || []).filter((e) => (e?.receivedAt || 0) > sessionStart).length : 0
+  // Reminders that fired during the session, split so a genuinely urgent one can
+  // break through while routine ones stay quietly parked (pull over push).
+  const sessionEvents = running ? (events || []).filter((e) => (e?.receivedAt || 0) > sessionStart) : []
+  const { breakthrough, routine } = partitionByTier(sessionEvents)
 
   const [park, setPark] = useState(() => store.loadJson(PARK_KEY, ''))
   const savePark = (text) => { setPark(text); store.saveJson(PARK_KEY, text) }
@@ -92,8 +95,11 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
         </div>
       </div>
 
-      {running && parked > 0 && (
-        <div className="focus-parked" title="Reminders that fired while you focus — review them when you finish"><IconBell size={13} /> {parked} reminder{parked > 1 ? 's' : ''} parked</div>
+      {running && breakthrough.length > 0 && (
+        <div className="focus-breakthrough" title="Urgent: overdue or high-priority reminders fired"><IconBell size={13} /> {breakthrough.length} urgent reminder{breakthrough.length > 1 ? 's' : ''} — worth a look</div>
+      )}
+      {running && routine.length > 0 && (
+        <div className="focus-parked" title="Routine reminders fired while you focus — review them when you finish"><IconBell size={13} /> {routine.length} reminder{routine.length > 1 ? 's' : ''} parked</div>
       )}
 
       <div className="focus-brain">
