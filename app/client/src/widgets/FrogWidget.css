@@ -1,0 +1,29 @@
+/* Today's Frog + Eisenhower matrix — co-located with the widget (moved out of
+   styles.css). All theme-token driven so light/dark + accents follow. */
+.frog { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
+.frog-toggle { display: inline-flex; gap: 4px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 2px; }
+.seg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 9px; cursor: pointer; }
+.seg.on { color: var(--text); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
+.frog-card { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
+.frog-eyebrow { position: absolute; top: 10px; right: 12px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+.frog-check { flex: 0 0 auto; width: 26px; height: 26px; margin-top: 18px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; }
+.frog-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
+.frog-body { flex: 1; min-width: 0; margin-top: 14px; }
+.frog-title { font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.frog-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; }
+.eq-Q1 { border-left: 3px solid var(--danger); }
+.eq-Q2 { border-left: 3px solid var(--accent); }
+.eq-Q3 { border-left: 3px solid var(--warn); }
+.eq-Q4 { border-left: 3px solid var(--line-strong); }
+.eq-head { display: flex; align-items: baseline; justify-content: space-between; }
+.eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
+.eq-sub { font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
+.eq-list { display: flex; flex-direction: column; gap: 3px; }
+.eq-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+.eq-item-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eq-item .pdot, .eq-item .chip { flex: 0 0 auto; }
+.eq-item .chip { font-size: 10px; padding: 0 5px; }
+.eq-empty { font-size: 11.5px; color: var(--faint); }

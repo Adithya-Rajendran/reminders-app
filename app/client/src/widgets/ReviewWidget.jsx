@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTaskList, computeReview, parseYmd, widgetStore, useWidgetSize, atLeastH, atMostW, SkeletonRows, EmptyState, ErrorState, IconChart, IconCheck } from '../widget-sdk'
+import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']

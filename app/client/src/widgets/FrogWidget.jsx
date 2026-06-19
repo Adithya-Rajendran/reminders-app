@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTaskList, selectFrog, groupEisenhower, dueChip, timeLabel, pdotClass, widgetStore, useWidgetSize, atLeastW, atLeastH, SkeletonRows, EmptyState, ErrorState, UndoBar, IconFrog, IconGrid, IconList } from '../widget-sdk'
+import './FrogWidget.css'
 
 const FROG_KEY = 'frog-pick'
 const QUADS = [

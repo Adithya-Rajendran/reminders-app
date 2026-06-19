@@ -1588,27 +1588,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
    All theme-token driven so light/dark + accents follow.
    ============================================================ */
 
-/* Weekly Review widget */
-.review { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; }
-.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
-.rv-stat { display: flex; flex-direction: column; line-height: 1.05; }
-.rv-big { font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-.rv-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-.rv-delta { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; }
-.rv-delta.rv-up { color: var(--green); }
-.rv-delta.rv-down { color: var(--danger); }
-.rv-spark { display: flex; align-items: flex-end; gap: 6px; height: 88px; }
-.rv-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; }
-.rv-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
-.rv-bar { width: 70%; max-width: 22px; border-radius: 5px 5px 2px 2px; background: var(--accent-grad); min-height: 4px; transition: height .2s ease; }
-.rv-bar.empty { background: var(--line-strong); }
-.rv-bar-lbl { font-size: 10.5px; color: var(--faint); font-weight: 600; }
-.rv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
-.rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
-.rv-prompt-body { flex: 1; min-width: 0; }
-.rv-prompt-title { font-size: 13px; font-weight: 700; color: var(--text); }
-.rv-prompt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.rv-reviewed { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green); }
+/* Weekly Review widget → co-located in widgets/ReviewWidget.css */
 
 /* If-then cue chip + inline editor (TaskRow + Cues widget) */
 .cue-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 220px; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); cursor: pointer; }
@@ -1641,34 +1621,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
 .habit-strip .chip { font-size: 11px; }
 
-/* Today's Frog + Eisenhower matrix */
-.frog { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
-.frog-toggle { display: inline-flex; gap: 4px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 2px; }
-.seg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 9px; cursor: pointer; }
-.seg.on { color: var(--text); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
-.frog-card { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
-.frog-eyebrow { position: absolute; top: 10px; right: 12px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
-.frog-check { flex: 0 0 auto; width: 26px; height: 26px; margin-top: 18px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; }
-.frog-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
-.frog-body { flex: 1; min-width: 0; margin-top: 14px; }
-.frog-title { font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
-.frog-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; }
-.eq-Q1 { border-left: 3px solid var(--danger); }
-.eq-Q2 { border-left: 3px solid var(--accent); }
-.eq-Q3 { border-left: 3px solid var(--warn); }
-.eq-Q4 { border-left: 3px solid var(--line-strong); }
-.eq-head { display: flex; align-items: baseline; justify-content: space-between; }
-.eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
-.eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
-.eq-sub { font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
-.eq-list { display: flex; flex-direction: column; gap: 3px; }
-.eq-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
-.eq-item-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.eq-item .pdot, .eq-item .chip { flex: 0 0 auto; }
-.eq-item .chip { font-size: 10px; padding: 0 5px; }
-.eq-empty { font-size: 11.5px; color: var(--faint); }
+/* Today’s Frog + Eisenhower matrix → co-located in widgets/FrogWidget.css */
 
 /* Two-minute quick-win badge + Upcoming filter toggle */
 .qw-badge { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 32%, transparent); font-weight: 700; }
@@ -1676,40 +1629,4 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
 .qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }
 
-/* Cues mindmap/flowchart canvas */
-.flow-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.flow-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex: 0 0 auto; }
-.flow-hint { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-body { flex: 1; display: flex; min-height: 0; gap: 8px; }
-.flow-queue { flex: 0 0 158px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; border-right: 1px solid var(--line); }
-.flow-queue-head { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); padding: 2px; }
-.flow-queue-empty { font-size: 12px; color: var(--faint); padding: 4px 2px; }
-.flow-qitem { text-align: left; cursor: grab; display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border-radius: var(--r-chip); border: 1px solid var(--line-strong); background: color-mix(in oklab, var(--panel-solid) 45%, transparent); color: var(--text); }
-.flow-qitem:hover { border-color: var(--accent); }
-.flow-qitem-t { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-qitem-cue { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-canvas { flex: 1; overflow: auto; position: relative; border: 1px solid var(--line); border-radius: var(--r-btn); background:
-  radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--bg2); }
-.flow-content { position: relative; }
-.flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.flow-edge { pointer-events: auto; cursor: pointer; }
-.flow-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
-.flow-edge-line { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .85; }
-.flow-edge:hover .flow-edge-line { stroke: var(--danger); }
-.flow-edge-line.temp { stroke-dasharray: 5 4; opacity: .7; pointer-events: none; }
-.flow-edges marker path { fill: var(--accent); }
-.flow-node { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: var(--r-btn); border: 1px solid var(--line-strong); background: var(--panel-solid); box-shadow: var(--shadow-sm); cursor: grab; touch-action: none; user-select: none; }
-.flow-node:hover { border-color: var(--accent); }
-.flow-node.dragging { cursor: grabbing; box-shadow: var(--shadow); border-color: var(--accent); z-index: 5; }
-.flow-node.done { opacity: .6; }
-.flow-node.done .flow-node-title { text-decoration: line-through; }
-.flow-node-body { flex: 1; min-width: 0; }
-.flow-node-title { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-node-cue { font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-cue-add { color: var(--faint); }
-.flow-cue-input { font-size: 11.5px; padding: 2px 6px; margin-top: 3px; width: 100%; }
-.flow-unplace { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
-.flow-node:hover .flow-unplace { display: inline-flex; }
-.flow-unplace:hover { color: var(--danger); border-color: var(--danger); }
-.flow-handle { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel-solid); cursor: crosshair; }
-.flow-handle:hover { filter: brightness(1.2); }
+/* Cues mindmap/flowchart canvas → co-located in widgets/CuesWidget.css */
