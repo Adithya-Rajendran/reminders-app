@@ -2,7 +2,7 @@
 // isRealDate, dueChip, timeLabel, parseQuickAdd, pdotClass, ZERO_DATE.
 // Locks today's actual output so a future refactor that drifts is caught. Run with:
 //   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/tasklib.test.db node:22 node test/tasklib.test.mjs
-import { parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
+import { parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -60,6 +60,11 @@ ok(absDate(null) === '' && absDate(ZERO_DATE) === '', 'absDate(non-real) is empt
   const allday = new Date(2026, 5, 8, 0, 0)
   ok(absDate(allday.toISOString()) === `${SHORT[allday.getDay()]}, Jun ${allday.getDate()}, 2026`, 'absDate: midnight omits the time')
 }
+
+// --- isTimedDue: midnight is all-day, any other time is timed ---
+ok(isTimedDue(null) === false && isTimedDue(ZERO_DATE) === false, 'isTimedDue(non-real) is false')
+ok(isTimedDue(new Date(2026, 5, 8, 0, 0).toISOString()) === false, 'midnight -> false (all-day)')
+ok(isTimedDue(new Date(2026, 5, 8, 9, 30).toISOString()) === true, '9:30 -> true (timed)')
 
 // --- parseQuickAdd ---
 const q1 = parseQuickAdd('Submit report !2 *finance')

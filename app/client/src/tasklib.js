@@ -109,6 +109,15 @@ export function timeLabel(d) {
   return `${h}:${String(m).padStart(2, '0')} ${ap}`
 }
 
+// True when a due date carries a meaningful time-of-day (not midnight / all-day).
+// Lets the Calendar place dated-only tasks in the all-day lane and timed tasks on
+// the grid, and drag-to-a-slot then writes a real time back (time-blocking).
+export function isTimedDue(d) {
+  if (!isRealDate(d)) return false
+  const dt = new Date(d)
+  return dt.getHours() !== 0 || dt.getMinutes() !== 0
+}
+
 export const PRIORITIES = [
   { v: 0, label: 'None', cls: 'p0' },
   { v: 1, label: 'Low', cls: 'p3' },
