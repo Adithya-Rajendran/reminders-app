@@ -41,3 +41,18 @@ export function fakeGroups(names = []) {
     onNewGroup() {},
   }
 }
+
+// Stand-in for ctx.notes (the notesApi client + open-note bus). Only the methods
+// NotesWidget calls on mount are needed; the rest resolve to no-ops.
+export function fakeNotes({ configured = true, notes = [] } = {}) {
+  const calls = { list: 0, folders: 0, search: 0 }
+  return {
+    calls,
+    list: () => { calls.list++; return Promise.resolve({ configured, notes }) },
+    folders: () => { calls.folders++; return Promise.resolve({ folders: [] }) },
+    search: () => { calls.search++; return Promise.resolve({ results: [] }) },
+    onOpenNote: () => () => {},
+    emitOpenNote() {},
+  }
+}
+
