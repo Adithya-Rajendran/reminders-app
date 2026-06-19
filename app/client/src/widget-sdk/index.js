@@ -15,11 +15,8 @@ export { default as TaskRow } from './ui/TaskRow.jsx'
 export { default as DateTimePicker } from './ui/DateTimePicker.jsx'
 export { default as GroupPicker, GroupList } from './ui/GroupPicker.jsx'
 
-// ---- Notes-widget building blocks (app-level editor stack, re-exported) ----
-export { default as NoteEditor } from '../NoteEditor.jsx'
-export { default as NoteContextMenu } from '../NoteContextMenu.jsx'
-export { default as TrashView } from '../TrashView.jsx'
-export { default as PromptModal } from '../PromptModal.jsx'
+// Notes-widget building blocks (the heavy editor stack) live on a separate entry
+// — import them from '../widget-sdk/notes' — so this barrel stays light.
 
 // ---- hooks ----
 export { WidgetSizeContext, useWidgetSize, useElementSize } from '../useWidgetSize.js'

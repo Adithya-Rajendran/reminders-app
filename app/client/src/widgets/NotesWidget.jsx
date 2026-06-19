@@ -1,13 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   useWidgetSize, atMostW, atLeastW, atLeastH, usePopover,
-  NoteEditor, PromptModal, NoteContextMenu, TrashView,
   buildTree, folderKids, noteKids, countNotes, canDropInto,
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
   widgetStore,
   SkeletonRows, EmptyState, ErrorState,
   IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash,
 } from '../widget-sdk'
+import { NoteEditor, PromptModal, NoteContextMenu, TrashView } from '../widget-sdk/notes'
 
 const EXPAND_KEY = 'notes-expanded-folders'
 const RECENT_KEY = 'notes-recent'
