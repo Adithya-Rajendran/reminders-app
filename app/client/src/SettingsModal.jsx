@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useModalRef } from './useModalRef.js'
 import ReminderGroupsSection from './settings/ReminderGroupsSection.jsx'
-import NotesFolderSection from './settings/NotesFolderSection.jsx'
+import { WIDGETS } from './widgets/registry.jsx'
 import ConnectionsSection from './settings/ConnectionsSection.jsx'
 import { PROVIDER_PRESETS, ProviderIcon, deriveName, swatchFor } from './settings/providers.jsx'
 import {
@@ -212,7 +212,11 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                 <button className="btn ghost block" style={{ marginTop: 14 }} onClick={startAdd}>
                   <IconPlus size={15} /> Add account
                 </button>
-                {accounts.length > 0 && <NotesFolderSection accounts={accounts} />}
+                {/* Widget-contributed Settings panels (e.g. the Notes folder picker). */}
+                {accounts.length > 0 && WIDGETS.filter((wg) => wg.settingsPanel).map((wg) => {
+                  const Panel = wg.settingsPanel
+                  return <Panel key={wg.type} accounts={accounts} />
+                })}
                 {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
                 {/* Widget wiring exists regardless of linked accounts — always shown. */}
                 <ConnectionsSection />

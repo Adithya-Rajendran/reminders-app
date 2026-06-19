@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog } from '../widget-sdk'
+import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
 
 // Widgets are lazy: each becomes its own build chunk, fetched the first time it
@@ -24,6 +25,8 @@ const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
 //           options like w.group live on it); `ctx` holds EXACTLY the interfaces
 //           the descriptor's `plugs` connected to — nothing more (least privilege).
 //   title   optional (w) => string for the frame header (default: the label)
+//   settingsPanel  optional component the widget type contributes to the Settings
+//           modal (rendered there with { accounts }); see widget-sdk/panels.js
 const RENDERERS = {
   reminders: {
     icon: IconBell,
@@ -34,7 +37,12 @@ const RENDERERS = {
   },
   upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} /> },
   calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
-  notes: { icon: IconNote, render: (w, ctx) => <NotesWidget notes={ctx.notes} onOpenSettings={ctx.onOpenSettings} instanceId={w.i} /> },
+  notes: {
+    icon: IconNote,
+    // The Notes widget contributes its folder-config panel to the Settings modal.
+    settingsPanel: NotesFolderPanel,
+    render: (w, ctx) => <NotesWidget notes={ctx.notes} onOpenSettings={ctx.onOpenSettings} instanceId={w.i} />,
+  },
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
   frog: { icon: IconFrog, render: (w, ctx) => <FrogWidget tasks={ctx.tasks} instanceId={w.i} /> },

@@ -28,6 +28,11 @@ const Grid = WidthProvider(Responsive)
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
+// Capability prerequisites a widget may declare (manifest.requires) that the host
+// can determine and gate on. Others (e.g. nextcloud) a widget self-handles.
+const KNOWABLE_REQUIREMENTS = new Set(['caldav'])
+const REQUIREMENT_LABEL = { caldav: 'a CalDAV account', nextcloud: 'a Nextcloud account' }
+
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
 // Apple-style size floor: the smallest grid w/h a widget can be resized to, so a
@@ -217,6 +222,15 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   )
   const slots = useMemo(() => appSlots(appCtx), [appCtx])
 
+  // Which declared widget requirements the host can satisfy right now (see
+  // manifest.requires). A widget with an unmet, host-knowable requirement shows a
+  // "connect it in Settings" placeholder instead of rendering.
+  const available = useMemo(() => {
+    const s = new Set()
+    if (caldavAccounts > 0 || projects.length > 0) s.add('caldav')
+    return s
+  }, [caldavAccounts, projects.length])
+
   // Dev sanity check: warn once if a widget plugs into an interface the app
   // doesn't define (a typo'd / retired interface name) — caught at the registry,
   // not per saved widget, so it fires once regardless of how many are on the board.
@@ -288,10 +302,12 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
               // hand it ONLY the connected interfaces (least privilege).
               const { connections } = resolveConnections(spec?.plugs, slots)
               const ctx = selectCtx(appCtx, connections)
+              // Gate on declared capability requirements the host can determine.
+              const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
               return (
                 <div key={w.i}>
                   <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
-                    {spec?.render(w, ctx)}
+                    {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
                   </WidgetFrame>
                 </div>
               )
@@ -321,6 +337,21 @@ function OnboardingCard({ onOpenSettings }) {
           <IconCloud size={16} /> Connect CalDAV
         </button>
       </div>
+    </div>
+  )
+}
+
+/* ---------- Unmet capability requirement (manifest.requires) ---------- */
+function WidgetRequirement({ reqs, onOpenSettings }) {
+  const what = reqs.map((r) => REQUIREMENT_LABEL[r] || r).join(' & ')
+  return (
+    <div className="state">
+      <div className="state-ic"><IconCloud size={22} /></div>
+      <div className="state-title">Needs {what}</div>
+      <div className="state-sub">Connect it in Settings to use this widget.</div>
+      <button className="btn primary sm" style={{ marginTop: 10 }} onClick={() => onOpenSettings?.()}>
+        <IconCloud size={14} /> Open Settings
+      </button>
     </div>
   )
 }

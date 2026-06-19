@@ -20,4 +20,10 @@ describe('widget registry ↔ manifest parity', () => {
     expect(WIDGET_TYPES.size).toBe(WIDGET_MANIFEST.length)
     for (const m of WIDGET_MANIFEST) expect(WIDGET_TYPES.get(m.type)).toBeTruthy()
   })
+
+  it('supports widget-contributed Settings panels', () => {
+    const withPanel = WIDGETS.filter((w) => w.settingsPanel)
+    expect(withPanel.length).toBeGreaterThan(0) // Notes contributes its folder panel
+    for (const w of withPanel) expect(typeof w.settingsPanel).toBe('function')
+  })
 })
