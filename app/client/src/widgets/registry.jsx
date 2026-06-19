@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog } from '../icons.jsx'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog } from '../widget-sdk'
 import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
 
 // Widgets are lazy: each becomes its own build chunk, fetched the first time it

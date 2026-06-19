@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconPlus, IconChevDown } from './icons.jsx'
+import { IconPlus, IconChevDown } from '../../icons.jsx'
 
 // The panel content: a search box, the recent groups (or search matches), and a
 // "New group…" row that routes to Settings (group creation lives there now).

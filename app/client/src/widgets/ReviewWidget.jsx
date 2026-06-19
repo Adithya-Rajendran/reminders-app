@@ -1,12 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList } from '../useTasks.js'
-import { computeReview, parseYmd } from '../reviewstats.js'
-import { loadJson, saveJson } from '../storage.js'
+import { useTaskList, computeReview, parseYmd, loadJson, saveJson, useWidgetSize, atLeastH, atMostW, SkeletonRows, EmptyState, ErrorState, IconChart, IconCheck } from '../widget-sdk'
 import { emitTasksChanged } from '../tasksbus.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atLeastH, atMostW } from '../widgetsize.js'
-import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
-import { IconChart, IconCheck } from '../icons.jsx'
 
 const REVIEWED_KEY = 'review-last-reviewed'
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']

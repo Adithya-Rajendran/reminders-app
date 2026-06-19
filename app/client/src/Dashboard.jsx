@@ -3,7 +3,7 @@ import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk } from './api.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
-import { SkeletonRows } from './widgets/parts.jsx'
+import { SkeletonRows } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyMins,
@@ -11,7 +11,7 @@ import {
 import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
-import { GroupList } from './GroupPicker.jsx'
+import { GroupList } from './widget-sdk'
 import { recentGroups } from './groups.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,

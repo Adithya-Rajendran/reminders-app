@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList } from '../useTasks.js'
-import { selectFrog, groupEisenhower } from '../taskviews.js'
-import { dueChip, timeLabel, pdotClass } from '../tasklib.js'
-import { loadJson, saveJson } from '../storage.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atLeastW, atLeastH } from '../widgetsize.js'
-import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
-import { IconFrog, IconGrid, IconList } from '../icons.jsx'
+import { useTaskList, selectFrog, groupEisenhower, dueChip, timeLabel, pdotClass, loadJson, saveJson, useWidgetSize, atLeastW, atLeastH, SkeletonRows, EmptyState, ErrorState, UndoBar, IconFrog, IconGrid, IconList } from '../widget-sdk'
 
 const FROG_KEY = 'frog-pick'
 const QUADS = [

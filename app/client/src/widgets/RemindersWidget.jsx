@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind,
+  parseQuickAdd, dueChip, timeLabel, ZERO_DATE,
+  useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
+  SkeletonRows, EmptyState, ErrorState, UndoBar, loadStringSet, saveStringSet,
+  IconBell, IconClock, IconPlus, IconChevR, IconFlame,
+} from '../widget-sdk'
 import { reminderGroups } from '../api.js'
-import { useTaskList } from '../useTasks.js'
-import { selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind } from '../taskviews.js'
-import { createTask, parseQuickAdd, dueChip, timeLabel, ZERO_DATE } from '../tasklib.js'
+import { createTask } from '../tasklib.js'
 import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
 import { recentGroups, pushRecentGroup } from '../groups.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atLeastH } from '../widgetsize.js'
-import GroupPicker from '../GroupPicker.jsx'
-import TaskRow from './TaskRow.jsx'
-import DateTimePicker from './DateTimePicker.jsx'
-import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
-import { loadStringSet, saveStringSet } from '../storage.js'
-import { IconBell, IconClock, IconPlus, IconChevR, IconFlame } from '../icons.jsx'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
 

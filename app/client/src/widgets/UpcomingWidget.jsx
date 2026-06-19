@@ -1,11 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList } from '../useTasks.js'
-import { selectUpcoming, dueBucket, UPCOMING_ORDER, isQuickWin } from '../taskviews.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atMostH } from '../widgetsize.js'
-import TaskRow from './TaskRow.jsx'
-import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
-import { IconClock, IconBolt } from '../icons.jsx'
+import { useTaskList, selectUpcoming, dueBucket, UPCOMING_ORDER, isQuickWin, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconClock, IconBolt } from '../widget-sdk'
 
 export default function UpcomingWidget() {
   // Derive from the shared task store (one /api/tasks fetch for the whole board).

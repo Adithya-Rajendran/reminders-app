@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTaskList, selectFlowSource, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue } from '../widget-sdk'
 import { reminderGroups } from '../api.js'
-import { useTaskList } from '../useTasks.js'
-import { selectFlowSource } from '../taskviews.js'
 import { updateTask } from '../tasklib.js'
 import { patchTask as storePatch } from '../taskstore.js'
 import { emitTasksChanged } from '../tasksbus.js'
 import { recentGroups } from '../groups.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atLeastW } from '../widgetsize.js'
-import GroupPicker from '../GroupPicker.jsx'
-import { SkeletonRows, EmptyState, ErrorState, UndoBar } from './parts.jsx'
-import { IconCue } from '../icons.jsx'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
 // to place them, drag the ● handle from one card to another to connect them, and

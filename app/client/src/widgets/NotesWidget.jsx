@@ -1,20 +1,15 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useWidgetSize, atMostW, atLeastW, atLeastH, usePopover,
+  NoteEditor, PromptModal, NoteContextMenu, TrashView,
+  buildTree, folderKids, noteKids, countNotes, canDropInto,
+  sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
+  loadStringSet, saveStringSet, loadJson, saveJson,
+  SkeletonRows, EmptyState, ErrorState,
+  IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash,
+} from '../widget-sdk'
 import { notesApi } from '../api.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atLeastW, atLeastH } from '../widgetsize.js'
-import NoteEditor from '../NoteEditor.jsx'
-import PromptModal from '../PromptModal.jsx'
-import { buildTree, folderKids, noteKids, countNotes, canDropInto } from '../notetree.js'
-import { sortNotes, SORTS } from '../notesort.js'
-import { ancestorsOf } from '../notepaths.js'
 import { onOpenNote } from '../notesbus.js'
-import { pushRecent, pruneRecent } from '../noterecent.js'
-import { loadStringSet, saveStringSet, loadJson, saveJson } from '../storage.js'
-import { usePopover } from '../usePopover.js'
-import NoteContextMenu from '../NoteContextMenu.jsx'
-import TrashView from '../TrashView.jsx'
-import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
-import { IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash } from '../icons.jsx'
 
 const EXPAND_KEY = 'notes-expanded-folders'
 const RECENT_KEY = 'notes-recent'

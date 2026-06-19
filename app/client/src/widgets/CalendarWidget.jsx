@@ -4,13 +4,10 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
+import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 import { api, tk } from '../api.js'
-import { ZERO_DATE } from '../tasklib.js'
 import { emitTasksChanged } from '../tasksbus.js'
 import { subscribe, ensureLoaded } from '../taskstore.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atLeastW } from '../widgetsize.js'
-import { IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../icons.jsx'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')

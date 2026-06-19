@@ -1,4 +1,4 @@
-import { IconRefresh, IconInbox } from '../icons.jsx'
+import { IconRefresh, IconInbox } from '../../icons.jsx'
 
 export function SkeletonRows({ n = 5 }) {
   return (

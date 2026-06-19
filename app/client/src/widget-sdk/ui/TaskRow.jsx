@@ -1,11 +1,11 @@
 import { memo, useRef, useState } from 'react'
-import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../tasklib.js'
-import { isQuickWin, isTwoMinName, isRecurringTask } from '../taskviews.js'
-import { computeHabitStats, recentDays } from '../habitstats.js'
-import { usePopover } from '../usePopover.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW } from '../widgetsize.js'
-import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../icons.jsx'
+import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../../tasklib.js'
+import { isQuickWin, isTwoMinName, isRecurringTask } from '../../taskviews.js'
+import { computeHabitStats, recentDays } from '../../habitstats.js'
+import { usePopover } from '../../usePopover.js'
+import { useWidgetSize } from '../../useWidgetSize.js'
+import { atMostW } from '../../widgetsize.js'
+import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 
 const HABIT_DOTS = 14
