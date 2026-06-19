@@ -26,4 +26,12 @@ describe('widget registry ↔ manifest parity', () => {
     expect(withPanel.length).toBeGreaterThan(0) // Notes contributes its folder panel
     for (const w of withPanel) expect(typeof w.settingsPanel).toBe('function')
   })
+
+  it('accepts optional per-instance lifecycle hooks (when declared)', () => {
+    for (const w of WIDGETS) {
+      if (!w.lifecycle) continue
+      if (w.lifecycle.onMount) expect(typeof w.lifecycle.onMount).toBe('function')
+      if (w.lifecycle.onUnmount) expect(typeof w.lifecycle.onUnmount).toBe('function')
+    }
+  })
 })

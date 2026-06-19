@@ -307,7 +307,9 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
               return (
                 <div key={w.i}>
                   <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
-                    {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
+                    <WidgetMount spec={spec} w={w} ctx={ctx}>
+                      {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
+                    </WidgetMount>
                   </WidgetFrame>
                 </div>
               )
@@ -339,6 +341,19 @@ function OnboardingCard({ onOpenSettings }) {
       </div>
     </div>
   )
+}
+
+/* ---------- Per-instance lifecycle (optional registry `lifecycle` hooks) ---------- */
+// Runs a widget type's optional onMount/onUnmount once per INSTANCE (keyed to w.i,
+// not ctx identity, so re-memoizing a capability doesn't re-fire them). Forward-
+// looking: no widget declares lifecycle hooks today, but the host supports them.
+function WidgetMount({ spec, w, ctx, children }) {
+  const lifecycle = spec?.lifecycle
+  useEffect(() => {
+    lifecycle?.onMount?.(w, ctx)
+    return () => lifecycle?.onUnmount?.(w)
+  }, [w.i]) // eslint deps intentionally minimal: lifecycle is per-instance
+  return children
 }
 
 /* ---------- Unmet capability requirement (manifest.requires) ---------- */

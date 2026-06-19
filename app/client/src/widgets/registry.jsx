@@ -27,6 +27,8 @@ const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
 //   title   optional (w) => string for the frame header (default: the label)
 //   settingsPanel  optional component the widget type contributes to the Settings
 //           modal (rendered there with { accounts }); see widget-sdk/panels.js
+//   lifecycle  optional { onMount(w, ctx), onUnmount(w) } run once per widget
+//           instance by the dashboard (forward-looking; no widget uses it yet)
 const RENDERERS = {
   reminders: {
     icon: IconBell,
