@@ -20,9 +20,10 @@
 //                auto-connects each plug to the matching app slot and passes ONLY
 //                the connected interfaces' values into the widget's `ctx`. Declare
 //                every interface whose ctx key you read; omit it and that key is
-//                absent. Catalog: 'tasks' (shared store, ambient — no ctx key),
-//                'reminder-events' (ctx.events), 'projects' (ctx.projects),
-//                'reminder-groups' (ctx.onNewGroup), 'settings' (ctx.onOpenSettings).
+//                absent. Catalog: 'tasks' (ctx.tasks), 'reminder-events'
+//                (ctx.events), 'projects' (ctx.projects), 'reminder-groups'
+//                (ctx.groups), 'notes' (ctx.notes), 'calendar' (ctx.calendar),
+//                'settings' (ctx.onOpenSettings).
 //   pickGroup    optional; the "Add widget" menu opens a reminder-group submenu
 //                and stores the pick as w.group (null/undefined = all groups)
 //   defaultSize  optional { w, h } in grid units when first added (default 10×9)
@@ -32,8 +33,8 @@
 export const WIDGET_MANIFEST = [
   { type: 'reminders', label: 'Reminders',     plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], pickGroup: true, minSize: { w: 5, h: 5 } },
   { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks'] },
-  { type: 'calendar',  label: 'Calendar',      plugs: ['tasks'], minSize: { w: 5, h: 5 } },
-  { type: 'notes',     label: 'Notes',         plugs: ['settings'], minSize: { w: 6, h: 6 } },
+  { type: 'calendar',  label: 'Calendar',      plugs: ['tasks', 'calendar'], minSize: { w: 5, h: 5 } },
+  { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], minSize: { w: 6, h: 6 } },
   { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], defaultSize: { w: 8, h: 8 } },
   { type: 'cues',      label: 'Cues (flow)',   plugs: ['tasks', 'reminder-groups'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 6, h: 6 } },
   { type: 'frog',      label: 'Today’s Frog',  plugs: ['tasks'], defaultSize: { w: 8, h: 7 } },

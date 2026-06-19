@@ -8,8 +8,6 @@ import {
   SkeletonRows, EmptyState, ErrorState,
   IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash,
 } from '../widget-sdk'
-import { notesApi } from '../api.js'
-import { onOpenNote } from '../notesbus.js'
 
 const EXPAND_KEY = 'notes-expanded-folders'
 const RECENT_KEY = 'notes-recent'
@@ -69,7 +67,7 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
 // Notes widget: an Obsidian/VSCode-style workspace — a folder+note tree in a
 // sidebar, the selected note open in the main pane. Collapses to a single
 // master-detail column when the widget is narrow.
-export default function NotesWidget({ onOpenSettings }) {
+export default function NotesWidget({ notes: notesApi, onOpenSettings }) {
   const [state, setState] = useState('loading') // loading | ready | error | unconfigured
   const [notes, setNotes] = useState([])
   const [folders, setFolders] = useState([])
@@ -116,7 +114,7 @@ export default function NotesWidget({ onOpenSettings }) {
 
   // Open a note requested from elsewhere (command palette, a [[wikilink]], a
   // backlink). Reload so a just-created note appears, then bring it up.
-  useEffect(() => onOpenNote((path) => { setOpenPath(path); load() }), [load])
+  useEffect(() => notesApi.onOpenNote((path) => { setOpenPath(path); load() }), [load, notesApi])
 
   // Keep the open note's folder chain expanded once it's known in the list — so
   // a palette/wikilink jump into a collapsed folder reveals where the note lives.

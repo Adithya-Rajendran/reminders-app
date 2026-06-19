@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTaskList, selectFlowSource, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue } from '../widget-sdk'
-import { reminderGroups } from '../api.js'
-import { updateTask } from '../tasklib.js'
-import { patchTask as storePatch } from '../taskstore.js'
-import { emitTasksChanged } from '../tasksbus.js'
-import { recentGroups } from '../groups.js'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
 // to place them, drag the ● handle from one card to another to connect them, and
@@ -46,9 +41,9 @@ function FlowNode({ task, pos, dragging, onMoveStart, onLinkStart, onToggle, onU
   )
 }
 
-export default function CuesWidget({ group: initialGroup, onNewGroup }) {
+export default function CuesWidget({ tasks: tasksCap, groups, group: initialGroup }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load, onToggle, onSetCue, undo, dismissUndo } = useTaskList(selector)
+  const { tasks, state, load, onToggle, onSetCue, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const [group, setGroup] = useState(initialGroup || '')
   const [knownGroups, setKnownGroups] = useState([])
   const [drag, setDrag] = useState(null)
@@ -63,7 +58,7 @@ export default function CuesWidget({ group: initialGroup, onNewGroup }) {
   const showHint = atLeastW(sz, 'md')
 
   useEffect(() => {
-    reminderGroups().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
+    groups.fetch().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
   }, [])
 
   const source = useMemo(() => selectFlowSource(tasks, group), [tasks, group])
@@ -81,13 +76,13 @@ export default function CuesWidget({ group: initialGroup, onNewGroup }) {
       y: patch.y != null ? Math.round(patch.y) : cur.y,
       to: patch.to != null ? patch.to : (cur.to || []),
     }
-    storePatch(task.id, { flow })
-    updateTask(task.id, { flow }).then(emitTasksChanged).catch(() => load())
-  }, [load])
+    tasksCap.patchTask(task.id, { flow })
+    tasksCap.update(task.id, { flow }).then(tasksCap.emitChanged).catch(() => load())
+  }, [load, tasksCap])
   const unplace = useCallback((task) => {
-    storePatch(task.id, { flow: null })
-    updateTask(task.id, { flow: null }).then(emitTasksChanged).catch(() => load())
-  }, [load])
+    tasksCap.patchTask(task.id, { flow: null })
+    tasksCap.update(task.id, { flow: null }).then(tasksCap.emitChanged).catch(() => load())
+  }, [load, tasksCap])
   const addEdge = useCallback((task, targetUid) => {
     persistFlow(task, { to: [...new Set([...(task.flow?.to || []), targetUid])] })
   }, [persistFlow])
@@ -147,7 +142,7 @@ export default function CuesWidget({ group: initialGroup, onNewGroup }) {
   }
 
   const allGroups = [...knownGroups].sort()
-  const recent = recentGroups().filter((g) => allGroups.includes(g))
+  const recent = groups.recent().filter((g) => allGroups.includes(g))
 
   let body
   if (state === 'loading') body = <SkeletonRows />
@@ -198,7 +193,7 @@ export default function CuesWidget({ group: initialGroup, onNewGroup }) {
   return (
     <div className="tasklist flow-wrap">
       <div className="flow-toolbar">
-        <GroupPicker value={group} groups={allGroups} recent={recent} onChange={setGroup} onNew={(name) => onNewGroup?.(name)} neutral={{ label: 'All reminders', value: '' }} placeholder="All reminders" />
+        <GroupPicker value={group} groups={allGroups} recent={recent} onChange={setGroup} onNew={(name) => groups.onNewGroup?.(name)} neutral={{ label: 'All reminders', value: '' }} placeholder="All reminders" />
         {showHint && <span className="flow-hint">Drag a card onto the board · drag ● to link · click a line to remove · double-click to edit the cue</span>}
         {compact && source.length > 0 && (
           <button type="button" className="btn ghost sm" aria-pressed={queueOpen} onClick={() => setQueueOpen((o) => !o)}>

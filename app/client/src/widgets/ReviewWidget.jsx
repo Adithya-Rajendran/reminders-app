@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTaskList, computeReview, parseYmd, loadJson, saveJson, useWidgetSize, atLeastH, atMostW, SkeletonRows, EmptyState, ErrorState, IconChart, IconCheck } from '../widget-sdk'
-import { emitTasksChanged } from '../tasksbus.js'
 
 const REVIEWED_KEY = 'review-last-reviewed'
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -10,9 +9,9 @@ const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 // over the shared task store — reads completed one-time tasks (STATUS:COMPLETED)
 // plus habit-log dates; writes nothing to CalDAV. The "reviewed" timestamp is
 // client-only UI state in localStorage (not SQLite, not CalDAV).
-export default function ReviewWidget() {
+export default function ReviewWidget({ tasks: tasksCap }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load } = useTaskList(selector)
+  const { tasks, state, load } = useTaskList(tasksCap, selector)
   const sz = useWidgetSize()
 
   const [lastReviewed, setLastReviewed] = useState(() => loadJson(REVIEWED_KEY, null))
@@ -22,7 +21,7 @@ export default function ReviewWidget() {
     const now = new Date().toISOString()
     saveJson(REVIEWED_KEY, now)
     setLastReviewed(now)
-    emitTasksChanged() // nudge a refresh so the next-week rollover stays honest
+    tasksCap.emitChanged() // nudge a refresh so the next-week rollover stays honest
   }
 
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>

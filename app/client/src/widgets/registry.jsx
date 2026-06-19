@@ -29,15 +29,15 @@ const RENDERERS = {
     icon: IconBell,
     title: (w) => w.group || 'Reminders', // a group-locked widget shows the group name
     render: (w, ctx) => (
-      <RemindersWidget events={ctx.events} projects={ctx.projects} group={w.group || null} onNewGroup={ctx.onNewGroup} />
+      <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} group={w.group || null} instanceId={w.i} />
     ),
   },
-  upcoming: { icon: IconClock, render: () => <UpcomingWidget /> },
-  calendar: { icon: IconCalendar, render: () => <CalendarWidget /> },
-  notes: { icon: IconNote, render: (_w, ctx) => <NotesWidget onOpenSettings={ctx.onOpenSettings} /> },
-  review: { icon: IconChart, render: () => <ReviewWidget /> },
-  cues: { icon: IconCue, render: (w, ctx) => <CuesWidget group={w.group || ''} onNewGroup={ctx.onNewGroup} /> },
-  frog: { icon: IconFrog, render: () => <FrogWidget /> },
+  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} /> },
+  calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
+  notes: { icon: IconNote, render: (w, ctx) => <NotesWidget notes={ctx.notes} onOpenSettings={ctx.onOpenSettings} instanceId={w.i} /> },
+  review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
+  cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
+  frog: { icon: IconFrog, render: (w, ctx) => <FrogWidget tasks={ctx.tasks} instanceId={w.i} /> },
 }
 
 // Each manifest descriptor + its renderer = a full widget entry, in menu order.

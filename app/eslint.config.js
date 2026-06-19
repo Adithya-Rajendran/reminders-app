@@ -35,6 +35,20 @@ export default [
     },
   },
   {
+    // Widget boundary: a widget may import only `react`, its own sibling files
+    // (./…), and the widget SDK (../widget-sdk). All app data arrives through the
+    // ctx capabilities the host/SDK provide — never via direct store/api/bus imports.
+    files: ['client/src/widgets/**/*.{js,jsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['../*', '../../*', '../../../*', '!../widget-sdk', '!../widget-sdk/**'],
+          message: 'Widgets may import only react, sibling files (./), and the widget SDK (../widget-sdk). Reach app data through ctx capabilities, not direct imports.',
+        }],
+      }],
+    },
+  },
+  {
     // Component-test harness (vitest + jsdom + Testing Library): JSX test files
     // and the jsdom setup shim. Browser + node globals; vitest primitives are
     // imported explicitly (no magic globals).

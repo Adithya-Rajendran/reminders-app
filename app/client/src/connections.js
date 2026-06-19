@@ -21,15 +21,15 @@
 // React context without a defensive copy.
 
 // The catalog of interfaces the application/canvas provides. Each interface maps
-// to the ctx prop names it injects into a widget's render() (`keys`) — so widget
-// render() signatures stay byte-identical to the pre-connections ctx bag. A
-// keyless interface (like `tasks`) is a declarative dependency only: it's consumed
-// via a module singleton (the shared task store / useTaskList), not through ctx.
+// to the ctx key(s) it injects into a widget's render() (`keys`). Every interface
+// delivers a capability value through ctx (e.g. ctx.tasks, ctx.groups, ctx.notes,
+// ctx.calendar) — a widget reaches app data ONLY through what it plugs into; it
+// never imports the store/api/buses directly (the widget-SDK boundary enforces it).
 export const APP_INTERFACES = Object.freeze({
   'tasks': Object.freeze({
     scope: 'app',
-    summary: 'Shared task store — one /api/tasks fetch per board, optimistic edits + undo (ambient via useTaskList).',
-    keys: Object.freeze([]),
+    summary: 'Shared task store — one /api/tasks fetch per board, optimistic edits + undo. Injects ctx.tasks (store + mutations + bus); read it with useTaskList(ctx.tasks, selector).',
+    keys: Object.freeze(['tasks']),
   }),
   'reminder-events': Object.freeze({
     scope: 'app',
@@ -43,8 +43,18 @@ export const APP_INTERFACES = Object.freeze({
   }),
   'reminder-groups': Object.freeze({
     scope: 'app',
-    summary: 'Reminder groups + the “new group” affordance (opens Settings prefilled).',
-    keys: Object.freeze(['onNewGroup']),
+    summary: 'Reminder groups capability — fetch groups, recent picks, and the “new group” affordance (opens Settings prefilled). Injects ctx.groups.',
+    keys: Object.freeze(['groups']),
+  }),
+  'notes': Object.freeze({
+    scope: 'app',
+    summary: 'Markdown notes over WebDAV/Nextcloud — list/CRUD/search/trash + the open-note bus. Injects ctx.notes.',
+    keys: Object.freeze(['notes']),
+  }),
+  'calendar': Object.freeze({
+    scope: 'app',
+    summary: 'CalDAV calendar events — list a date range + create/edit/delete + the enabled-account list. Injects ctx.calendar.',
+    keys: Object.freeze(['calendar']),
   }),
   'settings': Object.freeze({
     scope: 'app',
@@ -123,9 +133,8 @@ export function selectCtx(fullCtx, connections, catalog = APP_INTERFACES) {
 }
 
 // The set of interface names the app currently provides, given the live ctx.
-// A keyless interface (e.g. `tasks`, an ambient module singleton) is always
-// provided; a keyed interface is provided only when every ctx key it injects is
-// present (!== undefined) — so a board built without, say, onOpenSettings would
+// An interface is provided only when every ctx key it injects is present
+// (!== undefined) — so a board built without, say, ctx.onOpenSettings would
 // honestly report `settings` as unavailable.
 export function appSlots(ctx = {}, catalog = APP_INTERFACES) {
   const names = new Set()

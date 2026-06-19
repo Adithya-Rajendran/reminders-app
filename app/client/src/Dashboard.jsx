@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
-import { api, tk } from './api.js'
+import { api, tk, reminderGroups, notesApi } from './api.js'
+import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks } from './taskstore.js'
+import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
+import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
+import { onOpenNote, emitOpenNote } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
 import { SkeletonRows } from './widget-sdk'
@@ -12,7 +16,7 @@ import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
-import { recentGroups } from './groups.js'
+import { recentGroups, pushRecentGroup } from './groups.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
@@ -182,10 +186,35 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // Group creation happens only in Settings now — open it with the typed name.
   const onNewGroup = useCallback((name) => onOpenSettings?.({ createGroup: name }), [onOpenSettings])
 
+  // The capability objects the app hands widgets through the connection layer.
+  // Built once (stable identity), so ctx.tasks/ctx.groups/ctx.notes/ctx.calendar
+  // wrap the app-owned singletons (the shared store, the buses, the API client) —
+  // a widget reaches data ONLY through what it plugs into, never via direct import.
+  const tasksCap = useMemo(() => ({
+    subscribe, getTasks, getState, refresh, ensureLoaded,
+    patchTask, removeTask, replaceTasks,
+    update: updateTask, create: createTask, del: deleteTask, attachLabels,
+    emitChanged: emitTasksChanged, onChanged: onTasksChanged, isRealDate,
+  }), [])
+  const groupsCap = useMemo(() => ({
+    fetch: reminderGroups, recent: recentGroups, pushRecent: pushRecentGroup, onNewGroup,
+  }), [onNewGroup])
+  const notesCap = useMemo(() => ({ ...notesApi, onOpenNote, emitOpenNote }), [])
+  const calendarCap = useMemo(() => ({
+    listEvents: (start, end) => api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+    createEvent: (body) => api('/api/calendar/events', { method: 'POST', body: JSON.stringify(body) }),
+    updateEvent: (body) => api('/api/calendar/events', { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteEvent: (body) => api('/api/calendar/events', { method: 'DELETE', body: JSON.stringify(body) }),
+    accounts: () => api('/api/caldav/accounts'),
+  }), [])
+
   // The app slots: every interface the canvas provides, with its live value. A
   // widget receives only the subset it plugs into (see connections.js) — the
   // dashboard never hands a widget app state it didn't declare a dependency on.
-  const appCtx = useMemo(() => ({ events, projects, onNewGroup, onOpenSettings }), [events, projects, onNewGroup, onOpenSettings])
+  const appCtx = useMemo(
+    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, onOpenSettings }),
+    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, onOpenSettings],
+  )
   const slots = useMemo(() => appSlots(appCtx), [appCtx])
 
   // Dev sanity check: warn once if a widget plugs into an interface the app

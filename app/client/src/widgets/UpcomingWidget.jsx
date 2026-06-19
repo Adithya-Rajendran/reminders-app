@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTaskList, selectUpcoming, dueBucket, UPCOMING_ORDER, isQuickWin, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconClock, IconBolt } from '../widget-sdk'
 
-export default function UpcomingWidget() {
+export default function UpcomingWidget({ tasks: tasksCap }) {
   // Derive from the shared task store (one /api/tasks fetch for the whole board).
   const selector = useCallback((all) => selectUpcoming(all), [])
-  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
+  const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const [quickOnly, setQuickOnly] = useState(false)
   const sz = useWidgetSize()
 

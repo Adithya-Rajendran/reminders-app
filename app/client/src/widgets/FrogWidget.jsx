@@ -14,9 +14,9 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 // due), plus an optional Eisenhower matrix. Pure derived view over existing
 // PRIORITY × due fields — no new data. The day's frog is pinned in localStorage
 // so it stays stable as you edit, until it's done or the day rolls over.
-export default function FrogWidget() {
+export default function FrogWidget({ tasks: tasksCap }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(selector)
+  const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const [view, setView] = useState('frog')
   const sz = useWidgetSize()
 

@@ -6,10 +6,6 @@ import {
   SkeletonRows, EmptyState, ErrorState, UndoBar, loadStringSet, saveStringSet,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame,
 } from '../widget-sdk'
-import { reminderGroups } from '../api.js'
-import { createTask } from '../tasklib.js'
-import { emitTasksChanged, onTasksChanged } from '../tasksbus.js'
-import { recentGroups, pushRecentGroup } from '../groups.js'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
 
@@ -20,14 +16,14 @@ function defaultWhen() {
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
-export default function RemindersWidget({ events, projects, group, onNewGroup }) {
+export default function RemindersWidget({ tasks: tasksCap, events, projects, groups: groupsCap, group }) {
   const inboxId = projects?.[0]?.id
   // Derive from the shared task store (one /api/tasks fetch for the whole board).
   // We take the whole list and split it into a Habits section (recurring tasks,
   // shown with an inline consistency strip) and the reminder groups (non-recurring
   // tasks carrying a reminder) — so habits live here instead of a separate widget.
   const selector = useCallback((all) => all, [])
-  const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(selector)
+  const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
 
   // Index tasks by UID and group subtasks under their parent (RELATED-TO ⇒
   // task.goal === parent.uid), so a parent reminder can show progress + nest its
@@ -68,7 +64,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     const parsed = parseQuickAdd(text)
     if (!parsed.title) return
     try {
-      await createTask(inboxId, {
+      await tasksCap.create(inboxId, {
         title: parsed.title,
         priority: parsed.priority || 0,
         ...(parsed.due_date ? { due_date: parsed.due_date } : {}),
@@ -76,7 +72,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
         ...(parsed.cue ? { cue: parsed.cue } : {}),
         goal_uid: parent.uid,
       })
-      emitTasksChanged(); load()
+      tasksCap.emitChanged(); load()
     } catch { /* the list refresh surfaces the result */ }
   }, [inboxId, load])
 
@@ -107,10 +103,10 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   // tag with no calendar is the default group, so we load the set in both views to
   // fold uncoupled tags into "No group" (and hide their stray chips).
   const loadGroups = useCallback(() => {
-    reminderGroups().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
-  }, [])
+    groupsCap.fetch().then((d) => setKnownGroups((d.groups || []).map((g) => g.name).filter(Boolean))).catch(() => {})
+  }, [groupsCap])
   useEffect(() => { loadGroups() }, [loadGroups])
-  useEffect(() => onTasksChanged(loadGroups), [loadGroups])
+  useEffect(() => tasksCap.onChanged(loadGroups), [loadGroups, tasksCap])
 
   const add = async (e) => {
     e.preventDefault()
@@ -127,7 +123,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
     const g = group || qaGroup.trim() // locked widget forces its group
     const labels = [...new Set([...(g ? [g] : []), ...(parsed.labels || [])])]
     try {
-      await createTask(inboxId, {
+      await tasksCap.create(inboxId, {
         title,
         priority: parsed.priority || 0,
         due_date: due,
@@ -135,8 +131,8 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
         ...(labels.length ? { labels } : {}),
         ...(parsed.cue ? { cue: parsed.cue } : {}),
       })
-      if (g) pushRecentGroup(g)
-      setWhen(defaultWhen()); emitTasksChanged(); load()
+      if (g) groupsCap.pushRecent(g)
+      setWhen(defaultWhen()); tasksCap.emitChanged(); load()
     } catch (e2) {
       setDraft(raw)
       let msg = 'Could not add reminder.'
@@ -156,7 +152,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
   // Only calendar-coupled groups count; uncoupled tags fold into the default group.
   const isGroup = useCallback((name) => knownGroups.includes(name), [knownGroups])
   const allGroups = [...knownGroups].sort()
-  const recent = recentGroups().filter((g) => allGroups.includes(g))
+  const recent = groupsCap.recent().filter((g) => allGroups.includes(g))
 
   // Hide chips for tags that aren't real (coupled) groups so a stray tag doesn't
   // render as a label. Done once per task/groups change so rows keep stable
@@ -220,7 +216,7 @@ export default function RemindersWidget({ events, projects, group, onNewGroup })
               groups={allGroups}
               recent={recent}
               onChange={setQaGroup}
-              onNew={(name) => onNewGroup?.(name)}
+              onNew={(name) => groupsCap.onNewGroup?.(name)}
               neutral={{ label: 'No group', value: '' }}
             />
           )}
