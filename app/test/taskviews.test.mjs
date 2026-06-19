@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -41,6 +41,17 @@ const upTasks = [
   { id: 'd', done: false, due_date: '' },                 // no date -> excluded
 ]
 ok(selectUpcoming(upTasks).map((t) => t.id).join() === 'a', 'selectUpcoming: open, real-dated only')
+
+// ---- selectStalled (Weekly Review "get current") ----
+const stalledTasks = [
+  { id: 's1', done: false },                                              // no due, no reminder -> stalled
+  { id: 's2', done: false, due_date: iso(1 * DAY) },                      // has due -> not stalled
+  { id: 's3', done: false, reminders: [{ reminder: iso(1 * DAY) }] },     // has reminder -> not stalled
+  { id: 's4', done: false, due_date: ZERO_DATE },                         // zero date counts as no date -> stalled
+  { id: 's5', done: true },                                               // done -> excluded
+  { id: 's6', done: false, is_goal: true },                              // goal -> excluded
+]
+ok(selectStalled(stalledTasks).map((t) => t.id).join() === 's1,s4', 'selectStalled: open, non-goal, no due AND no reminder')
 
 // ---- selectCued / hasCue ----
 const cueTasks = [

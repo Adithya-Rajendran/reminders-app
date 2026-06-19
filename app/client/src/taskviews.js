@@ -43,6 +43,14 @@ export function selectFlowSource(tasks, group) {
   return list
 }
 
+// Stalled tasks: open, not a goal, with NO due date AND NO reminder — i.e. items
+// sitting without a concrete next action or schedule. The Weekly Review surfaces
+// these so the user gives each a specific next step; forming a plan (not finishing
+// it) is what relieves the "open loop" (Masicampo & Baumeister 2011).
+export function selectStalled(tasks) {
+  return (tasks || []).filter((t) => !t.done && !t.is_goal && !isRealDate(t.due_date) && (t.reminders || []).length === 0)
+}
+
 // Habits view: open recurring tasks (RRULE-backed or custom-from-completion).
 // Their completion history lives in X-REMINDERS-HABIT-LOG (see habitstats.js).
 export const isRecurringTask = (t) => (Number(t.repeat_after) > 0) || t.repeat_mode === 1 || t.repeat_mode === 2
