@@ -30,7 +30,7 @@ export * from '../icons.jsx'
 
 // ---- pure domain helpers ----
 export * from '../taskviews.js'
-export { ZERO_DATE, isRealDate, parseQuickAdd, dueChip, timeLabel, PRIORITIES, pdotClass } from '../tasklib.js'
+export { ZERO_DATE, isRealDate, parseQuickAdd, dueChip, timeLabel, absDate, PRIORITIES, pdotClass } from '../tasklib.js'
 export * from '../habitstats.js'
 export * from '../reviewstats.js'
 export * from '../notetree.js'

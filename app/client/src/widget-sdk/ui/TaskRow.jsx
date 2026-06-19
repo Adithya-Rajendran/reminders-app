@@ -1,5 +1,5 @@
 import { memo, useRef, useState } from 'react'
-import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../../tasklib.js'
+import { dueChip, pdotClass, PRIORITIES, timeLabel, absDate } from '../../tasklib.js'
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../../taskviews.js'
 import { computeHabitStats, recentDays } from '../../habitstats.js'
 import { usePopover } from '../../usePopover.js'
@@ -207,6 +207,7 @@ function DueControl({ task, chip, onSchedule }) {
         className={`chip due-chip${chip ? ' ' + chip.cls : ' empty'}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        title={absDate(task.due_date) || 'Schedule'}
         onClick={() => setOpen((o) => !o)}
       >
         {hasReminder ? <IconBell size={12} /> : <ClockMini />} {chip ? chip.label : 'Schedule'}{chip && t ? ' · ' + t : ''}

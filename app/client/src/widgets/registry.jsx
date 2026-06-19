@@ -37,7 +37,7 @@ const RENDERERS = {
       <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} group={w.group || null} instanceId={w.i} />
     ),
   },
-  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} /> },
+  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
   calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
   notes: {
     icon: IconNote,

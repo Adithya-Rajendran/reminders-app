@@ -2,7 +2,7 @@
 // isRealDate, dueChip, timeLabel, parseQuickAdd, pdotClass, ZERO_DATE.
 // Locks today's actual output so a future refactor that drifts is caught. Run with:
 //   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/tasklib.test.db node:22 node test/tasklib.test.mjs
-import { parseQuickAdd, dueChip, timeLabel, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
+import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -51,6 +51,15 @@ ok(timeLabel(new Date(2026, 5, 8, 9, 5)) === '9:05 AM', '09:05 -> 9:05 AM')
 ok(timeLabel(new Date(2026, 5, 8, 0, 0)) === '', 'midnight 00:00 -> empty (all-day)')
 ok(timeLabel(new Date(2026, 5, 8, 12, 0)) === '12:00 PM', '12:00 -> 12:00 PM')
 ok(timeLabel(new Date(2026, 5, 8, 0, 30)) === '12:30 AM', '00:30 -> 12:30 AM')
+
+// --- absDate: full absolute date tooltip, time only when set ---
+ok(absDate(null) === '' && absDate(ZERO_DATE) === '', 'absDate(non-real) is empty')
+{
+  const dt = new Date(2026, 5, 8, 15, 0) // Jun 8 2026, 3:00 PM local
+  ok(absDate(dt.toISOString()) === `${SHORT[dt.getDay()]}, Jun ${dt.getDate()}, 2026, 3:00 PM`, 'absDate: weekday, Mon D, YYYY, time')
+  const allday = new Date(2026, 5, 8, 0, 0)
+  ok(absDate(allday.toISOString()) === `${SHORT[allday.getDay()]}, Jun ${allday.getDate()}, 2026`, 'absDate: midnight omits the time')
+}
 
 // --- parseQuickAdd ---
 const q1 = parseQuickAdd('Submit report !2 *finance')

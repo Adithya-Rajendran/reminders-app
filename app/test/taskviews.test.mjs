@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -76,6 +76,17 @@ ok(selectFrog(frogTasks).id === 'c', 'selectFrog: highest priority, then nearest
 ok(selectFrog([]) === null, 'selectFrog: empty -> null')
 ok(selectFrog([{ id: 'z', done: true, priority: 5 }]) === null, 'selectFrog: all done -> null')
 ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, priority: 4 }]).id === 'y', 'selectFrog: no due dates -> highest priority wins')
+
+// ---- byImportanceThenDue (anti-urgency sort) ----
+{
+  const a = { id: 'a', priority: 3, due_date: iso(1 * DAY) } // nearer but less important
+  const b = { id: 'b', priority: 5, due_date: iso(5 * DAY) }
+  const c = { id: 'c', priority: 5, due_date: iso(2 * DAY) } // top priority, nearer due
+  ok([a, b, c].slice().sort(byImportanceThenDue).map((t) => t.id).join() === 'c,b,a', 'byImportanceThenDue: priority desc, then nearest due (urgent-but-trivial does not lead)')
+  const x = { id: 'x', priority: 0, due_date: iso(1 * DAY) }
+  const y = { id: 'y', priority: 0 } // undated
+  ok([y, x].slice().sort(byImportanceThenDue).map((t) => t.id).join() === 'x,y', 'byImportanceThenDue: at equal priority a dated task sorts before an undated one')
+}
 
 // ---- eisenhowerQuadrant ----
 const NOW = new Date()

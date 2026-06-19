@@ -63,12 +63,21 @@ export function selectQuickWins(tasks) {
 // ---- Today's frog + Eisenhower (pure views over priority × due-proximity) ----
 const dueMs = (t) => (isRealDate(t.due_date) ? new Date(t.due_date).getTime() : Infinity)
 
+// Importance-first ordering: highest PRIORITY, then nearest DUE. Used as the
+// within-bucket / "smart" sort so a plain "due soonest" order can't bury an
+// important task beneath trivial-but-sooner ones — the documented "mere urgency
+// effect" (Zhu, Yang & Hsee 2018), where people over-weight urgency at the cost
+// of value. Pure comparator; sort with [...tasks].sort(byImportanceThenDue).
+export function byImportanceThenDue(a, b) {
+  return (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b)
+}
+
 // The one task to start with: highest PRIORITY, then nearest DUE. Goals and done
 // tasks are excluded. Returns null when nothing is open.
 export function selectFrog(tasks) {
   const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
   if (!open.length) return null
-  return open.slice().sort((a, b) => (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b))[0]
+  return open.slice().sort(byImportanceThenDue)[0]
 }
 
 const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)

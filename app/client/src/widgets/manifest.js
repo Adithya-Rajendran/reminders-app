@@ -39,7 +39,7 @@
 
 export const WIDGET_MANIFEST = [
   { type: 'reminders', label: 'Reminders',     plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 } },
-  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks'], requires: ['caldav'] },
+  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks', 'projects'], requires: ['caldav'] },
   { type: 'calendar',  label: 'Calendar',      plugs: ['tasks', 'calendar'], requires: ['caldav'], minSize: { w: 5, h: 5 } },
   { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], requires: ['nextcloud'], minSize: { w: 6, h: 6 } },
   { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 8 } },

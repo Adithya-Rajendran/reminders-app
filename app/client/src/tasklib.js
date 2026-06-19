@@ -72,6 +72,17 @@ export function dueChip(d) {
   return { label, cls: diff < 0 ? 'overdue' : diff <= 1 ? 'due-soon' : '' }
 }
 
+// Full absolute date (+ time when set), e.g. "Mon, Jun 22, 2026, 3:00 PM" — shown
+// as a tooltip on the relative chips so the exact date is always recoverable
+// (accessibility; matches GitHub Primer's relative-time guidance). '' when no date.
+export function absDate(d) {
+  if (!isRealDate(d)) return ''
+  const dt = new Date(d)
+  const date = `${DOW_SHORT[dt.getDay()]}, ${MON[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`
+  const t = timeLabel(d)
+  return t ? `${date}, ${t}` : date
+}
+
 // Short local time label, e.g. "3:00 PM" (blank for all-day / midnight defaults).
 export function timeLabel(d) {
   if (!isRealDate(d)) return ''

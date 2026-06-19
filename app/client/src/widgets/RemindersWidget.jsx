@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind,
+  useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
   parseQuickAdd, dueChip, timeLabel, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
   SkeletonRows, EmptyState, ErrorState, UndoBar, widgetStore,
-  IconBell, IconClock, IconPlus, IconChevR, IconFlame,
+  IconBell, IconClock, IconPlus, IconChevR, IconFlame, IconSort,
 } from '../widget-sdk'
 
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
+const SORT_KEY = 'reminders-sort'
 
 function defaultWhen() {
   const d = new Date(Date.now() + 3600e3); d.setSeconds(0, 0); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5); return d.toISOString()
@@ -25,6 +26,10 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const selector = useCallback((all) => all, [])
   const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
+  // Sort order, persisted per instance. "soonest" = next reminder first;
+  // "priority" = importance-first (counters the mere-urgency effect — see taskviews).
+  const [sortMode, setSortMode] = useState(() => store.loadJson(SORT_KEY, 'soonest'))
+  const cycleSort = () => setSortMode((m) => { const n = m === 'soonest' ? 'priority' : 'soonest'; store.saveJson(SORT_KEY, n); return n })
 
   // Index tasks by UID and group subtasks under their parent (RELATED-TO ⇒
   // task.goal === parent.uid), so a parent reminder can show progress + nest its
@@ -50,8 +55,8 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const reminders = useMemo(() => {
     let list = allTasks.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal))
     if (group) list = list.filter((t) => hasGroup(t, group))
-    return list.sort((a, b) => nextRemind(a) - nextRemind(b))
-  }, [allTasks, group, isChild, childrenByParent])
+    return list.sort(sortMode === 'priority' ? byImportanceThenDue : (a, b) => nextRemind(a) - nextRemind(b))
+  }, [allTasks, group, isChild, childrenByParent, sortMode])
   const habits = useMemo(() => {
     let h = selectHabits(allTasks).filter((t) => !isChild(t))
     if (group) h = h.filter((t) => hasGroup(t, group))
@@ -235,6 +240,13 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         </form>
       )}
       {err && <div role="alert" className="rem-err">{err}</div>}
+      {!compact && reminders.length > 1 && (
+        <div className="rem-sortbar">
+          <button type="button" className="chip" onClick={cycleSort} title="Change sort order">
+            <IconSort size={12} /> {sortMode === 'priority' ? 'Priority' : 'Soonest'}
+          </button>
+        </div>
+      )}
       {body}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>

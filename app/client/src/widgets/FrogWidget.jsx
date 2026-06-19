@@ -3,6 +3,7 @@ import { useTaskList, selectFrog, groupEisenhower, dueChip, timeLabel, pdotClass
 import './FrogWidget.css'
 
 const FROG_KEY = 'frog-pick'
+const DEFER_KEY = 'frog-deferrals'
 const QUADS = [
   { k: 'Q1', label: 'Do first', sub: 'important · urgent' },
   { k: 'Q2', label: 'Schedule', sub: 'important' },
@@ -42,7 +43,24 @@ export default function FrogWidget({ tasks: tasksCap, instanceId }) {
     }
     return selectFrog(open)
   }, [open, todayKey])
+
+  // Deferral counter: when the same task is still the frog on a NEW day, it was
+  // carried over — surface that gently. Evidence-honest framing: under load people
+  // default to easier work (KC & Staats 2020), so a repeatedly-deferred top task
+  // is worth flagging. No willpower/ego-depletion claims (that effect failed to
+  // replicate). This effect runs before the FROG_KEY-writing one below, so it sees
+  // the prior day's pin before it's overwritten.
+  const [deferrals, setDeferrals] = useState(() => store.loadJson(DEFER_KEY, {}))
+  useEffect(() => {
+    if (state !== 'ready' || !frog) return
+    const prev = store.loadJson(FROG_KEY, null)
+    if (prev && prev.id === frog.id && prev.date !== todayKey) {
+      const map = { ...store.loadJson(DEFER_KEY, {}), [frog.id]: (deferrals[frog.id] || 0) + 1 }
+      store.saveJson(DEFER_KEY, map); setDeferrals(map)
+    }
+  }, [frog, todayKey, state])
   useEffect(() => { if (frog) store.saveJson(FROG_KEY, { date: todayKey, id: frog.id }) }, [frog, todayKey, store])
+  const deferDays = (frog && deferrals[frog.id]) || 0
 
   const quads = useMemo(() => groupEisenhower(tasks, new Date()), [tasks])
 
@@ -65,8 +83,10 @@ export default function FrogWidget({ tasks: tasksCap, instanceId }) {
             <button className="frog-check" aria-label={`Complete: ${frog.title}`} onClick={() => onToggle(frog)} />
             <div className="frog-body">
               <div className="frog-title">{frog.title}</div>
+              {showMeta && <div className="frog-why">Your most important task — do it before easier, busier work.</div>}
               {showMeta && (
                 <div className="frog-meta">
+                  {deferDays > 0 && <span className="chip frog-defer" title="Carried over from earlier days — worth tackling now">deferred {deferDays}×</span>}
                   <span className={`pdot ${pdotClass(frog.priority || 0)}`} />
                   {dueChip(frog.due_date) && <span className={`chip ${dueChip(frog.due_date).cls}`}>{dueChip(frog.due_date).label}{timeLabel(frog.due_date) ? ' · ' + timeLabel(frog.due_date) : ''}</span>}
                   {frog.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {frog.cue}</span>}
