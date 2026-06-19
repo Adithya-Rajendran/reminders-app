@@ -35,6 +35,15 @@ for (const m of WIDGET_MANIFEST) {
   ok((m.plugs || []).every((p) => APP_INTERFACES[typeof p === 'string' ? p : p.interface]?.scope === 'app'), `${m.type}: all plugs are app-scope interfaces`)
 }
 
+// --- declared capability requirements are well-formed (manifest.requires) ---
+const KNOWN_CAPABILITIES = new Set(['caldav', 'nextcloud'])
+for (const m of WIDGET_MANIFEST) {
+  if (m.requires !== undefined) {
+    ok(Array.isArray(m.requires) && m.requires.every((r) => KNOWN_CAPABILITIES.has(r)),
+      `${m.type}: requires is an array of known capabilities (got: ${JSON.stringify(m.requires)})`)
+  }
+}
+
 // --- layout sizing is sane (these feed dashlayout via WIDGET_TYPES) ---
 for (const m of WIDGET_MANIFEST) {
   if (m.defaultSize !== undefined) ok(isSize(m.defaultSize), `${m.type}: defaultSize is { w>0, h>0 } integers`)

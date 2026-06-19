@@ -36,34 +36,37 @@ ok(Object.isFrozen(r) && Object.isFrozen(r.connections) && Object.isFrozen(r.con
 const empty = resolveConnections([], [])
 ok(empty.connections.length === 0 && empty.unknown.length === 0 && empty.missing.length === 0, 'no plugs -> empty report')
 
-// --- connectedCtxKeys: union of connected interfaces, keyless contributes nothing ---
+// --- connectedCtxKeys: union of connected interfaces' keys ---
 const remPlugs = ['tasks', 'reminder-events', 'projects', 'reminder-groups']
-const remConn = resolveConnections(remPlugs, appSlots({ events: [], projects: [], onNewGroup() {}, onOpenSettings() {} })).connections
-ok(setEq(connectedCtxKeys(remConn), ['events', 'projects', 'onNewGroup']), 'reminders keys = events+projects+onNewGroup')
-ok(!connectedCtxKeys(resolveConnections(['tasks'], ['tasks']).connections).has('events'), 'keyless `tasks` injects nothing')
+const FULL_CTX = { tasks: {}, events: [], projects: [], groups: {}, notes: {}, calendar: {}, onOpenSettings() {} }
+const fullSlots = appSlots(FULL_CTX)
+const remConn = resolveConnections(remPlugs, fullSlots).connections
+ok(setEq(connectedCtxKeys(remConn), ['tasks', 'events', 'projects', 'groups']), 'reminders keys = tasks+events+projects+groups')
+ok(connectedCtxKeys(resolveConnections(['tasks'], ['tasks']).connections).has('tasks'), '`tasks` injects ctx.tasks')
 
 // --- selectCtx: isolation (no leak) + frozen ---
-const fullCtx = { events: [1], projects: [2], onNewGroup: 'g', onOpenSettings: 's' }
-const notesConn = resolveConnections(['settings'], appSlots(fullCtx)).connections
-const notesCtx = selectCtx(fullCtx, notesConn)
-ok(setEq(new Set(Object.keys(notesCtx)), ['onOpenSettings']), 'notes sees only onOpenSettings')
-ok(notesCtx.events === undefined && notesCtx.projects === undefined, 'un-plugged keys are invisible (no leak)')
-ok(Object.isFrozen(notesCtx), 'selected ctx is frozen')
+const fullCtx = { tasks: { id: 't' }, events: [1], projects: [2], groups: { id: 'g' }, notes: {}, calendar: {}, onOpenSettings: 's' }
+const setConn = resolveConnections(['settings'], appSlots(fullCtx)).connections
+const setCtx = selectCtx(fullCtx, setConn)
+ok(setEq(new Set(Object.keys(setCtx)), ['onOpenSettings']), 'a settings-only widget sees only onOpenSettings')
+ok(setCtx.tasks === undefined && setCtx.events === undefined, 'un-plugged keys are invisible (no leak)')
+ok(Object.isFrozen(setCtx), 'selected ctx is frozen')
 ok(Object.keys(selectCtx(fullCtx, resolveConnections([], []).connections)).length === 0, 'no plugs -> empty ctx')
 
 // --- appSlots: presence-detection ---
-ok(appSlots({}).has('tasks'), 'keyless `tasks` always provided')
+ok(!appSlots({}).has('tasks'), 'tasks unprovided when ctx.tasks is missing')
+ok(appSlots({ tasks: {} }).has('tasks'), 'tasks provided once ctx.tasks is present')
 ok(!appSlots({}).has('reminder-events'), 'reminder-events unprovided when events missing')
 ok(appSlots({ events: [] }).has('reminder-events'), 'reminder-events provided once events present (even empty array)')
 ok(!appSlots({ events: undefined }).has('reminder-events'), 'explicit undefined still counts as unprovided')
-ok(appSlots({ events: [], projects: [], onNewGroup() {}, onOpenSettings() {} }).size === 5, 'full ctx provides all five app slots')
+ok(appSlots(FULL_CTX).size === 7, 'full ctx provides all seven app slots')
 
 // --- describeConnections: status mapping for the settings viewer ---
 const specs = [
   { type: 'reminders', label: 'Reminders', plugs: remPlugs },
   { type: 'broken', label: 'Broken', plugs: ['ghost'] },
 ]
-const report = describeConnections(specs, appSlots({ events: [], projects: [], onNewGroup() {}, onOpenSettings() {} }))
+const report = describeConnections(specs, fullSlots)
 ok(report[0].connections.every((c) => c.connected) && report[0].unknown.length === 0, 'reminders fully connected')
 ok(report[1].unknown.length === 1 && report[1].unknown[0] === 'ghost', 'broken widget surfaces unknown plug')
 ok(Object.isFrozen(report[0]), 'report rows frozen')

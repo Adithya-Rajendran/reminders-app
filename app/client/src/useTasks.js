@@ -1,25 +1,26 @@
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { updateTask, deleteTask, createTask, attachLabels, isRealDate } from './tasklib.js'
-import { emitTasksChanged } from './tasksbus.js'
-import {
-  subscribe, getTasks, getState, refresh,
-  patchTask as storePatch, removeTask as storeRemove, replaceTasks,
-} from './taskstore.js'
 
-// Shared task-list behaviour: derive a widget's view from the single shared store
-// (taskstore.js) via a memoized `selector`, plus optimistic priority/due edits, a
-// recurring-aware completion with Undo, and delete with a re-create Undo.
-// Mutations are applied to the SHARED store (so sibling widgets update instantly)
-// and broadcast on the tasks bus (so the store reconciles with the server).
-export function useTaskList(selector) {
+// Shared task-list behaviour, parameterized by the `tasks` capability the app
+// delivers through the connection layer (ctx.tasks) — so a widget never imports
+// the store/buses directly. Derives a widget's view from the single shared store
+// via a memoized `selector`, plus optimistic priority/due edits, a recurring-aware
+// completion with Undo, and delete with a re-create Undo. Mutations hit the SHARED
+// store (sibling widgets update instantly) and broadcast on the tasks bus (so the
+// store reconciles with the server).
+export function useTaskList(tasks, selector) {
+  const {
+    subscribe, getTasks, getState, refresh,
+    patchTask: storePatch, removeTask: storeRemove, replaceTasks,
+    update, create, del, attachLabels, emitChanged, isRealDate,
+  } = tasks
   const all = useSyncExternalStore(subscribe, getTasks)
   const state = useSyncExternalStore(subscribe, getState)
-  const tasks = useMemo(() => selector(all), [all, selector])
+  const view = useMemo(() => selector(all), [all, selector])
 
   const [undo, setUndo] = useState(null)
   const undoTimer = useRef(null)
 
-  const load = useCallback(() => refresh(), [])
+  const load = useCallback(() => refresh(), [refresh])
 
   const showUndo = useCallback((label, fn) => {
     clearTimeout(undoTimer.current)
@@ -30,30 +31,30 @@ export function useTaskList(selector) {
 
   const onSetPriority = useCallback((task, priority) => {
     storePatch(task.id, { priority })
-    updateTask(task.id, { priority }).then(emitTasksChanged).catch(() => refresh())
-  }, [])
+    update(task.id, { priority }).then(emitChanged).catch(() => refresh())
+  }, [storePatch, update, emitChanged, refresh])
 
   // Set/clear the implementation-intention cue ("after X -> do Y").
   const onSetCue = useCallback((task, cue) => {
     storePatch(task.id, { cue })
-    updateTask(task.id, { cue }).then(emitTasksChanged).catch(() => refresh())
-  }, [])
+    update(task.id, { cue }).then(emitChanged).catch(() => refresh())
+  }, [storePatch, update, emitChanged, refresh])
 
   // Set due date + (optionally) a reminder at the same instant, from the picker.
   // due_date is an ISO string or ZERO_DATE to clear; reminder is an ISO or null.
   const onSchedule = useCallback((task, { due_date, reminder }) => {
     const reminders = reminder ? [{ reminder }] : []
     storePatch(task.id, { due_date, reminders })
-    updateTask(task.id, { due_date, reminders }).then(emitTasksChanged).catch(() => refresh())
-  }, [])
+    update(task.id, { due_date, reminders }).then(emitChanged).catch(() => refresh())
+  }, [storePatch, update, emitChanged, refresh])
 
   const onToggle = useCallback(async (task) => {
-    if (task.done) { storePatch(task.id, { done: false }); updateTask(task.id, { done: false }).then(emitTasksChanged).catch(() => refresh()); return }
+    if (task.done) { storePatch(task.id, { done: false }); update(task.id, { done: false }).then(emitChanged).catch(() => refresh()); return }
     const snapshot = getTasks()
     storeRemove(task.id) // optimistic remove with exit animation handled in CSS
     try {
-      const r = await updateTask(task.id, { done: true })
-      emitTasksChanged()
+      const r = await update(task.id, { done: true })
+      emitChanged()
       if (r && r.done === false) {
         // Recurring: the store keeps the task open and (if it can) bumps the due
         // date. If the date didn't actually advance (e.g. no due date set), it can
@@ -62,10 +63,10 @@ export function useTaskList(selector) {
         showUndo(advanced ? 'Rescheduled ↻' : 'Recurring — set a due date to complete', null)
         refresh()
       } else {
-        showUndo('Completed', async () => { await updateTask(task.id, { done: false }).catch(() => {}); emitTasksChanged(); refresh() })
+        showUndo('Completed', async () => { await update(task.id, { done: false }).catch(() => {}); emitChanged(); refresh() })
       }
     } catch { replaceTasks(snapshot) }
-  }, [showUndo])
+  }, [storePatch, storeRemove, replaceTasks, update, emitChanged, isRealDate, refresh, getTasks, showUndo])
 
   // Delete is permanent, so Undo re-creates the task (best effort: core fields +
   // reminders + labels). The restored task gets a new id.
@@ -73,11 +74,11 @@ export function useTaskList(selector) {
     const snapshot = getTasks()
     storeRemove(task.id)
     try {
-      await deleteTask(task.id)
-      emitTasksChanged()
+      await del(task.id)
+      emitChanged()
       showUndo('Deleted', async () => {
         try {
-          const created = await createTask(task.project_id || 1, {
+          const created = await create(task.project_id || 1, {
             title: task.title,
             description: task.description || '',
             priority: task.priority || 0,
@@ -85,14 +86,14 @@ export function useTaskList(selector) {
             ...(task.repeat_after ? { repeat_after: task.repeat_after, repeat_mode: task.repeat_mode || 0 } : {}),
           })
           if (created?.id) {
-            if (Array.isArray(task.reminders) && task.reminders.length) await updateTask(created.id, { reminders: task.reminders }).catch(() => {})
+            if (Array.isArray(task.reminders) && task.reminders.length) await update(created.id, { reminders: task.reminders }).catch(() => {})
             if (Array.isArray(task.labels) && task.labels.length) await attachLabels(created.id, task.labels.map((l) => l.title)).catch(() => {})
           }
         } catch { /* best-effort restore */ }
-        emitTasksChanged(); refresh()
+        emitChanged(); refresh()
       })
     } catch { replaceTasks(snapshot); refresh() }
-  }, [showUndo])
+  }, [storeRemove, replaceTasks, del, create, update, attachLabels, emitChanged, isRealDate, refresh, getTasks, showUndo])
 
-  return { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, undo, dismissUndo }
+  return { tasks: view, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, undo, dismissUndo }
 }

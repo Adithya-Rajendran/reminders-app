@@ -4,13 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { api, tk } from '../api.js'
-import { ZERO_DATE } from '../tasklib.js'
-import { emitTasksChanged } from '../tasksbus.js'
-import { subscribe, ensureLoaded } from '../taskstore.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atMostW, atLeastW } from '../widgetsize.js'
-import { IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../icons.jsx'
+import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')
@@ -33,7 +27,7 @@ function errText(e) {
   try { return JSON.parse(m).error || m } catch { return m }
 }
 
-export default function CalendarWidget() {
+export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const calRef = useRef(null)
   const wrapRef = useRef(null)
   const [accounts, setAccounts] = useState([])
@@ -58,7 +52,7 @@ export default function CalendarWidget() {
   }, [accounts])
 
   useEffect(() => {
-    api('/api/caldav/accounts').then((r) => setAccounts(r.accounts || [])).catch(() => {})
+    calendar.accounts().then((r) => setAccounts(r.accounts || [])).catch(() => {})
   }, [])
 
   // FullCalendar sizes to its container but only re-measures on WINDOW resize, so
@@ -91,14 +85,14 @@ export default function CalendarWidget() {
 
   // Refetch when the shared task store changes — including optimistic edits made
   // in other widgets — so the calendar's task layer stays in sync.
-  useEffect(() => subscribe(() => calRef.current?.getApi().refetchEvents()), [])
+  useEffect(() => tasksCap.subscribe(() => calRef.current?.getApi().refetchEvents()), [tasksCap])
 
   // ---- merged event source: reminders/tasks (from the shared store) + CalDAV events ----
   const loadEvents = useCallback((info, success, failure) => {
     const start = info.startStr, end = info.endStr
     Promise.allSettled([
-      ensureLoaded(),
-      api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+      tasksCap.ensureLoaded(),
+      calendar.listEvents(start, end),
     ]).then(([taskRes, evRes]) => {
       const out = []
       // (a) reminders/tasks with a date — shown once, draggable to reschedule.
@@ -125,7 +119,7 @@ export default function CalendarWidget() {
       }
       success(out)
     }).catch(failure)
-  }, [])
+  }, [tasksCap, calendar])
 
   // ---- interactions ----
   const onSelect = (arg) => {
@@ -156,20 +150,17 @@ export default function CalendarWidget() {
     const p = arg.event.extendedProps
     // Drag a task on the calendar -> reschedule its due date.
     if (p.kind === 'task' && p.source === 'local') {
-      try { await tk('/tasks/' + p.taskId, { method: 'POST', body: JSON.stringify({ due_date: arg.event.start?.toISOString() }) }); emitTasksChanged() }
+      try { await tasksCap.update(p.taskId, { due_date: arg.event.start?.toISOString() }); tasksCap.emitChanged() }
       catch { arg.revert() }
       return
     }
     if (p.kind !== 'event') { arg.revert(); return }
     try {
-      await api('/api/calendar/events', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          accountId: p.accountId, objectUrl: p.objectUrl,
-          start: arg.event.start?.toISOString(),
-          end: (arg.event.end || arg.event.start)?.toISOString(),
-          allDay: arg.event.allDay,
-        }),
+      await calendar.updateEvent({
+        accountId: p.accountId, objectUrl: p.objectUrl,
+        start: arg.event.start?.toISOString(),
+        end: (arg.event.end || arg.event.start)?.toISOString(),
+        allDay: arg.event.allDay,
       })
     } catch { arg.revert() }
   }
@@ -177,20 +168,14 @@ export default function CalendarWidget() {
   // ---- modal submit handlers (throw -> surfaced by the modal) ----
   const submitModal = async (vals) => {
     if (modal.mode === 'create') {
-      await api('/api/calendar/events', {
-        method: 'POST',
-        body: JSON.stringify({
-          accountId: vals.accountId, listUrl: vals.listUrl, summary: vals.title,
-          start: vals.start, end: vals.end, allDay: vals.allDay,
-        }),
+      await calendar.createEvent({
+        accountId: vals.accountId, listUrl: vals.listUrl, summary: vals.title,
+        start: vals.start, end: vals.end, allDay: vals.allDay,
       })
     } else {
-      await api('/api/calendar/events', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          accountId: vals.accountId, objectUrl: vals.objectUrl, summary: vals.title,
-          start: vals.start, end: vals.end, allDay: vals.allDay,
-        }),
+      await calendar.updateEvent({
+        accountId: vals.accountId, objectUrl: vals.objectUrl, summary: vals.title,
+        start: vals.start, end: vals.end, allDay: vals.allDay,
       })
     }
     setModal(null)
@@ -198,10 +183,7 @@ export default function CalendarWidget() {
   }
 
   const deleteModal = async (vals) => {
-    await api('/api/calendar/events', {
-      method: 'DELETE',
-      body: JSON.stringify({ accountId: vals.accountId, objectUrl: vals.objectUrl }),
-    })
+    await calendar.deleteEvent({ accountId: vals.accountId, objectUrl: vals.objectUrl })
     setModal(null)
     refetch()
   }

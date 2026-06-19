@@ -1,0 +1,22 @@
+/* Weekly Review widget — co-located with the widget (moved out of styles.css).
+   All theme-token driven so light/dark + accents follow. */
+.review { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; }
+.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.rv-stat { display: flex; flex-direction: column; line-height: 1.05; }
+.rv-big { font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.rv-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.rv-delta { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; }
+.rv-delta.rv-up { color: var(--green); }
+.rv-delta.rv-down { color: var(--danger); }
+.rv-spark { display: flex; align-items: flex-end; gap: 6px; height: 88px; }
+.rv-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; }
+.rv-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.rv-bar { width: 70%; max-width: 22px; border-radius: 5px 5px 2px 2px; background: var(--accent-grad); min-height: 4px; transition: height .2s ease; }
+.rv-bar.empty { background: var(--line-strong); }
+.rv-bar-lbl { font-size: 10.5px; color: var(--faint); font-weight: 600; }
+.rv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
+.rv-prompt-body { flex: 1; min-width: 0; }
+.rv-prompt-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.rv-prompt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.rv-reviewed { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green); }

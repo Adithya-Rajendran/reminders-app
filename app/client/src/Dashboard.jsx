@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
-import { api, tk } from './api.js'
+import { api, tk, reminderGroups, notesApi } from './api.js'
+import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks } from './taskstore.js'
+import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
+import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
+import { onOpenNote, emitOpenNote } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
-import { SkeletonRows } from './widgets/parts.jsx'
+import { SkeletonRows } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyMins,
@@ -11,8 +15,8 @@ import {
 import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
-import { GroupList } from './GroupPicker.jsx'
-import { recentGroups } from './groups.js'
+import { GroupList } from './widget-sdk'
+import { recentGroups, pushRecentGroup } from './groups.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
@@ -23,6 +27,11 @@ const Grid = WidthProvider(Responsive)
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+// Capability prerequisites a widget may declare (manifest.requires) that the host
+// can determine and gate on. Others (e.g. nextcloud) a widget self-handles.
+const KNOWABLE_REQUIREMENTS = new Set(['caldav'])
+const REQUIREMENT_LABEL = { caldav: 'a CalDAV account', nextcloud: 'a Nextcloud account' }
 
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
@@ -182,11 +191,45 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // Group creation happens only in Settings now — open it with the typed name.
   const onNewGroup = useCallback((name) => onOpenSettings?.({ createGroup: name }), [onOpenSettings])
 
+  // The capability objects the app hands widgets through the connection layer.
+  // Built once (stable identity), so ctx.tasks/ctx.groups/ctx.notes/ctx.calendar
+  // wrap the app-owned singletons (the shared store, the buses, the API client) —
+  // a widget reaches data ONLY through what it plugs into, never via direct import.
+  const tasksCap = useMemo(() => ({
+    subscribe, getTasks, getState, refresh, ensureLoaded,
+    patchTask, removeTask, replaceTasks,
+    update: updateTask, create: createTask, del: deleteTask, attachLabels,
+    emitChanged: emitTasksChanged, onChanged: onTasksChanged, isRealDate,
+  }), [])
+  const groupsCap = useMemo(() => ({
+    fetch: reminderGroups, recent: recentGroups, pushRecent: pushRecentGroup, onNewGroup,
+  }), [onNewGroup])
+  const notesCap = useMemo(() => ({ ...notesApi, onOpenNote, emitOpenNote }), [])
+  const calendarCap = useMemo(() => ({
+    listEvents: (start, end) => api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+    createEvent: (body) => api('/api/calendar/events', { method: 'POST', body: JSON.stringify(body) }),
+    updateEvent: (body) => api('/api/calendar/events', { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteEvent: (body) => api('/api/calendar/events', { method: 'DELETE', body: JSON.stringify(body) }),
+    accounts: () => api('/api/caldav/accounts'),
+  }), [])
+
   // The app slots: every interface the canvas provides, with its live value. A
   // widget receives only the subset it plugs into (see connections.js) — the
   // dashboard never hands a widget app state it didn't declare a dependency on.
-  const appCtx = useMemo(() => ({ events, projects, onNewGroup, onOpenSettings }), [events, projects, onNewGroup, onOpenSettings])
+  const appCtx = useMemo(
+    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, onOpenSettings }),
+    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, onOpenSettings],
+  )
   const slots = useMemo(() => appSlots(appCtx), [appCtx])
+
+  // Which declared widget requirements the host can satisfy right now (see
+  // manifest.requires). A widget with an unmet, host-knowable requirement shows a
+  // "connect it in Settings" placeholder instead of rendering.
+  const available = useMemo(() => {
+    const s = new Set()
+    if (caldavAccounts > 0 || projects.length > 0) s.add('caldav')
+    return s
+  }, [caldavAccounts, projects.length])
 
   // Dev sanity check: warn once if a widget plugs into an interface the app
   // doesn't define (a typo'd / retired interface name) — caught at the registry,
@@ -259,10 +302,14 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
               // hand it ONLY the connected interfaces (least privilege).
               const { connections } = resolveConnections(spec?.plugs, slots)
               const ctx = selectCtx(appCtx, connections)
+              // Gate on declared capability requirements the host can determine.
+              const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
               return (
                 <div key={w.i}>
                   <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
-                    {spec?.render(w, ctx)}
+                    <WidgetMount spec={spec} w={w} ctx={ctx}>
+                      {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
+                    </WidgetMount>
                   </WidgetFrame>
                 </div>
               )
@@ -292,6 +339,34 @@ function OnboardingCard({ onOpenSettings }) {
           <IconCloud size={16} /> Connect CalDAV
         </button>
       </div>
+    </div>
+  )
+}
+
+/* ---------- Per-instance lifecycle (optional registry `lifecycle` hooks) ---------- */
+// Runs a widget type's optional onMount/onUnmount once per INSTANCE (keyed to w.i,
+// not ctx identity, so re-memoizing a capability doesn't re-fire them). Forward-
+// looking: no widget declares lifecycle hooks today, but the host supports them.
+function WidgetMount({ spec, w, ctx, children }) {
+  const lifecycle = spec?.lifecycle
+  useEffect(() => {
+    lifecycle?.onMount?.(w, ctx)
+    return () => lifecycle?.onUnmount?.(w)
+  }, [w.i]) // eslint deps intentionally minimal: lifecycle is per-instance
+  return children
+}
+
+/* ---------- Unmet capability requirement (manifest.requires) ---------- */
+function WidgetRequirement({ reqs, onOpenSettings }) {
+  const what = reqs.map((r) => REQUIREMENT_LABEL[r] || r).join(' & ')
+  return (
+    <div className="state">
+      <div className="state-ic"><IconCloud size={22} /></div>
+      <div className="state-title">Needs {what}</div>
+      <div className="state-sub">Connect it in Settings to use this widget.</div>
+      <button className="btn primary sm" style={{ marginTop: 10 }} onClick={() => onOpenSettings?.()}>
+        <IconCloud size={14} /> Open Settings
+      </button>
     </div>
   )
 }

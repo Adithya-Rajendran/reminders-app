@@ -1,12 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList } from '../useTasks.js'
-import { computeReview, parseYmd } from '../reviewstats.js'
-import { loadJson, saveJson } from '../storage.js'
-import { emitTasksChanged } from '../tasksbus.js'
-import { useWidgetSize } from '../useWidgetSize.js'
-import { atLeastH, atMostW } from '../widgetsize.js'
-import { SkeletonRows, EmptyState, ErrorState } from './parts.jsx'
-import { IconChart, IconCheck } from '../icons.jsx'
+import { useTaskList, computeReview, parseYmd, widgetStore, useWidgetSize, atLeastH, atMostW, SkeletonRows, EmptyState, ErrorState, IconChart, IconCheck } from '../widget-sdk'
+import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -16,19 +10,20 @@ const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 // over the shared task store — reads completed one-time tasks (STATUS:COMPLETED)
 // plus habit-log dates; writes nothing to CalDAV. The "reviewed" timestamp is
 // client-only UI state in localStorage (not SQLite, not CalDAV).
-export default function ReviewWidget() {
+export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load } = useTaskList(selector)
+  const { tasks, state, load } = useTaskList(tasksCap, selector)
   const sz = useWidgetSize()
+  const store = useMemo(() => widgetStore(instanceId), [instanceId])
 
-  const [lastReviewed, setLastReviewed] = useState(() => loadJson(REVIEWED_KEY, null))
+  const [lastReviewed, setLastReviewed] = useState(() => store.loadJson(REVIEWED_KEY, null))
   const review = useMemo(() => computeReview(tasks, new Date(), lastReviewed), [tasks, lastReviewed])
 
   const markReviewed = () => {
     const now = new Date().toISOString()
-    saveJson(REVIEWED_KEY, now)
+    store.saveJson(REVIEWED_KEY, now)
     setLastReviewed(now)
-    emitTasksChanged() // nudge a refresh so the next-week rollover stays honest
+    tasksCap.emitChanged() // nudge a refresh so the next-week rollover stays honest
   }
 
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
