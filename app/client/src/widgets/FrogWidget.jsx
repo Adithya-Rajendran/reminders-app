@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, selectFrog, groupEisenhower, dueChip, timeLabel, pdotClass, loadJson, saveJson, useWidgetSize, atLeastW, atLeastH, SkeletonRows, EmptyState, ErrorState, UndoBar, IconFrog, IconGrid, IconList } from '../widget-sdk'
+import { useTaskList, selectFrog, groupEisenhower, dueChip, timeLabel, pdotClass, widgetStore, useWidgetSize, atLeastW, atLeastH, SkeletonRows, EmptyState, ErrorState, UndoBar, IconFrog, IconGrid, IconList } from '../widget-sdk'
 
 const FROG_KEY = 'frog-pick'
 const QUADS = [
@@ -14,9 +14,10 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 // due), plus an optional Eisenhower matrix. Pure derived view over existing
 // PRIORITY × due fields — no new data. The day's frog is pinned in localStorage
 // so it stays stable as you edit, until it's done or the day rolls over.
-export default function FrogWidget({ tasks: tasksCap }) {
+export default function FrogWidget({ tasks: tasksCap, instanceId }) {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const store = useMemo(() => widgetStore(instanceId), [instanceId])
   const [view, setView] = useState('frog')
   const sz = useWidgetSize()
 
@@ -33,14 +34,14 @@ export default function FrogWidget({ tasks: tasksCap }) {
   const open = useMemo(() => tasks.filter((t) => !t.done && !t.is_goal), [tasks])
   const todayKey = ymd(new Date())
   const frog = useMemo(() => {
-    const saved = loadJson(FROG_KEY, null)
+    const saved = store.loadJson(FROG_KEY, null)
     if (saved && saved.date === todayKey) {
       const hit = open.find((t) => t.id === saved.id)
       if (hit) return hit
     }
     return selectFrog(open)
   }, [open, todayKey])
-  useEffect(() => { if (frog) saveJson(FROG_KEY, { date: todayKey, id: frog.id }) }, [frog, todayKey])
+  useEffect(() => { if (frog) store.saveJson(FROG_KEY, { date: todayKey, id: frog.id }) }, [frog, todayKey, store])
 
   const quads = useMemo(() => groupEisenhower(tasks, new Date()), [tasks])
 

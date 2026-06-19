@@ -3,7 +3,7 @@ import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind,
   parseQuickAdd, dueChip, timeLabel, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
-  SkeletonRows, EmptyState, ErrorState, UndoBar, loadStringSet, saveStringSet,
+  SkeletonRows, EmptyState, ErrorState, UndoBar, widgetStore,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame,
 } from '../widget-sdk'
 
@@ -16,7 +16,7 @@ function defaultWhen() {
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
-export default function RemindersWidget({ tasks: tasksCap, events, projects, groups: groupsCap, group }) {
+export default function RemindersWidget({ tasks: tasksCap, events, projects, groups: groupsCap, group, instanceId }) {
   const inboxId = projects?.[0]?.id
   // Derive from the shared task store (one /api/tasks fetch for the whole board).
   // We take the whole list and split it into a Habits section (recurring tasks,
@@ -24,6 +24,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   // tasks carrying a reminder) — so habits live here instead of a separate widget.
   const selector = useCallback((all) => all, [])
   const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const store = useMemo(() => widgetStore(instanceId), [instanceId])
 
   // Index tasks by UID and group subtasks under their parent (RELATED-TO ⇒
   // task.goal === parent.uid), so a parent reminder can show progress + nest its
@@ -82,7 +83,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const [pickOpen, setPickOpen] = useState(false)
   const [err, setErr] = useState('')
   const [knownGroups, setKnownGroups] = useState([])
-  const [collapsed, setCollapsed] = useState(() => loadStringSet(COLLAPSE_KEY))
+  const [collapsed, setCollapsed] = useState(() => store.loadStringSet(COLLAPSE_KEY))
   const whenRef = useRef(null)
 
   // Narrow: trim the quick-add to one capture line (the group + time pickers don't
@@ -95,7 +96,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const toggleGroup = (key) => setCollapsed((prev) => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
-    saveStringSet(COLLAPSE_KEY, next)
+    store.saveStringSet(COLLAPSE_KEY, next)
     return next
   })
 

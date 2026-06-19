@@ -4,7 +4,7 @@ import {
   NoteEditor, PromptModal, NoteContextMenu, TrashView,
   buildTree, folderKids, noteKids, countNotes, canDropInto,
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
-  loadStringSet, saveStringSet, loadJson, saveJson,
+  widgetStore,
   SkeletonRows, EmptyState, ErrorState,
   IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash,
 } from '../widget-sdk'
@@ -67,26 +67,27 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
 // Notes widget: an Obsidian/VSCode-style workspace — a folder+note tree in a
 // sidebar, the selected note open in the main pane. Collapses to a single
 // master-detail column when the widget is narrow.
-export default function NotesWidget({ notes: notesApi, onOpenSettings }) {
+export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceId }) {
+  const store = useMemo(() => widgetStore(instanceId), [instanceId])
   const [state, setState] = useState('loading') // loading | ready | error | unconfigured
   const [notes, setNotes] = useState([])
   const [folders, setFolders] = useState([])
   const [sel, setSel] = useState('')      // active folder (where new items go)
-  const [expanded, setExpanded] = useState(() => loadStringSet(EXPAND_KEY))
+  const [expanded, setExpanded] = useState(() => store.loadStringSet(EXPAND_KEY))
   const [q, setQ] = useState('')
   const [tag, setTag] = useState(null)
   const [contentHits, setContentHits] = useState([]) // full-text body matches (server FTS)
   const [openPath, setOpenPath] = useState(null)
   const [folderPrompt, setFolderPrompt] = useState(false)
-  const [sort, setSort] = useState(() => loadJson('notes-sort', 'updated'))
+  const [sort, setSort] = useState(() => store.loadJson('notes-sort', 'updated'))
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = usePopover(sortOpen, setSortOpen)
-  const changeSort = (k) => { setSort(k); saveJson('notes-sort', k); setSortOpen(false) }
+  const changeSort = (k) => { setSort(k); store.saveJson('notes-sort', k); setSortOpen(false) }
   const [dragItem, setDragItem] = useState(null) // { type:'note'|'folder', path, folder? }
   const [overTarget, setOverTarget] = useState(null) // destination folder rel path ('' = root) | null
   const [ctxMenu, setCtxMenu] = useState(null) // { note, x, y } | null
   const [renamePrompt, setRenamePrompt] = useState(null) // { path, title } | null
-  const [recent, setRecent] = useState(() => loadJson(RECENT_KEY, []))
+  const [recent, setRecent] = useState(() => store.loadJson(RECENT_KEY, []))
   const [trashOpen, setTrashOpen] = useState(false)
   const [tplOpen, setTplOpen] = useState(false)
   const tplRef = usePopover(tplOpen, setTplOpen)
@@ -129,7 +130,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings }) {
     if (!openPath) return
     const n = notes.find((x) => x.path === openPath)
     const title = n?.title || openPath.split('/').pop().replace(/\.md$/i, '')
-    setRecent((prev) => { const next = pushRecent(prev, { path: openPath, title }); saveJson(RECENT_KEY, next); return next })
+    setRecent((prev) => { const next = pushRecent(prev, { path: openPath, title }); store.saveJson(RECENT_KEY, next); return next })
   }, [openPath, notes])
 
   // ---- per-note actions (context menu) ----
@@ -144,7 +145,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings }) {
 
   const toggleExpand = (path) => setExpanded((prev) => {
     const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path)
-    saveStringSet(EXPAND_KEY, n)
+    store.saveStringSet(EXPAND_KEY, n)
     return n
   })
   const expandAncestors = (path) => setExpanded((prev) => new Set([...prev, ...ancestorsOf(path)]))
