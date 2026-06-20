@@ -1,5 +1,5 @@
 import { memo, useRef, useState } from 'react'
-import { dueChip, pdotClass, PRIORITIES, timeLabel } from '../../tasklib.js'
+import { dueChip, pdotClass, PRIORITIES, timeLabel, absDate, cueTriggerOf } from '../../tasklib.js'
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../../taskviews.js'
 import { computeHabitStats, recentDays } from '../../habitstats.js'
 import { usePopover } from '../../usePopover.js'
@@ -35,6 +35,16 @@ function HabitStrip({ task }) {
   )
 }
 
+// Compact minutes label, e.g. 45 -> "45m", 90 -> "1h30", 120 -> "2h".
+export const fmtEst = (min) => {
+  const m = Math.max(0, Math.trunc(Number(min) || 0))
+  if (!m) return ''
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60), r = m % 60
+  return r ? `${h}h${r}` : `${h}h`
+}
+const EST_OPTIONS = [5, 15, 30, 45, 60, 90, 120]
+
 const ClockMini = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" />
@@ -47,7 +57,7 @@ const ClockMini = () => (
 // editing/typing elsewhere in a list no longer re-renders every sibling row. It
 // also re-renders when the enclosing widget crosses a size tier (context bypasses
 // memo), which is what lets it shed secondary controls in a very narrow column.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, showHabit, childTasks, onAddSubtask }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, showHabit, childTasks, onAddSubtask }) {
   const [burst, setBurst] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [subDraft, setSubDraft] = useState('')
@@ -96,8 +106,10 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             {!dense && <PriorityControl value={task.priority || 0} onSet={(p) => onSetPriority(task, p)} />}
             <DueControl task={task} chip={chip} onSchedule={(payload) => onSchedule(task, payload)} />
             {!dense && (onSetCue
-              ? <CueControl task={task} onSetCue={onSetCue} />
+              ? <CueControl task={task} onSetCue={onSetCue} onSetTrigger={onPatch ? (t, trig) => onPatch(t, { cue_trigger: trig }) : null} />
               : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>)}
+            {!dense && onPatch && <EstimateControl task={task} onSet={(m) => onPatch(task, { time_estimate: m })} />}
+            {!dense && !onPatch && task.time_estimate > 0 && <span className="chip est-chip" title="Estimated time">~{fmtEst(task.time_estimate)}</span>}
             {!dense && isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
             {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
             {!dense && canSubtask && (
@@ -124,7 +136,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
       {expanded && canSubtask && (
         <div className="task-children">
           {kids.map((c) => (
-            <TaskRow key={c.id} task={c} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} />
+            <TaskRow key={c.id} task={c} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} />
           ))}
           <form className="add-row qa subtask-add" onSubmit={submitSub}>
             <input className="rem-text" value={subDraft} onChange={(e) => setSubDraft(e.target.value)} placeholder="Add a subtask…" aria-label="Add a subtask" />
@@ -159,18 +171,33 @@ function PriorityControl({ value, onSet }) {
   )
 }
 
-// Inline editor for a task's implementation-intention cue ("after X -> do Y").
+// Inline editor for a task's implementation-intention cue ("when X -> do Y").
 // Shown when a widget passes onSetCue; otherwise TaskRow renders a static chip.
-function CueControl({ task, onSetCue }) {
+// When onSetTrigger is supplied, the editor also captures a typed trigger KIND
+// (time / location / after) — the machine-readable "when" of the if-then plan —
+// which is what lets other widgets surface the cue contextually.
+const CUE_KINDS = [
+  { k: 'after', label: 'After' },
+  { k: 'time', label: 'Time' },
+  { k: 'location', label: 'Place' },
+]
+function CueControl({ task, onSetCue, onSetTrigger }) {
   const [open, setOpen] = useState(false)
   const ref = usePopover(open, setOpen)
   const [val, setVal] = useState(task.cue || '')
+  const [kind, setKind] = useState(task.cue_trigger?.kind || 'after')
   const cue = (task.cue || '').trim()
-  const openEdit = () => { setVal(task.cue || ''); setOpen(true) }
-  const save = () => { onSetCue(task, val.trim()); setOpen(false) }
+  const openEdit = () => { setVal(task.cue || ''); setKind(task.cue_trigger?.kind || cueTriggerOf(task.cue)?.kind || 'after'); setOpen(true) }
+  const save = () => {
+    const text = val.trim()
+    onSetCue(task, text)
+    if (onSetTrigger) onSetTrigger(task, text ? { kind, value: text } : null)
+    setOpen(false)
+  }
+  const clear = () => { onSetCue(task, ''); if (onSetTrigger) onSetTrigger(task, null); setOpen(false) }
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className={`chip cue-chip${cue ? '' : ' empty'}`} title="If-then cue" onClick={() => (open ? setOpen(false) : openEdit())}>
+      <button className={`chip cue-chip${cue ? '' : ' empty'}`} title={task.cue_trigger ? `If-then cue (${task.cue_trigger.kind})` : 'If-then cue'} onClick={() => (open ? setOpen(false) : openEdit())}>
         <span className="cue-arrow">→</span> {cue || 'cue'}
       </button>
       {open && (
@@ -179,14 +206,44 @@ function CueControl({ task, onSetCue }) {
             className="input cue-input"
             autoFocus
             value={val}
-            placeholder="after morning erg…"
+            placeholder="when… (e.g. after standup, at 9am)"
             onChange={(e) => setVal(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') setOpen(false) }}
           />
+          {onSetTrigger && (
+            <div className="cue-kinds" role="group" aria-label="Trigger type">
+              {CUE_KINDS.map((c) => (
+                <button key={c.k} type="button" className={`cue-kind${kind === c.k ? ' on' : ''}`} onClick={() => setKind(c.k)}>{c.label}</button>
+              ))}
+            </div>
+          )}
           <div className="cue-pop-row">
-            {cue && <button className="btn ghost sm" onClick={() => { onSetCue(task, ''); setOpen(false) }}>Clear</button>}
+            {cue && <button className="btn ghost sm" onClick={clear}>Clear</button>}
             <button className="btn primary sm" onClick={save}>Save</button>
           </div>
+        </div>
+      )}
+    </span>
+  )
+}
+
+// Quick time-estimate picker — supports the planning-fallacy countermeasure
+// (estimating work) and feeds the Daily Planning roll-up. Minutes, or 0 to clear.
+function EstimateControl({ task, onSet }) {
+  const [open, setOpen] = useState(false)
+  const ref = usePopover(open, setOpen)
+  const est = Math.max(0, Math.trunc(Number(task.time_estimate) || 0))
+  return (
+    <span className="inline-ctl" ref={ref}>
+      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" onClick={() => setOpen((o) => !o)}>
+        {est ? '~' + fmtEst(est) : 'est'}
+      </button>
+      {open && (
+        <div className="mini-menu" role="menu">
+          {EST_OPTIONS.map((m) => (
+            <button key={m} className={`mini-item${m === est ? ' active' : ''}`} role="menuitem" onClick={() => { onSet(m); setOpen(false) }}>{fmtEst(m)}</button>
+          ))}
+          {est > 0 && <button className="mini-item" role="menuitem" onClick={() => { onSet(0); setOpen(false) }}>Clear</button>}
         </div>
       )}
     </span>
@@ -207,6 +264,7 @@ function DueControl({ task, chip, onSchedule }) {
         className={`chip due-chip${chip ? ' ' + chip.cls : ' empty'}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        title={absDate(task.due_date) || 'Schedule'}
         onClick={() => setOpen((o) => !o)}
       >
         {hasReminder ? <IconBell size={12} /> : <ClockMini />} {chip ? chip.label : 'Schedule'}{chip && t ? ' · ' + t : ''}

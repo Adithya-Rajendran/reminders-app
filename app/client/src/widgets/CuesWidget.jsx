@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, selectFlowSource, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue } from '../widget-sdk'
+import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue } from '../widget-sdk'
 import './CuesWidget.css'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
@@ -44,7 +44,13 @@ function FlowNode({ task, pos, dragging, onMoveStart, onLinkStart, onToggle, onU
 
 export default function CuesWidget({ tasks: tasksCap, groups, group: initialGroup }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load, onToggle, onSetCue, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const { tasks, state, load, onToggle, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  // Editing a cue here also derives its typed trigger (time/location/after) so the
+  // cue is contextually usable elsewhere (e.g. the Focus widget) — see cueTriggerOf.
+  const setCue = useCallback((task, text) => {
+    onSetCue(task, text)
+    onPatch(task, { cue_trigger: text ? cueTriggerOf(text) : null })
+  }, [onSetCue, onPatch])
   const [group, setGroup] = useState(initialGroup || '')
   const [knownGroups, setKnownGroups] = useState([])
   const [drag, setDrag] = useState(null)
@@ -182,7 +188,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
             {placed.map((t) => (
               <FlowNode
                 key={t.id} task={t} pos={posOf(t)} dragging={draggingMoveUid === t.uid}
-                onMoveStart={onMoveStart} onLinkStart={onLinkStart} onToggle={onToggle} onUnplace={unplace} onSetCue={onSetCue}
+                onMoveStart={onMoveStart} onLinkStart={onLinkStart} onToggle={onToggle} onUnplace={unplace} onSetCue={setCue}
               />
             ))}
           </div>

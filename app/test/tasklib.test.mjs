@@ -2,7 +2,7 @@
 // isRealDate, dueChip, timeLabel, parseQuickAdd, pdotClass, ZERO_DATE.
 // Locks today's actual output so a future refactor that drifts is caught. Run with:
 //   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/tasklib.test.db node:22 node test/tasklib.test.mjs
-import { parseQuickAdd, dueChip, timeLabel, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
+import { parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -51,6 +51,20 @@ ok(timeLabel(new Date(2026, 5, 8, 9, 5)) === '9:05 AM', '09:05 -> 9:05 AM')
 ok(timeLabel(new Date(2026, 5, 8, 0, 0)) === '', 'midnight 00:00 -> empty (all-day)')
 ok(timeLabel(new Date(2026, 5, 8, 12, 0)) === '12:00 PM', '12:00 -> 12:00 PM')
 ok(timeLabel(new Date(2026, 5, 8, 0, 30)) === '12:30 AM', '00:30 -> 12:30 AM')
+
+// --- absDate: full absolute date tooltip, time only when set ---
+ok(absDate(null) === '' && absDate(ZERO_DATE) === '', 'absDate(non-real) is empty')
+{
+  const dt = new Date(2026, 5, 8, 15, 0) // Jun 8 2026, 3:00 PM local
+  ok(absDate(dt.toISOString()) === `${SHORT[dt.getDay()]}, Jun ${dt.getDate()}, 2026, 3:00 PM`, 'absDate: weekday, Mon D, YYYY, time')
+  const allday = new Date(2026, 5, 8, 0, 0)
+  ok(absDate(allday.toISOString()) === `${SHORT[allday.getDay()]}, Jun ${allday.getDate()}, 2026`, 'absDate: midnight omits the time')
+}
+
+// --- isTimedDue: midnight is all-day, any other time is timed ---
+ok(isTimedDue(null) === false && isTimedDue(ZERO_DATE) === false, 'isTimedDue(non-real) is false')
+ok(isTimedDue(new Date(2026, 5, 8, 0, 0).toISOString()) === false, 'midnight -> false (all-day)')
+ok(isTimedDue(new Date(2026, 5, 8, 9, 30).toISOString()) === true, '9:30 -> true (timed)')
 
 // --- parseQuickAdd ---
 const q1 = parseQuickAdd('Submit report !2 *finance')
@@ -103,6 +117,23 @@ ok(cue5.cue === undefined, 'arrow with an empty trigger -> no cue')
 
 const cue6 = parseQuickAdd('after gym -> stretch -> cooldown')
 ok(cue6.cue === 'after gym' && cue6.title === 'stretch -> cooldown', 'only the FIRST arrow splits the cue from the task')
+
+// --- cueTriggerOf: classify a free-text cue into a typed trigger ---
+ok(cueTriggerOf('') === null && cueTriggerOf('   ') === null, 'cueTriggerOf: blank -> null')
+ok(cueTriggerOf('after standup').kind === 'after', 'after-prefix -> after')
+ok(cueTriggerOf('at 9am').kind === 'time', 'clock time -> time')
+ok(cueTriggerOf('tomorrow morning').kind === 'time', 'time-of-day word -> time')
+ok(cueTriggerOf('when I arrive at the office').kind === 'location', 'arrival phrase -> location')
+ok(cueTriggerOf('at the gym').kind === 'location', 'place phrase -> location')
+ok(cueTriggerOf('after lunch at 1pm').kind === 'after', 'explicit "after" wins over a time mention')
+ok(cueTriggerOf('finish the thing').kind === 'after', 'plain text -> after default')
+ok(cueTriggerOf('  at 9am  ').value === 'at 9am', 'cueTriggerOf trims the value')
+// parseQuickAdd now also returns the derived trigger when a cue is present
+{
+  const p = parseQuickAdd('at 9am -> draft figure')
+  ok(p.cue === 'at 9am' && p.cue_trigger && p.cue_trigger.kind === 'time', 'parseQuickAdd attaches a typed cue_trigger')
+  ok(parseQuickAdd('plain task').cue_trigger === undefined, 'no cue -> no cue_trigger field')
+}
 
 // --- pdotClass ---
 ok(pdotClass(5) === 'p1' && pdotClass(4) === 'p1', 'pdotClass 5 and 4 -> p1')

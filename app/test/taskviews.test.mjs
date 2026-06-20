@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -42,6 +42,17 @@ const upTasks = [
 ]
 ok(selectUpcoming(upTasks).map((t) => t.id).join() === 'a', 'selectUpcoming: open, real-dated only')
 
+// ---- selectStalled (Weekly Review "get current") ----
+const stalledTasks = [
+  { id: 's1', done: false },                                              // no due, no reminder -> stalled
+  { id: 's2', done: false, due_date: iso(1 * DAY) },                      // has due -> not stalled
+  { id: 's3', done: false, reminders: [{ reminder: iso(1 * DAY) }] },     // has reminder -> not stalled
+  { id: 's4', done: false, due_date: ZERO_DATE },                         // zero date counts as no date -> stalled
+  { id: 's5', done: true },                                               // done -> excluded
+  { id: 's6', done: false, is_goal: true },                              // goal -> excluded
+]
+ok(selectStalled(stalledTasks).map((t) => t.id).join() === 's1,s4', 'selectStalled: open, non-goal, no due AND no reminder')
+
 // ---- selectCued / hasCue ----
 const cueTasks = [
   { id: 'c1', done: false, cue: 'after morning erg' },
@@ -76,6 +87,29 @@ ok(selectFrog(frogTasks).id === 'c', 'selectFrog: highest priority, then nearest
 ok(selectFrog([]) === null, 'selectFrog: empty -> null')
 ok(selectFrog([{ id: 'z', done: true, priority: 5 }]) === null, 'selectFrog: all done -> null')
 ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, priority: 4 }]).id === 'y', 'selectFrog: no due dates -> highest priority wins')
+
+// ---- selectFrogScored (priority + dread) ----
+{
+  const t = [
+    { id: 'a', done: false, priority: 4, dread: 0, due_date: iso(1 * DAY) }, // score 4
+    { id: 'b', done: false, priority: 3, dread: 3, due_date: iso(2 * DAY) }, // score 6 -> frog
+    { id: 'c', done: false, priority: 5, dread: 0, due_date: iso(3 * DAY) }, // score 5
+  ]
+  ok(selectFrogScored(t).id === 'b', 'selectFrogScored: dread lifts an important-but-avoided task to the top')
+  ok(selectFrogScored([]) === null, 'selectFrogScored: empty -> null')
+  ok(selectFrogScored(frogTasks).id === selectFrog(frogTasks).id, 'selectFrogScored reduces to selectFrog when no dread present')
+}
+
+// ---- byImportanceThenDue (anti-urgency sort) ----
+{
+  const a = { id: 'a', priority: 3, due_date: iso(1 * DAY) } // nearer but less important
+  const b = { id: 'b', priority: 5, due_date: iso(5 * DAY) }
+  const c = { id: 'c', priority: 5, due_date: iso(2 * DAY) } // top priority, nearer due
+  ok([a, b, c].slice().sort(byImportanceThenDue).map((t) => t.id).join() === 'c,b,a', 'byImportanceThenDue: priority desc, then nearest due (urgent-but-trivial does not lead)')
+  const x = { id: 'x', priority: 0, due_date: iso(1 * DAY) }
+  const y = { id: 'y', priority: 0 } // undated
+  ok([y, x].slice().sort(byImportanceThenDue).map((t) => t.id).join() === 'x,y', 'byImportanceThenDue: at equal priority a dated task sorts before an undated one')
+}
 
 // ---- eisenhowerQuadrant ----
 const NOW = new Date()

@@ -39,12 +39,14 @@
 
 export const WIDGET_MANIFEST = [
   { type: 'reminders', label: 'Reminders',     plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 } },
-  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks'], requires: ['caldav'] },
+  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks', 'projects'], requires: ['caldav'] },
   { type: 'calendar',  label: 'Calendar',      plugs: ['tasks', 'calendar'], requires: ['caldav'], minSize: { w: 5, h: 5 } },
   { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], requires: ['nextcloud'], minSize: { w: 6, h: 6 } },
   { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 8 } },
   { type: 'cues',      label: 'Cues (flow)',   plugs: ['tasks', 'reminder-groups'], requires: ['caldav'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 6, h: 6 } },
   { type: 'frog',      label: 'Today’s Frog',  plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 7 } },
+  { type: 'daily',     label: 'Daily Plan',    plugs: ['tasks', 'projects'], requires: ['caldav'], defaultSize: { w: 10, h: 11 }, minSize: { w: 6, h: 6 } },
+  { type: 'focus',     label: 'Focus',         plugs: ['tasks', 'reminder-events'], requires: ['caldav'], defaultSize: { w: 7, h: 8 }, minSize: { w: 4, h: 5 } },
 ]
 
 export const WIDGET_MANIFEST_BY_TYPE = new Map(WIDGET_MANIFEST.map((m) => [m.type, m]))

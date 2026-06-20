@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog } from '../widget-sdk'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog, IconSun, IconTarget } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
 
@@ -14,6 +14,8 @@ const NotesWidget = lazy(() => import('./NotesWidget.jsx'))
 const ReviewWidget = lazy(() => import('./ReviewWidget.jsx'))
 const CuesWidget = lazy(() => import('./CuesWidget.jsx'))
 const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
+const DailyWidget = lazy(() => import('./DailyWidget.jsx'))
+const FocusWidget = lazy(() => import('./FocusWidget.jsx'))
 
 // The render/view half of each widget, keyed by the same `type` as its pure
 // descriptor in manifest.js. Splitting the JSX (icon + render here) from the pure
@@ -37,7 +39,7 @@ const RENDERERS = {
       <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} group={w.group || null} instanceId={w.i} />
     ),
   },
-  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} /> },
+  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
   calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
   notes: {
     icon: IconNote,
@@ -48,6 +50,8 @@ const RENDERERS = {
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
   frog: { icon: IconFrog, render: (w, ctx) => <FrogWidget tasks={ctx.tasks} instanceId={w.i} /> },
+  daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
+  focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} instanceId={w.i} /> },
 }
 
 // Each manifest descriptor + its renderer = a full widget entry, in menu order.

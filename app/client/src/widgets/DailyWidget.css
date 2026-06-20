@@ -1,0 +1,24 @@
+/* Daily Planning + Shutdown ritual — theme-token driven (light/dark + accents). */
+.daily { gap: 4px; }
+.daily-toggle { display: inline-flex; gap: 4px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 2px; margin: 2px 0 4px; }
+.daily-seg { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+.daily-seg.on { color: var(--text); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
+.daily-secline { position: static; background: none; }
+.daily-budget { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
+.daily-budget.over { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 45%, transparent); }
+.daily-empty { font-size: 12.5px; color: var(--muted); padding: 8px 10px; }
+.daily-row { display: flex; align-items: center; gap: 4px; }
+.daily-row-main { flex: 1; min-width: 0; }
+.daily-x { flex: 0 0 auto; opacity: 0; transition: opacity 120ms ease; }
+.daily-row:hover .daily-x, .daily-row:focus-within .daily-x { opacity: 1; }
+@media (hover: none) { .daily-x { opacity: 1; } }
+.daily-carry { flex: 0 0 auto; white-space: nowrap; }
+.daily-suggest { display: flex; flex-direction: column; gap: 2px; }
+.daily-sg { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px dashed transparent; border-radius: 9px; padding: 7px 10px; cursor: pointer; }
+.daily-sg:hover { background: var(--panel2); border-color: var(--line); }
+.daily-sg .ic { color: var(--accent); flex: 0 0 auto; }
+.daily-sg-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.daily-recap { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); padding: 8px 10px; }
+.daily-recap .ic { color: var(--green); }
+.daily-clear { align-self: flex-start; }
+.daily-note { width: 100%; min-height: 80px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; }

@@ -43,6 +43,14 @@ export function selectFlowSource(tasks, group) {
   return list
 }
 
+// Stalled tasks: open, not a goal, with NO due date AND NO reminder — i.e. items
+// sitting without a concrete next action or schedule. The Weekly Review surfaces
+// these so the user gives each a specific next step; forming a plan (not finishing
+// it) is what relieves the "open loop" (Masicampo & Baumeister 2011).
+export function selectStalled(tasks) {
+  return (tasks || []).filter((t) => !t.done && !t.is_goal && !isRealDate(t.due_date) && (t.reminders || []).length === 0)
+}
+
 // Habits view: open recurring tasks (RRULE-backed or custom-from-completion).
 // Their completion history lives in X-REMINDERS-HABIT-LOG (see habitstats.js).
 export const isRecurringTask = (t) => (Number(t.repeat_after) > 0) || t.repeat_mode === 1 || t.repeat_mode === 2
@@ -63,12 +71,32 @@ export function selectQuickWins(tasks) {
 // ---- Today's frog + Eisenhower (pure views over priority × due-proximity) ----
 const dueMs = (t) => (isRealDate(t.due_date) ? new Date(t.due_date).getTime() : Infinity)
 
+// Importance-first ordering: highest PRIORITY, then nearest DUE. Used as the
+// within-bucket / "smart" sort so a plain "due soonest" order can't bury an
+// important task beneath trivial-but-sooner ones — the documented "mere urgency
+// effect" (Zhu, Yang & Hsee 2018), where people over-weight urgency at the cost
+// of value. Pure comparator; sort with [...tasks].sort(byImportanceThenDue).
+export function byImportanceThenDue(a, b) {
+  return (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b)
+}
+
 // The one task to start with: highest PRIORITY, then nearest DUE. Goals and done
 // tasks are excluded. Returns null when nothing is open.
 export function selectFrog(tasks) {
   const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
   if (!open.length) return null
-  return open.slice().sort((a, b) => (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b))[0]
+  return open.slice().sort(byImportanceThenDue)[0]
+}
+
+// Frog selection that also weighs DREAD (the optional avoidance score): an
+// important-but-dreaded task surfaces ahead of an equally-important easy one, so
+// the day's frog is the thing you'd otherwise put off (KC & Staats 2020). Ties
+// fall back to nearest due. Reduces to selectFrog when no task carries dread.
+export function selectFrogScored(tasks) {
+  const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
+  if (!open.length) return null
+  const score = (t) => (t.priority || 0) + (t.dread || 0)
+  return open.slice().sort((a, b) => score(b) - score(a) || dueMs(a) - dueMs(b))[0]
 }
 
 const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)

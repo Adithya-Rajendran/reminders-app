@@ -4,7 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')
@@ -69,7 +69,8 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
 
   // A month grid is unreadable in a narrow column, so switch to the agenda list
   // when mini and back to the month grid otherwise (the view switcher is hidden
-  // while mini, so this is the only way to pick a view at that size).
+  // while mini, so this is the only way to pick a view at that size). The all-day
+  // lane + time grid for time-blocking are reachable via the Week view button.
   useEffect(() => {
     calRef.current?.getApi().changeView(mini ? 'listWeek' : 'dayGridMonth')
   }, [mini])
@@ -97,11 +98,14 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
       const out = []
       // (a) reminders/tasks with a date — shown once, draggable to reschedule.
       // (Single source: /api/tasks IS the CalDAV store, so no separate VTODO feed.)
+      // Date-only tasks go in the all-day lane (not the timed grid, which would
+      // clutter it); a task with a real time shows on the grid. Dragging a date
+      // task onto a time slot sets a real time -> persisted as a time-block.
       if (taskRes.status === 'fulfilled') {
         for (const t of (Array.isArray(taskRes.value) ? taskRes.value : [])) {
           if (t.done || !t.due_date || t.due_date === ZERO_DATE) continue
           out.push({
-            id: 'task-' + t.id, title: t.title, start: t.due_date, allDay: false, editable: true,
+            id: 'task-' + t.id, title: t.title, start: t.due_date, allDay: !isTimedDue(t.due_date), editable: true,
             classNames: ['cal-task', 'cal-task-local'],
             extendedProps: { kind: 'task', source: 'local', taskId: t.id, done: !!t.done },
           })

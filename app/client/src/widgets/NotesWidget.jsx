@@ -5,7 +5,7 @@ import {
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
   widgetStore,
   SkeletonRows, EmptyState, ErrorState,
-  IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash,
+  IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash, IconSun,
 } from '../widget-sdk'
 import { NoteEditor, PromptModal, NoteContextMenu, TrashView } from '../widget-sdk/notes'
 
@@ -153,6 +153,17 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const newNote = async () => {
     try { const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
   }
+  // Daily note (Logseq/Obsidian pattern): a frictionless capture surface titled by
+  // today's date. Opens the existing one if present (matched by title, any folder),
+  // else creates it in the active folder. Low-friction capture is the best-evidenced
+  // notes lever (cognitive offloading; Risko & Gilbert 2016).
+  const openToday = async () => {
+    const d = new Date()
+    const title = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const existing = notes.find((n) => n.title === title)
+    if (existing) { setOpenPath(existing.path); return }
+    try { const n = await notesApi.create(sel, title); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
+  }
   // New note from a template (a note in the Templates folder): duplicate it, then
   // move the copy into the active folder and open it.
   const newFromTemplate = async (tpl) => {
@@ -265,6 +276,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                 </div>
               )}
             </div>
+            <button className="iconbtn sm" aria-label="Today’s note" title="Open today’s note" onClick={openToday}><IconSun size={15} /></button>
             <button className="iconbtn sm" aria-label="New folder" title={sel ? `New folder in ${sel}` : 'New folder'} onClick={() => setFolderPrompt(true)}><IconFolder size={15} /></button>
             <button className="iconbtn sm" aria-label="New note" title={sel ? `New note in ${sel}` : 'New note'} onClick={newNote}><IconPlus size={16} /></button>
             {templates.length > 0 && (

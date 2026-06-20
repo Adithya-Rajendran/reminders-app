@@ -10,7 +10,13 @@
 .frog-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
 .frog-body { flex: 1; min-width: 0; margin-top: 14px; }
 .frog-title { font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.frog-why { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 .frog-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.frog-defer { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 40%, transparent); }
+.frog-dread { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+.frog-dread-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin-right: 2px; }
+.dread-dot { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: transparent; cursor: pointer; padding: 0; }
+.dread-dot.on { background: var(--warn); border-color: var(--warn); }
 .eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; }
 .eq-Q1 { border-left: 3px solid var(--danger); }

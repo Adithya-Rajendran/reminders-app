@@ -7,7 +7,7 @@ import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
-import { readCue, writeCue, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow } from './vtodo_meta.js'
+import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -43,7 +43,8 @@ export function serializeVtodo(vt, listId, objectUrl) {
     due_date: dueV ? outTs(dueV.toJSDate()) : ZERO,
     priority: icalToOur(vt.getFirstPropertyValue('priority')),
     repeat_after: rep.repeat_after, repeat_mode: rep.repeat_mode,
-    cue: readCue(vt),
+    cue: readCue(vt), cue_trigger: readCueTrigger(vt),
+    dread: readDread(vt), time_estimate: readEstimate(vt),
     habit_log: readHabitLog(vt),
     is_goal: readGoalFlag(vt), goal: readParentGoal(vt), goal_plan: readGoalPlan(vt),
     flow: readFlow(vt),
@@ -191,6 +192,9 @@ export async function createTask(req, res) {
     vt.updatePropertyWithValue('status', 'NEEDS-ACTION')
     if (b.description) vt.updatePropertyWithValue('description', String(b.description))
     if (b.cue) writeCue(vt, b.cue)
+    if (b.cue_trigger) writeCueTrigger(vt, b.cue_trigger)
+    if (b.dread) writeDread(vt, b.dread)
+    if (b.time_estimate) writeEstimate(vt, b.time_estimate)
     if (b.is_goal) writeGoalFlag(vt, true)
     if (b.goal_plan) writeGoalPlan(vt, b.goal_plan)
     if (b.goal_uid) writeParentGoal(vt, b.goal_uid)
@@ -224,6 +228,9 @@ export async function patchTask(req, res) {
       if ('title' in b) { const t = (b.title || '').trim(); if (!t) { const e = new Error('title cannot be empty'); e.status = 400; throw e } vt.updatePropertyWithValue('summary', t) }
       if ('description' in b) { if (b.description) vt.updatePropertyWithValue('description', String(b.description)); else vt.removeAllProperties('description') }
       if ('cue' in b) writeCue(vt, b.cue)
+      if ('cue_trigger' in b) writeCueTrigger(vt, b.cue_trigger)
+      if ('dread' in b) writeDread(vt, b.dread)
+      if ('time_estimate' in b) writeEstimate(vt, b.time_estimate)
       if ('is_goal' in b) writeGoalFlag(vt, !!b.is_goal)
       if ('goal_plan' in b) writeGoalPlan(vt, b.goal_plan)
       if ('goal_uid' in b) writeParentGoal(vt, b.goal_uid)
