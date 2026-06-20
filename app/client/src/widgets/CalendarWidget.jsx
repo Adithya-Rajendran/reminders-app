@@ -67,14 +67,13 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     return () => ro.disconnect()
   }, [])
 
-  // Pick a default view per size: agenda list when too narrow for a grid; the
-  // month grid only when there's room for the full switcher; otherwise the WEEK
-  // grid — the week view best supports "opportunistic rehearsal" (glancing at the
-  // week passively rehearses upcoming commitments — Tullio/Bellotti calendar-use
-  // research), and its all-day lane + time grid suit task time-blocking.
+  // A month grid is unreadable in a narrow column, so switch to the agenda list
+  // when mini and back to the month grid otherwise (the view switcher is hidden
+  // while mini, so this is the only way to pick a view at that size). The all-day
+  // lane + time grid for time-blocking are reachable via the Week view button.
   useEffect(() => {
-    calRef.current?.getApi().changeView(mini ? 'listWeek' : full ? 'dayGridMonth' : 'timeGridWeek')
-  }, [mini, full])
+    calRef.current?.getApi().changeView(mini ? 'listWeek' : 'dayGridMonth')
+  }, [mini])
 
   // As the widget narrows, first shrink the toolbar (compact CSS) so the view
   // buttons fit on one row and stay out of the way; only when it's really small

@@ -18,8 +18,12 @@ test('counts this week’s completions and clears the review nudge', async ({ pa
   await expect(frame.locator('.rv-big')).toHaveText('3')
   await expect(frame.locator('.rv-meta')).toContainText('in 30 days')
 
-  // The weekly review prompt is due (never reviewed) -> mark it and it clears.
+  // The weekly review prompt is due (never reviewed) -> run the guided review
+  // (get clear -> get current -> reflect); finishing it clears the nudge.
   await expect(frame.locator('.rv-prompt')).toBeVisible()
-  await frame.getByRole('button', { name: 'Mark reviewed' }).click()
+  await frame.getByRole('button', { name: 'Start review' }).click()
+  await frame.getByRole('button', { name: 'Next' }).click()        // get clear -> get current
+  await frame.getByRole('button', { name: 'Next' }).click()        // get current -> get creative
+  await frame.getByRole('button', { name: 'Finish review' }).click()
   await expect(frame.locator('.rv-reviewed')).toContainText('Reviewed this week')
 })
