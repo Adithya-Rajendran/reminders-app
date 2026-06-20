@@ -53,7 +53,10 @@ test('create an event from the grid', async ({ page, request }) => {
   await modal.getByRole('button', { name: 'Create' }).click()
   await expect(modal).toBeHidden()
 
-  await expect(frame.getByText('Team standup', { exact: true })).toBeVisible()
+  // A multi-day all-day event (the drag spans today->tomorrow) renders one
+  // segment per week row, so it can resolve to >1 element when the span crosses a
+  // Sat/Sun row boundary — assert the first; existence is verified via the API below.
+  await expect(frame.getByText('Team standup', { exact: true }).first()).toBeVisible()
   const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(isoDaysFromNow(-2))}&end=${encodeURIComponent(isoDaysFromNow(2))}`)
   expect((await r.json()).events.some((e) => e.title === 'Team standup')).toBe(true)
 })
