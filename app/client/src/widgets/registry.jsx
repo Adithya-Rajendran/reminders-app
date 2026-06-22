@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconFrog, IconSun, IconTarget } from '../widget-sdk'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconTrophy, IconSun, IconTarget } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
 
@@ -13,7 +13,7 @@ const CalendarWidget = lazy(() => import('./CalendarWidget.jsx'))
 const NotesWidget = lazy(() => import('./NotesWidget.jsx'))
 const ReviewWidget = lazy(() => import('./ReviewWidget.jsx'))
 const CuesWidget = lazy(() => import('./CuesWidget.jsx'))
-const FrogWidget = lazy(() => import('./FrogWidget.jsx'))
+const TriageWidget = lazy(() => import('./TriageWidget.jsx'))
 const DailyWidget = lazy(() => import('./DailyWidget.jsx'))
 const FocusWidget = lazy(() => import('./FocusWidget.jsx'))
 
@@ -49,7 +49,7 @@ const RENDERERS = {
   },
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
-  frog: { icon: IconFrog, render: (w, ctx) => <FrogWidget tasks={ctx.tasks} instanceId={w.i} /> },
+  triage: { icon: IconTrophy, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} instanceId={w.i} /> },
   daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
   focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} instanceId={w.i} /> },
 }

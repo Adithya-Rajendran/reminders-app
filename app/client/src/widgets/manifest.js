@@ -44,7 +44,7 @@ export const WIDGET_MANIFEST = [
   { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], requires: ['nextcloud'], minSize: { w: 6, h: 6 } },
   { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 8 } },
   { type: 'cues',      label: 'Cues (flow)',   plugs: ['tasks', 'reminder-groups'], requires: ['caldav'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 6, h: 6 } },
-  { type: 'frog',      label: 'Today’s Frog',  plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 7 } },
+  { type: 'triage',    label: 'Triage',        plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 10, h: 12 }, minSize: { w: 6, h: 8 } },
   { type: 'daily',     label: 'Daily Plan',    plugs: ['tasks', 'projects'], requires: ['caldav'], defaultSize: { w: 10, h: 11 }, minSize: { w: 6, h: 6 } },
   { type: 'focus',     label: 'Focus',         plugs: ['tasks', 'reminder-events'], requires: ['caldav'], defaultSize: { w: 7, h: 8 }, minSize: { w: 4, h: 5 } },
 ]

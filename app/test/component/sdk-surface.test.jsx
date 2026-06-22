@@ -7,7 +7,7 @@ import * as notes from '../../client/src/widget-sdk/notes'
 // surface change must be reflected here on purpose. Keeps the contract honest.
 const MAIN_SURFACE = [
   // UI primitives
-  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'TaskRow', 'DateTimePicker', 'GroupPicker', 'GroupList',
+  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'TaskRow', 'EstimateControl', 'DreadControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
   // hooks
   'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover',
   // sizing
@@ -16,7 +16,7 @@ const MAIN_SURFACE = [
   'useTaskList', 'widgetStore', 'loadJson', 'saveJson', 'loadStringSet', 'saveStringSet',
   // pure domain (sampled across the re-exported modules)
   'selectUpcoming', 'selectFrog', 'selectFlowSource', 'selectHabits', 'dueBucket',
-  'computeReview', 'computeHabitStats', 'buildTree', 'sortNotes', 'ancestorsOf', 'pushRecent',
+  'computeReview', 'computeHabitStats', 'taskXp', 'levelProgress', 'dailyStreak', 'buildTree', 'sortNotes', 'ancestorsOf', 'pushRecent',
   'dueChip', 'timeLabel', 'pdotClass', 'PRIORITIES', 'parseQuickAdd', 'ZERO_DATE', 'isRealDate',
   // icons (sampled)
   'IconBell', 'IconCalendar', 'IconNote', 'IconCue', 'IconFrog',

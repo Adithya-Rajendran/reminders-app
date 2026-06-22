@@ -81,7 +81,16 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         // Any persisted layout is authoritative — but drop retired widget types
         // (e.g. the old tasklist/caldav widgets), and scale a pre-24-column layout
         // up to the new grid. Persist whichever cleanup happened so it sticks.
-        const original = saved.layout.widgets || []
+        // The Frog widget was folded into the gamified Triage widget — remap any
+        // saved instance in place (same `i`, so its grid slot is preserved) rather
+        // than letting the unknown-type filter below silently drop it. Track the
+        // remap so the migration is persisted (the filter alone wouldn't trigger a
+        // write when nothing is dropped).
+        let remapped = false
+        const original = (saved.layout.widgets || []).map((w) => {
+          if (w.type === 'frog') { remapped = true; return { ...w, type: 'triage' } }
+          return w
+        })
         const sw = original.filter((w) => WIDGET_TYPES.has(w.type))
         const storedV = saved.layout.gridV || 1
         let lay = saved.layout.layouts || {}
@@ -102,7 +111,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)
-        if (sw.length !== original.length || needsGrid || addedBp || staleWide) {
+        if (sw.length !== original.length || needsGrid || addedBp || staleWide || remapped) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),

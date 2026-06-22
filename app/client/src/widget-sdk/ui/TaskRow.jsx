@@ -7,6 +7,7 @@ import { useWidgetSize } from '../../useWidgetSize.js'
 import { atMostW } from '../../widgetsize.js'
 import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
+import DreadControl from './DreadControl.jsx'
 
 const HABIT_DOTS = 14
 
@@ -57,7 +58,7 @@ const ClockMini = () => (
 // editing/typing elsewhere in a list no longer re-renders every sibling row. It
 // also re-renders when the enclosing widget crosses a size tier (context bypasses
 // memo), which is what lets it shed secondary controls in a very narrow column.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, showHabit, childTasks, onAddSubtask }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, onSetDread, showHabit, childTasks, onAddSubtask }) {
   const [burst, setBurst] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [subDraft, setSubDraft] = useState('')
@@ -110,6 +111,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
               : cue && <span className="chip cue-chip" title="If-then cue"><span className="cue-arrow">→</span> {cue}</span>)}
             {!dense && onPatch && <EstimateControl task={task} onSet={(m) => onPatch(task, { time_estimate: m })} />}
             {!dense && !onPatch && task.time_estimate > 0 && <span className="chip est-chip" title="Estimated time">~{fmtEst(task.time_estimate)}</span>}
+            {!dense && onSetDread && <DreadControl value={task.dread || 0} onSet={(d) => onSetDread(task, d)} />}
             {!dense && isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
             {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
             {!dense && canSubtask && (
@@ -136,7 +138,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
       {expanded && canSubtask && (
         <div className="task-children">
           {kids.map((c) => (
-            <TaskRow key={c.id} task={c} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} />
+            <TaskRow key={c.id} task={c} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} onSetDread={onSetDread} />
           ))}
           <form className="add-row qa subtask-add" onSubmit={submitSub}>
             <input className="rem-text" value={subDraft} onChange={(e) => setSubDraft(e.target.value)} placeholder="Add a subtask…" aria-label="Add a subtask" />
@@ -229,7 +231,8 @@ function CueControl({ task, onSetCue, onSetTrigger }) {
 
 // Quick time-estimate picker — supports the planning-fallacy countermeasure
 // (estimating work) and feeds the Daily Planning roll-up. Minutes, or 0 to clear.
-function EstimateControl({ task, onSet }) {
+// Exported (via the widget-sdk barrel) so the Triage widget reuses the same picker.
+export function EstimateControl({ task, onSet }) {
   const [open, setOpen] = useState(false)
   const ref = usePopover(open, setOpen)
   const est = Math.max(0, Math.trunc(Number(task.time_estimate) || 0))

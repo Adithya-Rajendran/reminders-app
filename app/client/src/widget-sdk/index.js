@@ -11,8 +11,9 @@
 
 // ---- shared widget UI ----
 export { SkeletonRows, EmptyState, ErrorState, UndoBar } from './ui/parts.jsx'
-export { default as TaskRow } from './ui/TaskRow.jsx'
+export { default as TaskRow, EstimateControl, fmtEst } from './ui/TaskRow.jsx'
 export { default as DateTimePicker } from './ui/DateTimePicker.jsx'
+export { default as DreadControl } from './ui/DreadControl.jsx'
 export { default as GroupPicker, GroupList } from './ui/GroupPicker.jsx'
 
 // Notes-widget building blocks (the heavy editor stack) live on a separate entry
@@ -30,6 +31,7 @@ export * from '../icons.jsx'
 
 // ---- pure domain helpers ----
 export * from '../taskviews.js'
+export * from '../leveling.js'
 export * from '../notiftier.js'
 export { ZERO_DATE, isRealDate, parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, PRIORITIES, pdotClass } from '../tasklib.js'
 export * from '../habitstats.js'
