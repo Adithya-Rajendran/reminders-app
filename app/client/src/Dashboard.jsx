@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk, reminderGroups, notesApi } from './api.js'
-import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks } from './taskstore.js'
+import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks, insertTask } from './taskstore.js'
 import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
 import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
 import { onOpenNote, emitOpenNote } from './notesbus.js'
@@ -207,7 +207,11 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   const tasksCap = useMemo(() => ({
     subscribe, getTasks, getState, refresh, ensureLoaded,
     patchTask, removeTask, replaceTasks,
-    update: updateTask, create: createTask, del: deleteTask, attachLabels,
+    update: updateTask, del: deleteTask, attachLabels,
+    // Optimistically insert the created task into the shared store so it appears
+    // in every widget at once (fixes the "added it but it vanished" gap); the
+    // bus-debounced refetch then reconciles its full shape.
+    create: async (pid, fields) => { const t = await createTask(pid, fields); insertTask(t); return t },
     emitChanged: emitTasksChanged, onChanged: onTasksChanged, isRealDate,
   }), [])
   const groupsCap = useMemo(() => ({

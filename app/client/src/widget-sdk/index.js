@@ -22,6 +22,7 @@ export { default as GroupPicker, GroupList } from './ui/GroupPicker.jsx'
 // ---- hooks ----
 export { WidgetSizeContext, useWidgetSize, useElementSize } from '../useWidgetSize.js'
 export { usePopover } from '../usePopover.js'
+export { useModalRef } from '../useModalRef.js'
 
 // ---- size classification (pure) ----
 export { atLeastW, atMostW, atLeastH, atMostH, DEFAULT_WIDGET_SIZE } from '../widgetsize.js'
