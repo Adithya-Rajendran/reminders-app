@@ -211,6 +211,13 @@ export const IconGrid = (p) => (
   </Icon>
 )
 export const IconBolt = (p) => <Icon {...p} d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+export const IconTrophy = (p) => (
+  <Icon {...p}>
+    <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" />
+    <path d="M7 5H4.5a2.5 2.5 0 0 0 0 5H7M17 5h2.5a2.5 2.5 0 0 1 0 5H17" />
+    <path d="M12 14v3M9 20h6M10 17h4" />
+  </Icon>
+)
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

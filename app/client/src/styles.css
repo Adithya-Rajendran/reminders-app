@@ -1611,6 +1611,15 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .est-chip { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
 .est-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
 
+/* dread chip + 1–5 dot picker (shared widget-sdk control; used by TaskRow + Triage) */
+.dread-chip { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 34%, transparent); cursor: pointer; }
+.dread-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
+.dread-menu { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dread-dots { display: inline-flex; gap: 5px; padding: 2px; }
+.dread-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: transparent; cursor: pointer; padding: 0; }
+.dread-dot.on { background: var(--warn); border-color: var(--warn); }
+.dread-clear { padding: 4px 7px; font-size: 12px; }
+
 /* Habits widget — streak / consistency dots / automaticity bar */
 .habit { display: flex; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
 .habit:last-child { border-bottom: none; }
@@ -1633,7 +1642,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
 .habit-strip .chip { font-size: 11px; }
 
-/* Today’s Frog + Eisenhower matrix → co-located in widgets/FrogWidget.css */
+/* Eat-the-frog + Eisenhower matrix now live in the Triage widget → co-located in
+   widgets/TriageWidget.css (the standalone Frog widget was folded into it). */
 
 /* Two-minute quick-win badge + Upcoming filter toggle */
 .qw-badge { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 32%, transparent); font-weight: 700; }
