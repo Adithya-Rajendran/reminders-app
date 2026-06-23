@@ -3,7 +3,7 @@ import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
   parseQuickAdd, dueChip, timeLabel, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
-  SkeletonRows, EmptyState, ErrorState, UndoBar, widgetStore,
+  SkeletonRows, EmptyState, ErrorState, UndoBar, QuickAddPreview, widgetStore,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame, IconSort,
 } from '../widget-sdk'
 
@@ -241,6 +241,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
           <button type="submit" className="iconbtn sm" aria-label="Add reminder" title="Add reminder"><IconPlus size={16} /></button>
         </form>
       )}
+      {inboxId && <QuickAddPreview text={draft} />}
       {err && <div role="alert" className="rem-err">{err}</div>}
       {!compact && reminders.length > 1 && (
         <div className="rem-sortbar">
