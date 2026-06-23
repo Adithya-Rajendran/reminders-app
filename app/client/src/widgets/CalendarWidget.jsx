@@ -4,7 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, useModalRef, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, useModalRef, UndoBar, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 
 // Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
 // events, so they must never appear in — let alone default — the create picker.
@@ -26,6 +26,10 @@ function parseInput(v) {
   return isNaN(dt.getTime()) ? null : dt
 }
 const fromInput = (v) => { const d = parseInput(v); return d ? d.toISOString() : null }
+// Timed -> local ISO; all-day -> UTC midnight so the server's getUTC* date
+// matches the picked day (avoids an off-by-one east of UTC). Shared by create,
+// edit, and the delete→undo re-create.
+const toIso = (v, allDay) => (allDay ? (v ? new Date(v + 'T00:00:00Z').toISOString() : null) : fromInput(v))
 
 function errText(e) {
   const m = String(e?.message || e || 'Something went wrong')
@@ -89,6 +93,17 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
 
   const refetch = () => calRef.current?.getApi().refetchEvents()
+
+  // Optimistic event delete with a 6s Undo (re-creates the event), mirroring the
+  // task list's delete→undo — no jarring native confirm().
+  const [undo, setUndo] = useState(null)
+  const undoTimer = useRef(null)
+  const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
+  const showUndo = useCallback((label, fn) => {
+    clearTimeout(undoTimer.current)
+    setUndo({ label, fn })
+    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  }, [])
 
   // Refetch when the shared task store changes — including optimistic edits made
   // in other widgets — so the calendar's task layer stays in sync.
@@ -192,14 +207,28 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     refetch()
   }
 
-  const deleteModal = async (vals) => {
-    await calendar.deleteEvent({ accountId: vals.accountId, objectUrl: vals.objectUrl })
+  const deleteModal = async (ev) => {
     setModal(null)
-    refetch()
+    // Capture what we'd need to re-create the event if the user hits Undo.
+    const restore = {
+      accountId: ev.accountId, listUrl: ev.listUrl, summary: ev.title,
+      start: toIso(ev.start, ev.allDay), end: toIso(ev.end, ev.allDay), allDay: !!ev.allDay,
+    }
+    try {
+      await calendar.deleteEvent({ accountId: ev.accountId, objectUrl: ev.objectUrl })
+      refetch()
+      showUndo('Event deleted', async () => {
+        try { await calendar.createEvent(restore) } catch { /* best-effort restore */ }
+        refetch()
+      })
+    } catch {
+      refetch() // delete failed — restore the view and tell the user
+      showUndo('Couldn’t delete the event', null)
+    }
   }
 
   return (
-    <div className={`cal-wrap${!full ? ' cal-compact' : ''}`} ref={wrapRef}>
+    <div className={`cal-wrap${!full ? ' cal-compact' : ''}`} ref={wrapRef} style={{ position: 'relative' }}>
       <FullCalendar
         ref={calRef}
         plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
@@ -231,6 +260,11 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
           onClose={() => setModal(null)}
         />
       )}
+      {undo && (
+        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, zIndex: 5 }}>
+          <UndoBar undo={undo} dismiss={dismissUndo} />
+        </div>
+      )}
     </div>
   )
 }
@@ -259,13 +293,8 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
     if (busy) return
     setBusy(true); setErr(null)
     try {
-      // All-day dates are floating (the server stores a VALUE=DATE and reads it
-      // back with getUTC*). Sending them as UTC midnight makes the server's date
-      // match the picked day — local midnight + toISOString() lands a day early
-      // east of UTC. Timed values keep the normal local->ISO conversion.
-      const allDayIso = (v) => (v ? new Date(v + 'T00:00:00Z').toISOString() : null)
-      const startIso = allDay ? allDayIso(start) : fromInput(start)
-      const endIso = allDay ? allDayIso(end) : fromInput(end)
+      const startIso = toIso(start, allDay)
+      const endIso = toIso(end, allDay)
       if (!title.trim()) throw new Error('Give the event a title.')
       if (!startIso) throw new Error('Pick a start date/time.')
       if (isCreate) {
@@ -278,13 +307,9 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
     } catch (e2) { setErr(errText(e2)); setBusy(false) }
   }
 
-  const remove = async () => {
-    if (busy) return
-    if (!confirm('Delete this event?')) return
-    setBusy(true); setErr(null)
-    try { await onDelete({ accountId: initial.accountId, objectUrl: initial.objectUrl }) }
-    catch (e2) { setErr(errText(e2)); setBusy(false) }
-  }
+  // Optimistic: hand the original event up to be deleted with a 6s Undo (no
+  // native confirm). The parent closes this modal and shows the UndoBar.
+  const remove = () => { if (!busy) onDelete(initial) }
 
   return (
     <div className="overlay" onMouseDown={onClose}>
