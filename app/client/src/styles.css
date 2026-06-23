@@ -1677,3 +1677,15 @@ button.rem-head:hover .g-title { color: var(--accent); }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ---------- quick-add parse preview ----------
+   Read-only chips under a quick-add input showing what parseQuickAdd understood
+   (due / priority / labels / cue) before submit — recognition over recall.
+   Aligned under the input text (past the leading icon); hidden when nothing parses. */
+.qa-preview { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 4px 34px; }
+.qa-chip { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; line-height: 1.4; padding: 2px 8px; border-radius: 999px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.qa-chip.due { color: var(--text); }
+.qa-chip.due.due-soon { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 30%, transparent); }
+.qa-chip.due.overdue { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
+.qa-chip.pri { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 30%, transparent); }
+.qa-chip.cue { font-style: italic; }

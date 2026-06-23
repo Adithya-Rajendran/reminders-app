@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectStalled, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
+import { useTaskList, selectStalled, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
 import './DailyWidget.css'
 
 const PLAN_KEY = 'daily-plan' // { date, ids: [] }
@@ -98,6 +98,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
               <button type="submit" className="iconbtn sm" aria-label="Add" title="Add to today"><IconPlus size={16} /></button>
             </form>
           )}
+          {inboxId && <QuickAddPreview text={draft} />}
 
           <div className="group-head daily-secline">
             <span className="g-title">Today’s focus</span>

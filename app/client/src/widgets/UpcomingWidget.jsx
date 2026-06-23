@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectUpcoming, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
+import { useTaskList, selectUpcoming, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
 
 const COLLAPSE_KEY = 'upcoming-collapsed'
 // Default a quick-added task to today at 9am so it lands in the "Today" bucket
@@ -94,6 +94,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
           <button type="submit" className="iconbtn sm" aria-label="Add task" title="Add task"><IconPlus size={16} /></button>
         </form>
       )}
+      {inboxId && !compact && <QuickAddPreview text={draft} />}
       {state === 'ready' && !compact && (tasks.length > 0 || quickOnly) && (
         <div className="up-filter">
           <button

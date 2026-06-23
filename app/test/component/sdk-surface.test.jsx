@@ -7,7 +7,7 @@ import * as notes from '../../client/src/widget-sdk/notes'
 // surface change must be reflected here on purpose. Keeps the contract honest.
 const MAIN_SURFACE = [
   // UI primitives
-  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'TaskRow', 'EstimateControl', 'DreadControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
+  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'QuickAddPreview', 'TaskRow', 'EstimateControl', 'DreadControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
   // hooks
   'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover', 'useModalRef',
   // sizing

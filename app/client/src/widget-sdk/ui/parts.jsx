@@ -1,4 +1,5 @@
 import { IconRefresh, IconInbox } from '../../icons.jsx'
+import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate } from '../../tasklib.js'
 
 export function SkeletonRows({ n = 5 }) {
   return (
@@ -42,6 +43,28 @@ export function UndoBar({ undo, dismiss }) {
     <div className="undo-bar" role="status">
       <span>{undo.label}</span>
       {undo.fn && <button className="undo-btn" onClick={() => { undo.fn(); dismiss() }}>Undo</button>}
+    </div>
+  )
+}
+
+// Live, read-only preview of the tokens parseQuickAdd will pull from a quick-add
+// line — so the user SEES "tomorrow", "!1", "*work", "after … ->" being
+// understood before submitting (recognition over recall; closes the "typed a
+// date but the chip still said Today" gap). Renders nothing until something parses.
+export function QuickAddPreview({ text }) {
+  const p = parseQuickAdd(text || '')
+  const chips = []
+  if (isRealDate(p.due_date)) {
+    const c = dueChip(p.due_date), t = timeLabel(p.due_date)
+    chips.push({ k: 'due', cls: `qa-chip due ${c?.cls || ''}`, label: `${c?.label || ''}${t ? ` · ${t}` : ''}`, title: absDate(p.due_date) })
+  }
+  if (p.priority) chips.push({ k: 'pri', cls: `qa-chip pri p${p.priority}`, label: `P${p.priority}`, title: `Priority ${p.priority}` })
+  for (const l of (p.labels || [])) chips.push({ k: `lbl-${l}`, cls: 'qa-chip lbl', label: `#${l}`, title: `Group / label: ${l}` })
+  if (p.cue) chips.push({ k: 'cue', cls: 'qa-chip cue', label: `⤳ ${p.cue}`, title: `Cue: ${p.cue}` })
+  if (!chips.length) return null
+  return (
+    <div className="qa-preview" aria-live="polite">
+      {chips.map((c) => <span key={c.k} className={c.cls} title={c.title}>{c.label}</span>)}
     </div>
   )
 }
