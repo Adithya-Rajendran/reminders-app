@@ -61,6 +61,13 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // Initial load: projects + saved layout (or a sensible default).
   useEffect(() => {
     (async () => {
+      // Warm the shared task store NOW (fire-and-forget) so /api/tasks is already
+      // in-flight before the task widgets mount and subscribe — otherwise the
+      // first /tasks fetch is serialized after boot + render, leaving ~10s of
+      // skeletons on a home CalDAV server. refresh() shares one in-flight request,
+      // so the later subscribe reuses this rather than firing a second fetch. Not
+      // awaited: the grid still renders as soon as the three boot fetches resolve.
+      refresh()
       // The three boot fetches are independent — run them concurrently instead
       // of paying three sequential round-trips before the grid can render.
       const [prR, acctR, savedR] = await Promise.allSettled([
