@@ -23,6 +23,11 @@ if (!SESSION_SECRET) {
   console.error('FATAL: SESSION_SECRET is required')
   process.exit(1)
 }
+// Secure-by-default; this override is for local HTTP dev only. Surface it loudly
+// so it can never silently ship to production.
+if (process.env.COOKIE_INSECURE === '1') {
+  console.warn('COOKIE_INSECURE=1 — session cookie Secure flag is OFF. Use only for local HTTP development, never behind HTTPS/production.')
+}
 
 const app = express()
 app.set('trust proxy', 1)

@@ -25,39 +25,48 @@
 // delivers a capability value through ctx (e.g. ctx.tasks, ctx.groups, ctx.notes,
 // ctx.calendar) — a widget reaches app data ONLY through what it plugs into; it
 // never imports the store/api/buses directly (the widget-SDK boundary enforces it).
+// Each interface carries two descriptions: `userSummary` is plain language shown
+// in Settings; `summary` is the developer/SDK detail (kept for docs + tooltips).
 export const APP_INTERFACES = Object.freeze({
   'tasks': Object.freeze({
     scope: 'app',
+    userSummary: 'Your tasks & reminders — shared across widgets so an edit shows up everywhere instantly.',
     summary: 'Shared task store — one /api/tasks fetch per board, optimistic edits + undo. Injects ctx.tasks (store + mutations + bus); read it with useTaskList(ctx.tasks, selector).',
     keys: Object.freeze(['tasks']),
   }),
   'reminder-events': Object.freeze({
     scope: 'app',
+    userSummary: 'Live reminder alerts when something becomes due or overdue.',
     summary: 'Live reminder/overdue events from the in-app scheduler (SSE feed).',
     keys: Object.freeze(['events']),
   }),
   'projects': Object.freeze({
     scope: 'app',
+    userSummary: 'Your task lists from CalDAV (new items land in your inbox).',
     summary: 'The user’s CalDAV task projects/lists (the inbox is projects[0]).',
     keys: Object.freeze(['projects']),
   }),
   'reminder-groups': Object.freeze({
     scope: 'app',
+    userSummary: 'Your reminder groups, plus a shortcut to create a new one.',
     summary: 'Reminder groups capability — fetch groups, recent picks, and the “new group” affordance (opens Settings prefilled). Injects ctx.groups.',
     keys: Object.freeze(['groups']),
   }),
   'notes': Object.freeze({
     scope: 'app',
+    userSummary: 'Your Markdown notes, stored in your Nextcloud.',
     summary: 'Markdown notes over WebDAV/Nextcloud — list/CRUD/search/trash + the open-note bus. Injects ctx.notes.',
     keys: Object.freeze(['notes']),
   }),
   'calendar': Object.freeze({
     scope: 'app',
+    userSummary: 'Your calendar events — view, add, edit and delete.',
     summary: 'CalDAV calendar events — list a date range + create/edit/delete + the enabled-account list. Injects ctx.calendar.',
     keys: Object.freeze(['calendar']),
   }),
   'settings': Object.freeze({
     scope: 'app',
+    userSummary: 'A shortcut to open Settings (for example, to connect an account).',
     summary: 'Open the Settings panel (e.g. to connect a CalDAV / Nextcloud account).',
     keys: Object.freeze(['onOpenSettings']),
   }),

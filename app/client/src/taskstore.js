@@ -47,6 +47,13 @@ export async function ensureLoaded() {
 export function patchTask(id, p) { tasks = tasks.map((t) => (t.id === id ? { ...t, ...p } : t)); notify() }
 export function removeTask(id) { tasks = tasks.filter((t) => t.id !== id); notify() }
 export function replaceTasks(next) { tasks = Array.isArray(next) ? next : []; notify() }
+// Optimistic insert of a freshly-created task so it shows in every widget
+// immediately, instead of vanishing until the reconcile refetch lands. No-ops
+// on a missing id or a dupe (the debounced refresh will reconcile shape).
+export function insertTask(t) {
+  if (!t || t.id == null || tasks.some((x) => x.id === t.id)) return
+  tasks = [...tasks, t]; notify()
+}
 
 let busTimer = null
 export function subscribe(fn) {

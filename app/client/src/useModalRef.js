@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 
 // Modal focus management: focus the first focusable on open, trap Tab inside,
 // close on Esc, restore focus on unmount. Put the returned ref on the dialog.
-export function useModalRef(onClose) {
+// Pass { autoFocus: false } when the dialog has its own autoFocus target (e.g.
+// a form's first input) so we don't steal focus onto an earlier control.
+export function useModalRef(onClose, opts = {}) {
   const ref = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -12,7 +14,7 @@ export function useModalRef(onClose) {
     const prevFocus = document.activeElement
     const sel = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     const focusables = () => Array.from(node.querySelectorAll(sel)).filter((el) => !el.disabled && el.offsetParent !== null)
-    const t = setTimeout(() => { const f = focusables(); (f[0] || node).focus() }, 30)
+    const t = opts.autoFocus === false ? null : setTimeout(() => { const f = focusables(); (f[0] || node).focus() }, 30)
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); return }
       if (e.key === 'Tab') {

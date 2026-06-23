@@ -9,7 +9,7 @@ const MAIN_SURFACE = [
   // UI primitives
   'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'TaskRow', 'EstimateControl', 'DreadControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
   // hooks
-  'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover',
+  'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover', 'useModalRef',
   // sizing
   'atLeastW', 'atMostW', 'atLeastH', 'atMostH', 'DEFAULT_WIDGET_SIZE',
   // task list + storage

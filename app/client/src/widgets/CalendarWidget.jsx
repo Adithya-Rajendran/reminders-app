@@ -4,7 +4,12 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, useModalRef, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+
+// Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
+// events, so they must never appear in — let alone default — the create picker.
+// Mirrors the server's isReadOnlySystemCalendar (caldav.js).
+const isReadOnlyCal = (url) => /\/(contact_birthdays|birthdays)\/?(?:$|\?)/i.test(url || '')
 
 // ---- date <-> <input> helpers (inputs are local time; ISO crosses the wire) ----
 const pad = (n) => String(n).padStart(2, '0')
@@ -45,6 +50,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     for (const a of accounts) {
       for (const l of (a.lists || [])) {
         if (!l.enabled) continue
+        if (isReadOnlyCal(l.url)) continue // never offer a read-only calendar as an event target
         out.push({ accountId: a.id, listUrl: l.url, label: `${a.name} · ${l.displayName || l.url}` })
       }
     }
@@ -240,6 +246,7 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
 
   const isCreate = mode === 'create'
   const noCalendars = isCreate && calendars.length === 0
+  const dialogRef = useModalRef(onClose, { autoFocus: false }) // form's title input keeps autoFocus
 
   const switchAllDay = (next) => {
     setAllDay(next)
@@ -252,8 +259,13 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
     if (busy) return
     setBusy(true); setErr(null)
     try {
-      const startIso = fromInput(start)
-      const endIso = fromInput(end)
+      // All-day dates are floating (the server stores a VALUE=DATE and reads it
+      // back with getUTC*). Sending them as UTC midnight makes the server's date
+      // match the picked day — local midnight + toISOString() lands a day early
+      // east of UTC. Timed values keep the normal local->ISO conversion.
+      const allDayIso = (v) => (v ? new Date(v + 'T00:00:00Z').toISOString() : null)
+      const startIso = allDay ? allDayIso(start) : fromInput(start)
+      const endIso = allDay ? allDayIso(end) : fromInput(end)
       if (!title.trim()) throw new Error('Give the event a title.')
       if (!startIso) throw new Error('Pick a start date/time.')
       if (isCreate) {
@@ -276,10 +288,11 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
 
   return (
     <div className="overlay" onMouseDown={onClose}>
-      <div className="modal" style={{ maxWidth: 480 }} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 480 }} onMouseDown={(e) => e.stopPropagation()}
+        ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
         <div className="modal-head">
           <span className="ic"><IconCalendar size={20} /></span>
-          <h2>{isCreate ? 'New event' : 'Edit event'}</h2>
+          <h2 id="event-modal-title">{isCreate ? 'New event' : 'Edit event'}</h2>
           <button className="iconbtn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><IconX /></button>
         </div>
         <form className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={submit}>

@@ -85,6 +85,14 @@ export const VTODO_FILTER = [{ 'comp-filter': { _attributes: { name: 'VCALENDAR'
 export const CALDAV_PRODID = '-//reminders-app//caldav//EN'
 
 // ---- password encryption at rest (AES-256-GCM) ----
+// Prefer a dedicated CALDAV_ENC_KEY; fall back to SESSION_SECRET (index.js
+// requires it in prod), then to a dev-only default so the module still imports
+// under tests/tooling with no env. Warn when no dedicated key is set: rotating
+// SESSION_SECRET would otherwise make saved CalDAV passwords undecryptable — a
+// dedicated key decouples them.
+if (!process.env.CALDAV_ENC_KEY && process.env.NODE_ENV === 'production') {
+  console.warn('CALDAV_ENC_KEY not set — encrypting stored CalDAV passwords with SESSION_SECRET. Set a dedicated CALDAV_ENC_KEY so rotating SESSION_SECRET does not orphan saved account passwords.')
+}
 const KEY = crypto.createHash('sha256')
   .update(process.env.CALDAV_ENC_KEY || process.env.SESSION_SECRET || 'dev-insecure')
   .digest()
@@ -273,17 +281,19 @@ export async function addAccountHandler(req, res) {
   if (!name || !type || !username || !password || (type !== 'icloud' && !serverUrl)) {
     return res.status(400).json({ error: 'name, type, username, password (and serverUrl) are required' })
   }
-  const acc = {
-    id: 'ca-' + crypto.randomUUID(), user_id: req.session.user.sub, name, type,
-    server_url: normalizeServerUrl(type, serverUrl), username, password_enc: enc(password),
-  }
+  let acc
   try {
-    // persist, then validate credentials by discovering its calendars
+    // Build (enc/normalize can throw) inside the try so nothing escapes as an
+    // unhandled rejection; then persist and validate by discovering calendars.
+    acc = {
+      id: 'ca-' + crypto.randomUUID(), user_id: req.session.user.sub, name, type,
+      server_url: normalizeServerUrl(type, serverUrl), username, password_enc: enc(password),
+    }
     await insertAccount(acc)
     const lists = await discover(acc)
     res.json({ account: acctPublic(acc, lists) })
   } catch (e) {
-    await deleteAccountById(acc.id).catch(() => {})
+    if (acc) await deleteAccountById(acc.id).catch(() => {})
     console.error('caldav add/discover failed:', e?.message || e)
     res.status(400).json({ error: 'Could not connect — check the server URL, username and (app) password.' })
   }

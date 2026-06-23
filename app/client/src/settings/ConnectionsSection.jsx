@@ -40,7 +40,9 @@ export default function ConnectionsSection() {
         {SLOT_NAMES.map((name) => (
           <div className="conn-slot" key={name}>
             <span className="conn-iface">{name}</span>
-            <span className="conn-slot-sub">{APP_INTERFACES[name].summary}</span>
+            <span className="conn-slot-sub" title={APP_INTERFACES[name].summary}>
+              {APP_INTERFACES[name].userSummary || APP_INTERFACES[name].summary}
+            </span>
           </div>
         ))}
       </div>
