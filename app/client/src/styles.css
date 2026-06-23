@@ -57,6 +57,10 @@
      the breakpoint ladder in dashlayout.js (more columns, not wider columns).
      Set a px value here to re-cap and center the canvas. */
   --canvas-max: none;
+  /* Readable line-length cap for list/text widget bodies (~66ch ≈ WCAG 1.4.8).
+     Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it
+     keeps content left-aligned at a readable measure instead of 150-char lines. */
+  --measure: 66ch;
 }
 
 [data-theme="light"] {
@@ -585,7 +589,10 @@ body {
   transition: background 120ms ease;
 }
 .task:hover { background: var(--panel2); }
-.task .task-main { flex: 1; min-width: 0; }
+/* Cap the readable measure of a task line (~66ch). No effect at normal widget
+   widths; on a wide (ultrawide-filled) list it keeps titles from stretching into
+   150-char lines — the row's controls follow and the slack falls to the right. */
+.task .task-main { flex: 1; min-width: 0; max-width: var(--measure); }
 .task .task-title {
   font-size: 13.5px;
   line-height: 1.4;

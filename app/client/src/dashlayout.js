@@ -65,16 +65,29 @@ export function appendToLayouts(layouts, id, size) {
   return next
 }
 
-// Fill in any breakpoint that has no saved layout by repacking the densest
-// breakpoint that DOES (usually lg) into the target's column count. Older boards
-// predate the ultrawide tiers (xl…xxxxl), so without this they'd hit a wide
-// screen with those tiers missing — react-grid-layout would clone lg's 0–30
-// column positions and leave the right ~75% of the canvas empty. We repack at
-// CONSTANT widget size instead: column pitch is ~40px at every tier, so keeping
-// each widget's w/h fixed keeps its pixel size fixed, and the extra width simply
-// fits more widgets per row — widgets that were on lower rows flow up. So a wide
-// canvas fills out without the widgets ballooning. Non-mutating. No source
-// breakpoint present -> returned untouched.
+// Proportionally scale a layout's x/w to a wider column count, preserving each
+// widget's ROW (y) — so a sparse board fills the extra width instead of leaving
+// a right-side void, while keeping the user's row arrangement. Widths are clamped
+// to the tier and x kept in range. Heights/rows are untouched.
+function scaleItems(items, cols, f) {
+  return (items || []).map((it) => {
+    const w = Math.max(2, Math.min(cols, Math.round((it.w || 1) * f)))
+    const x = Math.max(0, Math.min(Math.round((it.x || 0) * f), cols - w))
+    return { ...it, x, w, y: Math.max(0, Math.round(it.y || 0)), h: Math.max(1, Math.round(it.h || 1)) }
+  })
+}
+
+// Fill in any breakpoint that has no saved layout from the densest one present
+// (usually lg). Older boards predate the ultrawide tiers (xl…xxxxl), so without
+// this react-grid-layout would clone lg's columns and leave the right of a wide
+// canvas empty. Two regimes:
+//   • WIDER tiers (more columns than the source) → scale widget x/w to FILL the
+//     width, preserving rows. A sparse board (e.g. 3 widgets) thus spreads across
+//     the ultrawide screen rather than hugging the left third. The ~66ch text cap
+//     (styles.css) keeps the now-wider widgets readable.
+//   • NARROWER/equal tiers → constant-size shelf repack, so phones/tablets stack
+//     widgets at their normal size (unchanged).
+// Non-mutating. No source breakpoint present -> returned untouched.
 export function fillBreakpoints(layouts) {
   const out = { ...(layouts || {}) }
   const present = Object.keys(COLS).filter((bp) => Array.isArray(out[bp]))
@@ -82,7 +95,9 @@ export function fillBreakpoints(layouts) {
   const source = present.reduce((a, b) => (COLS[b] > COLS[a] ? b : a))
   for (const bp of Object.keys(COLS)) {
     if (Array.isArray(out[bp])) continue
-    out[bp] = repack(out[source], COLS[bp])
+    out[bp] = COLS[bp] > COLS[source]
+      ? scaleItems(out[source], COLS[bp], COLS[bp] / COLS[source])
+      : repack(out[source], COLS[bp])
   }
   return out
 }

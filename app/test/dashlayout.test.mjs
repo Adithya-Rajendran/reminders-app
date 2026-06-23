@@ -31,20 +31,22 @@ for (const bp of byWidth) {
   ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
 }
 
-// --- fillBreakpoints (constant-size repack into the wider tiers) ---
+// --- fillBreakpoints (scale-to-fill on WIDER tiers; constant-size repack on narrower) ---
 const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
 const filled = fillBreakpoints(partial)
+const fW = COLS.xxxxl / COLS.lg
 ok(Object.keys(filled).sort().join() === Object.keys(COLS).sort().join(), 'fills every missing breakpoint from the densest present one')
 ok(partial.lg.length === 2 && partial.lg[1].x === 20 && !partial.xxxxl, 'fillBreakpoints is non-mutating')
 ok(filled.lg === partial.lg, 'present breakpoints are reused untouched')
-// Widgets keep their size on a wider tier (no proportional growth)...
-ok(filled.xxxxl.every((it) => it.w === 10 && it.h === 9), 'widget size (w/h) is unchanged on a wider tier')
-// ...and the extra columns just fit more per row: two 10-wide widgets share row 0.
-ok(filled.xxxxl[0].y === 0 && filled.xxxxl[1].y === 0 && filled.xxxxl.map((it) => it.x).sort((a, b) => a - b).join() === '0,10', 'widgets repack left-to-right into the wider tier')
-ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w >= 2), 'repacked items stay within the target column range')
-// A widget on a lower row moves up when the wider tier has room beside the first.
+// On a WIDER tier widgets scale up proportionally to fill the extra width (no void); height unchanged.
+ok(filled.xxxxl.every((it) => it.w === Math.round(10 * fW) && it.h === 9), 'widget width scales to fill a wider tier; height unchanged')
+// Rows are preserved and x scales proportionally, staying within the tier.
+ok(filled.xxxxl[0].y === 0 && filled.xxxxl[1].y === 0 && filled.xxxxl.map((it) => it.x).join() === `0,${Math.round(20 * fW)}` && filled.xxxxl.every((it) => it.x + it.w <= COLS.xxxxl), 'x scales proportionally and stays within the wider tier')
+// Narrower tiers still constant-size repack (phones/tablets stack at normal size).
+ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w === 10), 'narrower tiers keep widgets at their original size')
+// On a wider tier a lower widget keeps its row (it widens to fill, rather than flowing up).
 const stacked = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 9 }] })
-ok(stacked.xxxxl.find((it) => it.i === 'b').y === 0, 'a lower widget moves up into the freed horizontal space')
+ok(stacked.xxxxl.find((it) => it.i === 'b').y === 9 && stacked.xxxxl.find((it) => it.i === 'b').w === Math.round(10 * fW), 'a lower widget keeps its row and widens to fill on a wider tier')
 // Wrapping: at md (25 cols) two 10-wide widgets fit a shelf, the third wraps below.
 const wrapped = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 10, y: 0, w: 10, h: 9 }, { i: 'c', x: 20, y: 0, w: 10, h: 9 }] }).md
 ok(wrapped.filter((it) => it.y === 0).length === 2 && wrapped.find((it) => it.i === 'c').x === 0 && wrapped.find((it) => it.i === 'c').y === 9, 'a third widget wraps to a new shelf below (shelf height = max h)')
