@@ -269,6 +269,16 @@ export default function App() {
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
+  // App-level commands surfaced in the Ctrl/Cmd+K palette (alongside its built-in
+  // note command), so the palette is a keyboard-driven spine for the whole app.
+  const paletteCommands = [
+    { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, run: () => openSettings() },
+    { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, run: toggleTheme },
+    { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
+    { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', run: addDashboard },
+    { id: 'logout', label: 'Log out', icon: IconLogout, run: () => window.location.assign('/auth/logout') },
+  ]
+
   return (
     <>
       <div className="app-bg" />
@@ -309,7 +319,7 @@ export default function App() {
       {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => setSettings(null)} />}
 
       {status === 'ready' && palette && (
-        <CommandPalette initialMode={palette.mode} onClose={() => setPalette(null)} />
+        <CommandPalette initialMode={palette.mode} commands={paletteCommands} onClose={() => setPalette(null)} />
       )}
     </>
   )
