@@ -19,13 +19,14 @@
 //     raw screen width, so the exact tier boundary is approximate by design.
 export const COLS = { xxxxl: 128, xxxl: 96, xxl: 64, xl: 45, lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
 export const BREAKPOINTS = { xxxxl: 5120, xxxl: 3840, xxl: 2560, xl: 1800, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
-export const GRID_V = 4
+export const GRID_V = 5
 // Multiply a saved layout's x/w by this to reach the current grid, keyed by the
 // layout's stored gridV (1 = old 12-col, 2 = 24-col, 3+ = current 30-col base).
-// v4 did NOT change the base columns (factor 1, same as v3); the bump is a stamp
-// that a board's ultrawide tiers predate constant-size repacking and must be
-// rebuilt from the base layout on load (see Dashboard.jsx) — so it scales by 1.
-export const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1, 4: 1 }
+// v4/v5 did NOT change the base columns (factor 1, same as v3); the bumps are
+// stamps that a board's ultrawide tiers must be rebuilt from the base layout on
+// load (see Dashboard.jsx) — v4 rebuilt them at constant size, v5 rebuilds them
+// scaled-to-fill — so both scale the base by 1.
+export const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1, 4: 1, 5: 1 }
 
 export const DEFAULT_SIZE = { w: 10, h: 9 } // a default widget spans ~1/3 at lg (10 of 30)
 
