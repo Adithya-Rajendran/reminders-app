@@ -1659,3 +1659,21 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }
 
 /* Cues mindmap/flowchart canvas → co-located in widgets/CuesWidget.css */
+
+/* ---------- keyboard focus ring on borderless custom inputs ----------
+   These inputs reset `outline: none` (deliberate for mouse focus), which also
+   strips the global :focus-visible ring for KEYBOARD users. Re-assert it here:
+   the class + :focus-visible has higher specificity than the bare class rule,
+   so the ring returns on keyboard focus only. (The Tiptap editor body is
+   intentionally excluded — its caret is the focus indicator.) */
+.add-row input:focus-visible,
+.note-search:focus-visible,
+.note-folder-in:focus-visible,
+.note-folder-pick select:focus-visible,
+.note-tag-in:focus-visible,
+.note-title-input:focus-visible,
+.cmdk-input:focus-visible,
+.dash-tab-edit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
