@@ -10,7 +10,7 @@ let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
 
 // --- invariants the persistence format depends on ---
-ok(GRID_V === 4, 'GRID_V is 4 (bump SCALE_TO_CURRENT when changing the grid)')
+ok(GRID_V === 5, 'GRID_V is 5 (bump SCALE_TO_CURRENT when changing the grid)')
 ok(Object.keys(SCALE_TO_CURRENT).length === GRID_V, 'every historical gridV has a scale factor')
 ok(SCALE_TO_CURRENT[GRID_V] === 1, 'the current gridV scales by 1 (no-op)')
 for (const [v, f] of Object.entries(SCALE_TO_CURRENT)) {

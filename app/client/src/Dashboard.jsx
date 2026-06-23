@@ -97,11 +97,12 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         const f = SCALE_TO_CURRENT[storedV] ?? 2.5
         const needsGrid = f !== 1
         if (needsGrid) lay = scaleLayouts(lay, f)
-        // Boards stamped before gridV 4 may carry the old ultrawide tiers that
-        // scaled widgets proportionally (so they grew on wide screens). Drop those
-        // tiers — keeping the base layout (lg…xxs) — so fillBreakpoints rebuilds
-        // them at constant widget size. Runs once: the PUT below stamps GRID_V.
-        const staleWide = storedV < 4
+        // Drop any saved ultrawide tiers (keeping the base lg…xxs) so
+        // fillBreakpoints rebuilds them with the CURRENT regime. gridV 5 switched
+        // wide tiers from constant-size (the v4 behaviour, which left a void on a
+        // sparse 21:9 board) to scale-to-fill, so v4 boards must rebuild too.
+        // Runs once: the PUT below re-stamps GRID_V.
+        const staleWide = storedV < 5
         if (staleWide) { lay = { ...lay }; for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp] }
         // Fill in any breakpoints the saved board lacks (e.g. the ultrawide tiers
         // on a board that predates them) so a wide canvas shows a full layout, not
