@@ -57,6 +57,10 @@
      the breakpoint ladder in dashlayout.js (more columns, not wider columns).
      Set a px value here to re-cap and center the canvas. */
   --canvas-max: none;
+  /* Readable line-length cap for list/text widget bodies (~66ch ≈ WCAG 1.4.8).
+     Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it
+     keeps content left-aligned at a readable measure instead of 150-char lines. */
+  --measure: 66ch;
 }
 
 [data-theme="light"] {
@@ -1040,7 +1044,7 @@ body {
 .err { color: var(--danger); font-size: 12.5px; background: var(--danger-soft); border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent); padding: 8px 11px; border-radius: 10px; }
 
 /* ===== Interactive task widgets ===== */
-.tasklist { display: flex; flex-direction: column; gap: 2px; height: 100%; }
+.tasklist { display: flex; flex-direction: column; gap: 2px; height: 100%; max-width: var(--measure); }
 .task-stream { display: flex; flex-direction: column; gap: 1px; }
 .add-row.qa { margin-bottom: 2px; }
 .add-row.qa input { font-size: 13.5px; }
