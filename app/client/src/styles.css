@@ -589,7 +589,10 @@ body {
   transition: background 120ms ease;
 }
 .task:hover { background: var(--panel2); }
-.task .task-main { flex: 1; min-width: 0; }
+/* Cap the readable measure of a task line (~66ch). No effect at normal widget
+   widths; on a wide (ultrawide-filled) list it keeps titles from stretching into
+   150-char lines — the row's controls follow and the slack falls to the right. */
+.task .task-main { flex: 1; min-width: 0; max-width: var(--measure); }
 .task .task-title {
   font-size: 13.5px;
   line-height: 1.4;
@@ -1044,7 +1047,7 @@ body {
 .err { color: var(--danger); font-size: 12.5px; background: var(--danger-soft); border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent); padding: 8px 11px; border-radius: 10px; }
 
 /* ===== Interactive task widgets ===== */
-.tasklist { display: flex; flex-direction: column; gap: 2px; height: 100%; max-width: var(--measure); }
+.tasklist { display: flex; flex-direction: column; gap: 2px; height: 100%; }
 .task-stream { display: flex; flex-direction: column; gap: 1px; }
 .add-row.qa { margin-bottom: 2px; }
 .add-row.qa input { font-size: 13.5px; }
