@@ -27,7 +27,7 @@ function Highlight({ text, positions }) {
 // App-wide command palette / quick-switcher (Obsidian Ctrl+O / Ctrl+P). Notes
 // mode fuzzy-jumps to any note; typing `>` switches to command mode. Fully
 // keyboard-driven; selecting a note emits on the notesbus so the widget opens it.
-export default function CommandPalette({ initialMode = 'notes', onClose }) {
+export default function CommandPalette({ initialMode = 'notes', commands = [], onClose }) {
   const [raw, setRaw] = useState(initialMode === 'commands' ? '>' : '')
   const [notes, setNotes] = useState(null) // null = loading | [] | [...]
   const [unconfigured, setUnconfigured] = useState(false)
@@ -50,9 +50,12 @@ export default function CommandPalette({ initialMode = 'notes', onClose }) {
     return () => { alive = false }
   }, [])
 
+  // Built-in note command + any app-level commands the host passes in (settings,
+  // theme, dashboards, …) — so Ctrl/Cmd+K is a single keyboard-driven action spine.
   const COMMANDS = useMemo(() => [
     { id: 'new-note', label: 'New note', hint: 'Create a note in Notes', icon: IconPlus, run: async () => { try { const n = await notesApi.create('', 'Untitled'); emitOpenNote(n.path) } catch { /* ignore */ } } },
-  ], [])
+    ...commands,
+  ], [commands])
 
   const results = useMemo(
     () => (cmdMode ? fuzzyRank(term, COMMANDS, (c) => c.label) : fuzzyRank(term, notes || [], (n) => n.title)),
