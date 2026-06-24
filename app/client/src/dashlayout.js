@@ -103,26 +103,66 @@ export function fillBreakpoints(layouts) {
   return out
 }
 
-// Stamp per-widget minimum sizes (Apple-style floors, so content never breaks)
+// Stamp per-widget size constraints (Apple-style floors + ceilings + resize policy)
 // onto every layout item, keyed by widget type via `widgets` ({ i, type }). The
-// floor comes from minFor(type) -> { w, h }; react-grid-layout reads minW/minH
-// off each item and won't let a resize go below them. Derived at render from the
-// registry rather than persisted — floors are cheap to recreate and should track
-// the current registry, so saved layouts never need migrating. Non-mutating.
-export function applyMins(layouts, widgets, minFor) {
+// host (compositor) half of a Wayland xdg_toplevel / ICCCM WM_NORMAL_HINTS-style
+// contract: a widget DECLARES size hints in the manifest, the dashboard NEGOTIATES
+// and ENFORCES them. constraintsFor(type) returns the unified shape
+//   { min:{w,h}, max?:{w,h}, aspect?:{min,max}, resizable?:boolean, resizeHandles?:[] }
+// and react-grid-layout reads minW/minH/maxW/maxH/isResizable/resizeHandles off each
+// item. Derived at render from the registry rather than persisted — constraints are
+// cheap to recreate and should track the current registry, so saved layouts never
+// need migrating. Only ADDS min*/max*/isResizable/resizeHandles; never touches
+// x/y/w/h, so it can't feed a changed layout back through onLayoutChange and loop.
+// `aspect` is NOT stamped here (RGL has no aspect item prop) — it's enforced on
+// resize (Dashboard's onResize) and on first render via a contract-checked
+// defaultSize. Non-mutating.
+export function applyConstraints(layouts, widgets, constraintsFor) {
   const typeById = new Map((widgets || []).map((w) => [w.i, w.type]))
   const out = {}
   for (const bp of Object.keys(layouts || {})) {
     out[bp] = (layouts[bp] || []).map((it) => {
-      const m = minFor(typeById.get(it.i)) || {}
-      const minW = Math.max(1, Math.round(m.w || 1))
-      const minH = Math.max(1, Math.round(m.h || 1))
+      const c = constraintsFor(typeById.get(it.i)) || {}
+      const min = c.min || {}
+      const floorW = Math.max(1, Math.round(min.w || 1))
+      const floorH = Math.max(1, Math.round(min.h || 1))
       // Never let a floor exceed the item's current size (that would force RGL to
       // grow it on load); clamp the floor to what's already placed.
-      return { ...it, minW: Math.min(minW, it.w || minW), minH: Math.min(minH, it.h || minH) }
+      const minW = Math.min(floorW, it.w || floorW)
+      const minH = Math.min(floorH, it.h || floorH)
+      const stamped = { ...it, minW, minH }
+      if (c.max) {
+        // Never let a ceiling fall below the item's current size (RGL would force-
+        // shrink a saved-large item) or below the floor (RGL misbehaves if max<min):
+        // clamp the ceiling UP to whichever is larger. The next resize lands inside
+        // the real max — non-destructive on load.
+        stamped.maxW = Math.max(Math.round(c.max.w), it.w || 1, minW)
+        stamped.maxH = Math.max(Math.round(c.max.h), it.h || 1, minH)
+      }
+      // Resize policy: a widget can lock its size or restrict which handles resize it.
+      if (c.resizable === false) stamped.isResizable = false
+      if (Array.isArray(c.resizeHandles)) stamped.resizeHandles = c.resizeHandles
+      return stamped
     })
   }
   return out
+}
+
+// Snap a proposed size onto an aspect band. `aspect` is { min, max } — the allowed
+// width/height ratio range in GRID CELLS (a fixed ratio is the band { min:r, max:r }).
+// Height is the anchor (rowHeight is constant, and "tall enough to read" dominates
+// for these content widgets): if the ratio falls outside the band, width is re-derived
+// from height at the nearer band edge. Returns integer { w, h }; a falsy aspect is the
+// identity. Pure + deterministic so the node tests exercise it without a renderer; the
+// dashboard's onResize handler composes it with the item's own min/max clamp.
+export function clampAspect(w, h, aspect) {
+  const hh = Math.max(1, Math.round(h))
+  const ww = Math.max(1, Math.round(w))
+  if (!aspect) return { w: ww, h: hh }
+  const r = ww / hh
+  if (r >= aspect.min && r <= aspect.max) return { w: ww, h: hh }
+  const edge = r < aspect.min ? aspect.min : aspect.max
+  return { w: Math.max(1, Math.round(hh * edge)), h: hh }
 }
 
 // Shelf-pack `items` into `cols` columns at their existing size. Walk them in
