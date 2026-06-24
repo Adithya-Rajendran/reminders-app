@@ -480,8 +480,12 @@ function WidgetFrame({ type, title, onRemove, children }) {
   // tweaks. This is the single place size is measured — every widget gets it free.
   const [bodyRef, size] = useElementSize()
   return (
-    <div className="widget">
-      <div className="widget-head" title="Drag to move">
+    // Label each widget as a navigable region for screen readers. Drag/resize are
+    // pointer-only (react-grid-layout has no keyboard path); the keyboard route to
+    // change the board is the toolbar — Add widget / Reset layout — and each
+    // widget's Remove button, which are all reachable controls.
+    <div className="widget" role="group" aria-label={title}>
+      <div className="widget-head" title="Drag to move (pointer); use the toolbar to change the layout">
         <span className="widget-title">
           <Ic size={17} />
           <span className="t-text">{title}</span>
