@@ -5,6 +5,7 @@
 // instead of silently dropping a widget at runtime.
 import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD } from '../client/src/widgets/manifest.js'
 import { APP_INTERFACES, resolveConnections, normalizePlugs } from '../client/src/connections.js'
+import { DEFAULT_SIZE } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -14,6 +15,10 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m)
 const APP_SLOTS = new Set(Object.keys(APP_INTERFACES))
 const isPosInt = (n) => Number.isInteger(n) && n > 0
 const isSize = (s) => s && isPosInt(s.w) && isPosInt(s.h)
+// aspect is a ratio BAND (non-integer), unlike sizes which are whole grid cells.
+const isAspect = (a) => a && typeof a.min === 'number' && typeof a.max === 'number' && a.min > 0 && a.max >= a.min
+const inBand = (w, h, a) => { const r = w / h; return r >= a.min - 1e-9 && r <= a.max + 1e-9 }
+const VALID_HANDLES = new Set(['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'])
 
 // --- the manifest itself is well-formed ---
 ok(Array.isArray(WIDGET_MANIFEST) && WIDGET_MANIFEST.length > 0, 'manifest is a non-empty array')
@@ -45,11 +50,33 @@ for (const m of WIDGET_MANIFEST) {
 }
 
 // --- layout sizing is sane (these feed dashlayout via WIDGET_TYPES) ---
+// The host enforces a Wayland/ICCCM-style size contract: min/max floors+ceilings,
+// an aspect band, and a resize policy. Validate the declared hints are well-formed
+// and mutually consistent, and that a widget is BORN at a size satisfying them
+// (aspect is only corrected on a user resize, so the initial size must already fit).
 for (const m of WIDGET_MANIFEST) {
   if (m.defaultSize !== undefined) ok(isSize(m.defaultSize), `${m.type}: defaultSize is { w>0, h>0 } integers`)
   if (m.minSize !== undefined) ok(isSize(m.minSize), `${m.type}: minSize is { w>0, h>0 } integers`)
+  if (m.maxSize !== undefined) ok(isSize(m.maxSize), `${m.type}: maxSize is { w>0, h>0 } integers`)
   if (isSize(m.defaultSize) && isSize(m.minSize)) {
     ok(m.defaultSize.w >= m.minSize.w && m.defaultSize.h >= m.minSize.h, `${m.type}: defaultSize is not smaller than minSize`)
+  }
+  if (isSize(m.maxSize) && isSize(m.minSize)) {
+    ok(m.maxSize.w >= m.minSize.w && m.maxSize.h >= m.minSize.h, `${m.type}: maxSize is not smaller than minSize`)
+  }
+  // The size a widget is actually born at (its defaultSize, else the host default).
+  const eff = { ...DEFAULT_SIZE, ...(m.defaultSize || {}) }
+  if (isSize(m.maxSize)) {
+    ok(eff.w <= m.maxSize.w && eff.h <= m.maxSize.h, `${m.type}: default size fits within maxSize`)
+  }
+  if (m.aspect !== undefined) {
+    ok(isAspect(m.aspect), `${m.type}: aspect is { min>0, max>=min }`)
+    if (isAspect(m.aspect)) ok(inBand(eff.w, eff.h, m.aspect), `${m.type}: default size satisfies its aspect band`)
+  }
+  if (m.resizable !== undefined) ok(typeof m.resizable === 'boolean', `${m.type}: resizable is a boolean`)
+  if (m.resizeHandles !== undefined) {
+    ok(Array.isArray(m.resizeHandles) && m.resizeHandles.length > 0 && m.resizeHandles.every((h) => VALID_HANDLES.has(h)),
+      `${m.type}: resizeHandles is a non-empty subset of the 8 valid handles`)
   }
 }
 

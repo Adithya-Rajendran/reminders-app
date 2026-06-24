@@ -10,7 +10,7 @@ import { resolveConnections, selectCtx, appSlots, describeConnections } from './
 import { SkeletonRows } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyMins,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
 } from './dashlayout.js'
 import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
@@ -35,11 +35,23 @@ const REQUIREMENT_LABEL = { caldav: 'a CalDAV account', nextcloud: 'a Nextcloud 
 
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
-// Apple-style size floor: the smallest grid w/h a widget can be resized to, so a
-// widget's content never has to render below its smallest legible tier. Per-type
-// override via the registry's minSize; otherwise this default (~mini tier).
+// The per-widget size contract the host enforces (Wayland/ICCCM-style hints): a
+// floor (Apple-style, so content never renders below its smallest legible tier), an
+// optional ceiling, an optional aspect band, and an optional resize policy. min
+// defaults to ~mini tier; everything else is opt-in via the registry. Returns the
+// unified shape applyConstraints / clampAspect both consume.
 const DEFAULT_MIN_SIZE = { w: 4, h: 4 }
-const minFor = (type) => ({ ...DEFAULT_MIN_SIZE, ...(WIDGET_TYPES.get(type)?.minSize || {}) })
+const constraintsFor = (type) => {
+  const m = WIDGET_TYPES.get(type)
+  return {
+    min: { ...DEFAULT_MIN_SIZE, ...(m?.minSize || {}) },
+    max: m?.maxSize ? { ...m.maxSize } : null, // no maxSize = no ceiling
+    aspect: m?.aspect || null,
+    resizable: m?.resizable,         // undefined = resizable (RGL default)
+    resizeHandles: m?.resizeHandles, // undefined = grid default (all 8)
+  }
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 const newId = () => 'w-' + crypto.randomUUID()
 
@@ -259,9 +271,28 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     }
   }, [slots])
 
-  // Stamp each item's resize floor (minW/minH) from the registry at render time,
-  // so saved layouts never need migrating and floors track the current registry.
-  const layoutsWithMins = useMemo(() => applyMins(layouts, widgets, minFor), [layouts, widgets])
+  // Stamp each item's size constraints (min/max floors + ceilings, resize policy)
+  // from the registry at render time, so saved layouts never need migrating and the
+  // constraints track the current registry. (Aspect isn't an RGL item prop — it's
+  // enforced live in onResize below.)
+  const layoutsWithConstraints = useMemo(() => applyConstraints(layouts, widgets, constraintsFor), [layouts, widgets])
+
+  // Enforce a widget's aspect band live during AND after a resize. RGL has already
+  // clamped to the item's minW/maxW before calling us; we layer the aspect band on
+  // top, then re-clamp into [min,max] so the ratio can't push the widget past its own
+  // ceiling/floor. Mutating newItem + placeholder in place updates BOTH the committed
+  // size and the live ghost preview (.react-grid-placeholder), so the widget snaps to
+  // its shape as you drag. onResizeStop repeats it so the persisted size is exact.
+  const typeOf = useMemo(() => new Map(widgets.map((w) => [w.i, w.type])), [widgets])
+  const enforceAspect = useCallback((_layout, _oldItem, newItem, placeholder) => {
+    const aspect = constraintsFor(typeOf.get(newItem.i)).aspect
+    if (!aspect) return
+    const snapped = clampAspect(newItem.w, newItem.h, aspect)
+    const w = clamp(snapped.w, newItem.minW || 1, newItem.maxW || Infinity)
+    const h = clamp(snapped.h, newItem.minH || 1, newItem.maxH || Infinity)
+    newItem.w = w; newItem.h = h
+    if (placeholder) { placeholder.w = w; placeholder.h = h }
+  }, [typeOf])
 
   if (!loaded) {
     return (
@@ -305,7 +336,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         ) : (
           <Grid
             className="layout"
-            layouts={layoutsWithMins}
+            layouts={layoutsWithConstraints}
             breakpoints={BREAKPOINTS}
             cols={COLS}
             rowHeight={30}
@@ -313,6 +344,8 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
             draggableHandle=".widget-head"
             draggableCancel="button,.iconbtn,.widget-head-actions"
             resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
+            onResize={enforceAspect}
+            onResizeStop={enforceAspect}
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => {

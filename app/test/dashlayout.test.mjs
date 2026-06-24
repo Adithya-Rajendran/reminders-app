@@ -3,7 +3,7 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyMins,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -86,23 +86,60 @@ ok(Number.isFinite(next.lg[3].y), 'y stays finite (Infinity would persist as nul
 const fromEmpty = appendToLayouts({}, 'w-1', DEFAULT_SIZE)
 ok(Object.keys(fromEmpty).length === Object.keys(COLS).length && fromEmpty.lg[0].y === 0, 'append works on an empty board at every breakpoint')
 
-// --- applyMins (per-widget size floors) ---
+// --- applyConstraints (per-widget floors + ceilings + resize policy) ---
 {
-  const mins = { a: { w: 4, h: 4 }, b: { w: 6, h: 5 } }
-  const minFor = (type) => mins[type]
+  const spec = {
+    a: { min: { w: 4, h: 4 }, max: { w: 20, h: 18 } },
+    b: { min: { w: 6, h: 5 } },                                  // no ceiling
+    locked: { min: { w: 4, h: 4 }, resizable: false },
+    corners: { min: { w: 4, h: 4 }, resizeHandles: ['se', 'sw', 'ne', 'nw'] },
+  }
+  const constraintsFor = (type) => spec[type]
   const base = { lg: [{ i: 'w-1', x: 0, y: 0, w: 10, h: 9 }, { i: 'w-2', x: 10, y: 0, w: 10, h: 9 }] }
-  const withMins = applyMins(base, board, minFor)
-  ok(withMins.lg[0].minW === 4 && withMins.lg[0].minH === 4, 'type a gets its floor')
-  ok(withMins.lg[1].minW === 6 && withMins.lg[1].minH === 5, 'type b gets its floor')
-  ok(base.lg[0].minW === undefined, 'applyMins is non-mutating')
-  ok(withMins.lg[0].w === 10 && withMins.lg[0].h === 9, 'x/y/w/h preserved')
+  const c = applyConstraints(base, board, constraintsFor) // board: w-1=a, w-2=b
+  ok(c.lg[0].minW === 4 && c.lg[0].minH === 4, 'type a gets its floor')
+  ok(c.lg[1].minW === 6 && c.lg[1].minH === 5, 'type b gets its floor')
+  ok(c.lg[0].maxW === 20 && c.lg[0].maxH === 18, 'type a gets its ceiling')
+  ok(c.lg[1].maxW === undefined && c.lg[1].maxH === undefined, 'type b (no maxSize) gets no ceiling')
+  ok(base.lg[0].minW === undefined && base.lg[0].maxW === undefined, 'applyConstraints is non-mutating')
+  ok(c.lg[0].w === 10 && c.lg[0].h === 9, 'x/y/w/h preserved')
   // a floor must never exceed the item's current size (would force RGL to grow it)
   const tiny = { lg: [{ i: 'w-1', x: 0, y: 0, w: 3, h: 2 }] }
-  const clamped = applyMins(tiny, [{ i: 'w-1', type: 'b' }], minFor)
+  const clamped = applyConstraints(tiny, [{ i: 'w-1', type: 'b' }], constraintsFor)
   ok(clamped.lg[0].minW === 3 && clamped.lg[0].minH === 2, 'floor clamps down to current size')
-  // unknown type / missing floor -> minimum of 1, no throw
-  const unknown = applyMins({ lg: [{ i: 'x', x: 0, y: 0, w: 5, h: 5 }] }, [{ i: 'x', type: 'gone' }], minFor)
+  // a ceiling must never fall below the current size (would force RGL to shrink it)
+  const big = applyConstraints({ lg: [{ i: 'w-1', x: 0, y: 0, w: 30, h: 25 }] }, [{ i: 'w-1', type: 'a' }], constraintsFor)
+  ok(big.lg[0].maxW === 30 && big.lg[0].maxH === 25, 'ceiling clamps up to current size')
+  // a ceiling must never fall below the floor (RGL misbehaves if max < min)
+  const both = applyConstraints({ lg: [{ i: 'w-1', x: 0, y: 0, w: 2, h: 2 }] }, [{ i: 'w-1', type: 'a' }], constraintsFor)
+  ok(both.lg[0].maxW >= both.lg[0].minW && both.lg[0].maxH >= both.lg[0].minH, 'ceiling stays >= floor')
+  // resize policy: lock + restricted handles pass through to the RGL item
+  const policy = applyConstraints(
+    { lg: [{ i: 'l', x: 0, y: 0, w: 6, h: 6 }, { i: 'k', x: 6, y: 0, w: 6, h: 6 }] },
+    [{ i: 'l', type: 'locked' }, { i: 'k', type: 'corners' }], constraintsFor)
+  ok(policy.lg[0].isResizable === false, 'resizable:false stamps isResizable=false')
+  ok(policy.lg[1].isResizable === undefined, 'a resizable widget keeps the RGL default (no isResizable)')
+  ok(JSON.stringify(policy.lg[1].resizeHandles) === JSON.stringify(['se', 'sw', 'ne', 'nw']), 'resizeHandles passes through')
+  ok(policy.lg[0].resizeHandles === undefined, 'no resizeHandles override when unset')
+  // unknown type / missing constraint -> minimum of 1, no throw
+  const unknown = applyConstraints({ lg: [{ i: 'x', x: 0, y: 0, w: 5, h: 5 }] }, [{ i: 'x', type: 'gone' }], constraintsFor)
   ok(unknown.lg[0].minW === 1 && unknown.lg[0].minH === 1, 'unknown type floors to 1')
+}
+
+// --- clampAspect (snap a size onto an aspect band; height is the anchor) ---
+{
+  const eq = (got, w, h) => got.w === w && got.h === h
+  // fixed ratio = the band where min === max
+  ok(eq(clampAspect(10, 5, { min: 1, max: 1 }), 5, 5), 'fixed 1:1 snaps width down to height')
+  ok(eq(clampAspect(4, 8, { min: 1, max: 1 }), 8, 8), 'fixed 1:1 grows width up to height')
+  ok(eq(clampAspect(6, 6, { min: 1, max: 1 }), 6, 6), 'already 1:1 -> untouched')
+  // band {min,max}: correct only when the ratio leaves [min,max]
+  ok(eq(clampAspect(20, 5, { min: 1, max: 2 }), 10, 5), 'too wide -> pulled to the max edge (2 * 5)')
+  ok(eq(clampAspect(3, 5, { min: 1, max: 2 }), 5, 5), 'too narrow -> pulled to the min edge (1 * 5)')
+  ok(eq(clampAspect(8, 5, { min: 1, max: 2 }), 8, 5), 'inside the band -> untouched')
+  // no aspect -> identity (still floors a degenerate size to >= 1)
+  ok(eq(clampAspect(7, 4, null), 7, 4), 'no aspect -> identity')
+  ok(eq(clampAspect(0, 0, null), 1, 1), 'degenerate size floors to 1')
 }
 
 console.log(`dashlayout: ${pass} passed, ${fail} failed`)

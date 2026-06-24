@@ -82,13 +82,40 @@ export default function StatWidget() {
 - **CSS escape hatch** — the body carries `data-wsize` / `data-hsize`, so purely
   cosmetic tweaks need no JS or re-render:
   `.widget-body[data-wsize="xs"] .stat-label { display: none }`.
-- **Floors** — set `minSize: { w, h }` on the registry entry (next to
-  `defaultSize`) so a user can't shrink the widget below its smallest legible
-  tier. Default floor is 4×4.
-
 Re-renders fire only when a *tier* changes (not per pixel), so branching freely
 is cheap. Put any non-trivial size→content mapping in a plain `.js` helper if
 it's worth a node test (see `widgetsize.js` itself).
+
+### Size hints (min / max / aspect / resize policy)
+
+A widget **declares** how it wants to be sized; the dashboard (the "compositor")
+**enforces** it — the same split as Wayland `xdg_toplevel` / X11 ICCCM
+`WM_NORMAL_HINTS`, where a client declares min/max/aspect and the window manager
+honors them. All hints are optional, pure data on the manifest descriptor, and
+are re-derived at render (never persisted), so adding or tightening one needs no
+layout migration.
+
+| hint | shape | effect |
+|---|---|---|
+| `minSize` | `{ w, h }` | resize floor (default `4×4`) — content never renders below its smallest legible tier |
+| `maxSize` | `{ w, h }` | resize ceiling (default: none). A saved item already larger is never force-shrunk; it just can't grow further |
+| `aspect` | `{ min, max }` | allowed **width/height ratio band** in grid cells. Enforced live on resize — the widget snaps to its shape as you drag |
+| `resizable` | `boolean` | `false` locks the size (no handles) |
+| `resizeHandles` | subset of `['s','w','e','n','sw','nw','se','ne']` | restrict which edges/corners resize this widget type |
+
+- **Aspect is a band, not a single ratio.** A fixed ratio is just the degenerate
+  band `{ min: r, max: r }`; a real band lets the widget breathe and only corrects
+  when you push outside it. The ratio is **width/height in grid cells**, so it's
+  deterministic and breakpoint-independent.
+- **Cell ratio ≠ pixel ratio.** A grid cell is ~40px wide × 30px tall, so a
+  *visual* square is about `aspect: { min: 0.75, max: 0.75 }`, not `1.0`. Pick the
+  cell ratio that yields the look you want at `lg`.
+- **`defaultSize` must already satisfy every hint** (the contract test enforces
+  this). Aspect is only corrected on a *user* resize, so a widget must be **born**
+  inside its band — `test/widget-contract.test.mjs` fails CI otherwise.
+- Examples in the manifest: `calendar` (near-square band + ceiling) and `focus`
+  (tall, narrow band). The pure helpers live in `dashlayout.js`
+  (`applyConstraints`, `clampAspect`) and are node-tested.
 
 ## 2. Register it
 
@@ -108,6 +135,10 @@ The split keeps the widget↔app connection contract testable without a renderer
   // plugs: ['tasks'],              // app interfaces this widget connects to (see below)
   // defaultSize: { w: 5, h: 5 },   // grid units when first added (default 10×9)
   // minSize: { w: 4, h: 4 },       // resize floor (default 4×4)
+  // maxSize: { w: 24, h: 22 },     // resize ceiling (default: none)
+  // aspect: { min: 0.9, max: 1.4 },// width/height ratio band in grid cells (see "Size hints")
+  // resizable: false,              // lock the size (no resize handles)
+  // resizeHandles: ['se'],         // restrict which edges/corners resize this type
   // pickGroup: true,               // "Add widget" asks for a reminder group -> w.group
 }
 ```
