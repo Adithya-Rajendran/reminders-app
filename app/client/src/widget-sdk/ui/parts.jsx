@@ -31,8 +31,8 @@ export function ErrorState({ sub, onRetry }) {
   return (
     <div className="state error" role="alert">
       <div className="state-ic"><IconRefresh size={22} /></div>
-      <div className="state-title">Couldn’t load</div>
-      <div className="state-sub">{sub || 'The request failed. Check your connection and try again.'}</div>
+      <div className="state-title">Couldn’t reach your server</div>
+      <div className="state-sub">{sub || 'This widget syncs with your own CalDAV / Nextcloud server. Check that it’s reachable and your account in Settings, then retry.'}</div>
       <button className="btn ghost sm" onClick={onRetry} style={{ marginTop: 4 }}><IconRefresh size={14} /> Retry</button>
     </div>
   )
