@@ -6,7 +6,7 @@ import dns from 'node:dns/promises'
 import net from 'node:net'
 import { createDAVClient } from 'tsdav'
 import ICAL from 'ical.js'
-import { baseOf, okPut } from './util.js'
+import { baseOf, okPut, sanitizeCalDAVError } from './util.js'
 import {
   getAccount, listAccounts, insertAccount, deleteAccount, deleteAccountById,
   upsertList, pruneLists, listsForAccount, enabledListsForAccount, setListEnabled,
@@ -173,7 +173,7 @@ async function createRemindersCalendar(acc, home) {
     if (r.ok || r.status === 201 || r.status === 405) return url
     console.error('MKCALENDAR failed (' + r.status + ')')
     return null
-  } catch (e) { console.error('MKCALENDAR error:', e?.message || e); return null }
+  } catch (e) { console.error(sanitizeCalDAVError(e, 'MKCALENDAR')); return null }
 }
 const isRemindersList = (name) => /^reminders$/i.test(String(name || '').trim())
 const escapeXml = (s) => String(s).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]))
@@ -294,7 +294,7 @@ export async function addAccountHandler(req, res) {
     res.json({ account: acctPublic(acc, lists) })
   } catch (e) {
     if (acc) await deleteAccountById(acc.id).catch(() => {})
-    console.error('caldav add/discover failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'add/discover'))
     res.status(400).json({ error: 'Could not connect — check the server URL, username and (app) password.' })
   }
 }
@@ -305,7 +305,7 @@ export async function discoverHandler(req, res) {
     if (!acc) return res.status(404).json({ error: 'not found' })
     res.json({ lists: await discover(acc) })
   } catch (e) {
-    console.error('caldav discover failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'discover'))
     res.status(400).json({ error: 'Discovery failed — check the connection.' })
   }
 }
@@ -328,8 +328,16 @@ export async function deleteAccountHandler(req, res, next) {
 }
 
 export async function fetchTasksHandler(req, res) {
+  // DB/crypto failures are OUR fault → 500; transient CalDAV failures are handled
+  // per-list below (skipped, partial 200). Don't mask the former as a 502.
+  let accs
   try {
-    const accs = await listAccounts(req.session.user.sub)
+    accs = await listAccounts(req.session.user.sub)
+  } catch (e) {
+    console.error(sanitizeCalDAVError(e, 'fetchTasks-db'))
+    return res.status(500).json({ error: 'internal error loading your accounts' })
+  }
+  try {
     const tasks = []
     // Same parallel fan-out as fetchEvents — see the comment there.
     await Promise.allSettled(accs.map(async (acc) => {
@@ -352,7 +360,7 @@ export async function fetchTasksHandler(req, res) {
     tasks.sort((a, b) => (a.done - b.done) || ((a.due || '9999') > (b.due || '9999') ? 1 : -1))
     res.json({ tasks })
   } catch (e) {
-    console.error('caldav fetchTasks failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'fetchTasks'))
     res.status(502).json({ error: 'could not fetch CalDAV tasks' })
   }
 }
@@ -550,7 +558,7 @@ export async function calendarEventsHandler(req, res) {
   try {
     res.json({ events: await fetchEvents(req.session.user.sub, start, end) })
   } catch (e) {
-    console.error('caldav fetchEvents failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'fetchEvents'))
     res.status(502).json({ error: 'could not fetch calendar events' })
   }
 }
@@ -569,7 +577,7 @@ export async function createEventHandler(req, res) {
     const event = await createEvent(acc, { listUrl, summary, start, end, allDay: !!allDay })
     res.json({ ok: true, event })
   } catch (e) {
-    console.error('caldav createEvent failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'createEvent'))
     res.status(502).json({ error: 'could not create event' })
   }
 }
@@ -586,7 +594,7 @@ export async function updateEventHandler(req, res) {
     await updateEvent(acc, { objectUrl, summary, start, end, allDay })
     res.json({ ok: true })
   } catch (e) {
-    console.error('caldav updateEvent failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'updateEvent'))
     res.status(502).json({ error: 'could not update event' })
   }
 }
@@ -600,7 +608,7 @@ export async function deleteEventHandler(req, res) {
     await deleteEvent(acc, { objectUrl })
     res.json({ ok: true })
   } catch (e) {
-    console.error('caldav deleteEvent failed:', e?.message || e)
+    console.error(sanitizeCalDAVError(e, 'deleteEvent'))
     res.status(502).json({ error: 'could not delete event' })
   }
 }

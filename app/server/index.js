@@ -10,6 +10,7 @@ import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from '.
 import { sseHandler } from './events.js'
 import { startValarmPoller } from './valarm-poller.js'
 import * as caldav from './caldav.js'
+import { rateLimitMiddleware } from './ratelimit.js'
 import * as notes from './notes.js'
 import * as groups from './reminder_groups.js'
 
@@ -135,8 +136,11 @@ app.delete('/api/dashboards/:id', requireAuth, async (req, res, next) => {
 })
 // CalDAV settings + tasks
 app.get('/api/caldav/accounts', requireAuth, caldav.listAccountsHandler)
-app.post('/api/caldav/accounts', requireAuth, caldav.addAccountHandler)
-app.post('/api/caldav/accounts/:id/discover', requireAuth, caldav.discoverHandler)
+// The two outbound-probing routes (add + discover make CalDAV PROPFINDs) share a
+// per-user rate limit so an authenticated user can't spam them / scan hosts.
+const caldavProbeLimit = rateLimitMiddleware(Number(process.env.CALDAV_RATE_LIMIT_PER_MIN) || 10)
+app.post('/api/caldav/accounts', requireAuth, caldavProbeLimit, caldav.addAccountHandler)
+app.post('/api/caldav/accounts/:id/discover', requireAuth, caldavProbeLimit, caldav.discoverHandler)
 app.put('/api/caldav/accounts/:id/lists', requireAuth, caldav.setListsHandler)
 app.delete('/api/caldav/accounts/:id', requireAuth, caldav.deleteAccountHandler)
 app.get('/api/caldav/tasks', requireAuth, caldav.fetchTasksHandler)
