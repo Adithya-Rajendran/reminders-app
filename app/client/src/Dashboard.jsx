@@ -104,22 +104,20 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         const f = SCALE_TO_CURRENT[storedV] ?? 2.5
         const needsGrid = f !== 1
         if (needsGrid) lay = scaleLayouts(lay, f)
-        // Drop any saved ultrawide tiers (keeping the base lg…xxs) so
-        // fillBreakpoints rebuilds them with the CURRENT regime. gridV 5 switched
-        // wide tiers from constant-size (the v4 behaviour, which left a void on a
-        // sparse 21:9 board) to scale-to-fill, so v4 boards must rebuild too.
-        // Runs once: the PUT below re-stamps GRID_V.
-        const staleWide = storedV < 5
-        if (staleWide) { lay = { ...lay }; for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp] }
-        // Fill in any breakpoints the saved board lacks (e.g. the ultrawide tiers
-        // on a board that predates them) so a wide canvas shows a full layout, not
-        // a top-left cluster. Persist below so the fill sticks (idempotent after).
+        // Ultrawide tiers (xl+) are always DERIVED from the base by scaling to
+        // fill the width — never authoritative. Drop any persisted copy and
+        // rebuild on EVERY load, so the fill is robust even when react-grid-layout
+        // re-saves a de-scaled copy at a narrow viewport (otherwise that sticks
+        // and the next wide load shows a half-empty board). fillBreakpoints scales
+        // the base up into each wide tier; narrower tiers it leaves untouched.
+        lay = { ...lay }
+        for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp]
         const before = Object.keys(lay).length
         lay = fillBreakpoints(lay)
         const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)
-        if (sw.length !== original.length || needsGrid || addedBp || staleWide || remapped) {
+        if (sw.length !== original.length || needsGrid || addedBp || remapped) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),
