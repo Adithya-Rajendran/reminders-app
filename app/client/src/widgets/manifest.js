@@ -53,14 +53,19 @@
 //                also contribute a Settings panel via `settingsPanel` (registry.jsx).
 
 export const WIDGET_MANIFEST = [
-  { type: 'reminders', label: 'Reminders',     plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 } },
-  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks', 'projects'], requires: ['caldav'] },
-  { type: 'calendar',  label: 'Calendar',      plugs: ['tasks', 'calendar'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 24, h: 22 }, aspect: { min: 0.9, max: 1.4 } }, // a month grid reads best near-square
-  { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], requires: ['nextcloud'], defaultSize: { w: 16, h: 11 }, minSize: { w: 6, h: 6 } }, // open wide enough for the tree+editor split (needs body ≥ ~540px)
-  { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 8, h: 8 } },
-  { type: 'cues',      label: 'Cues (flow)',   plugs: ['tasks', 'reminder-groups'], requires: ['caldav'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 6, h: 6 } },
-  { type: 'triage',    label: 'Triage',        plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 10, h: 12 }, minSize: { w: 6, h: 8 } },
-  { type: 'daily',     label: 'Daily Plan',    plugs: ['tasks', 'projects'], requires: ['caldav'], defaultSize: { w: 10, h: 11 }, minSize: { w: 6, h: 6 } },
+  // Every widget carries the full size contract — a min floor, a max ceiling, and
+  // an aspect BAND matched to how its content is laid out — so resizing always
+  // lands on a shape that reads well (cohesion). Reminder: a grid cell is ~40w×30h
+  // px, so visual ratio ≈ cell ratio × 1.33 (a visual square ≈ cell aspect 0.75).
+  // The effective default (defaultSize, else 10×9) must sit inside the band.
+  { type: 'reminders', label: 'Reminders',     plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 } }, // task list — portrait to gentle landscape, never a thin strip
+  { type: 'upcoming',  label: 'Upcoming',      plugs: ['tasks', 'projects'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 } }, // dated-task list — same shape band as reminders
+  { type: 'calendar',  label: 'Calendar',      plugs: ['tasks', 'calendar'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 24, h: 22 }, aspect: { min: 0.9, max: 1.4 } }, // a month grid reads best near-square / landscape
+  { type: 'notes',     label: 'Notes',         plugs: ['notes', 'settings'], requires: ['nextcloud'], defaultSize: { w: 16, h: 11 }, minSize: { w: 6, h: 6 }, maxSize: { w: 32, h: 24 }, aspect: { min: 0.5, max: 2.2 } }, // wide tree+editor split OR narrow single column — keep the band loose so both modes survive
+  { type: 'review',    label: 'Weekly Review', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 9, h: 7 }, minSize: { w: 6, h: 5 }, maxSize: { w: 18, h: 12 }, aspect: { min: 0.7, max: 1.85 } }, // compact stats card — wide, not a tall sliver
+  { type: 'cues',      label: 'Cues (flow)',   plugs: ['tasks', 'reminder-groups'], requires: ['caldav'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 8, h: 7 }, maxSize: { w: 32, h: 24 }, aspect: { min: 0.65, max: 1.85 } }, // queue + canvas board — landscape, needs room
+  { type: 'triage',    label: 'Triage',        plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 10, h: 12 }, minSize: { w: 6, h: 8 }, maxSize: { w: 18, h: 26 }, aspect: { min: 0.45, max: 1.05 } }, // HUD + frog + queue stack — portrait-leaning
+  { type: 'daily',     label: 'Daily Plan',    plugs: ['tasks', 'projects'], requires: ['caldav'], defaultSize: { w: 10, h: 11 }, minSize: { w: 6, h: 6 }, maxSize: { w: 18, h: 24 }, aspect: { min: 0.45, max: 1.05 } }, // plan/shutdown lists stack — portrait-leaning
   { type: 'focus',     label: 'Focus',         plugs: ['tasks', 'reminder-events'], requires: ['caldav'], defaultSize: { w: 7, h: 8 }, minSize: { w: 4, h: 5 }, maxSize: { w: 12, h: 20 }, aspect: { min: 0.55, max: 1.0 } }, // a single-task column stays tall & narrow
 ]
 
