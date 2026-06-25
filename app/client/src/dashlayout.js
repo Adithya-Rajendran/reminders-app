@@ -66,15 +66,33 @@ export function appendToLayouts(layouts, id, size) {
   return next
 }
 
+// Keep an auto-widened width inside a widget's cohesive shape: clamp it DOWN to
+// the max ceiling and the wide edge of the aspect band (anchored on height, like
+// clampAspect). Only ever shrinks w — so a scaled, non-overlapping row stays
+// non-overlapping (a sparse board may leave a gap rather than stretch a widget
+// past its band). A falsy contract is the identity. Pure + node-tested.
+export function fitWidthToContract(c, w, h) {
+  let out = Math.max(1, Math.round(w))
+  if (!c) return out
+  if (c.max) out = Math.min(out, Math.max(1, Math.round(c.max.w)))
+  if (c.aspect) out = Math.min(out, Math.max(1, Math.round(Math.max(1, Math.round(h)) * c.aspect.max)))
+  return Math.max(1, out)
+}
+
 // Proportionally scale a layout's x/w to a wider column count, preserving each
 // widget's ROW (y) — so a sparse board fills the extra width instead of leaving
 // a right-side void, while keeping the user's row arrangement. Widths are clamped
-// to the tier and x kept in range. Heights/rows are untouched.
-function scaleItems(items, cols, f) {
+// to the tier and x kept in range. Heights/rows are untouched. With a
+// `getConstraints(id)` accessor, the auto-widened width is additionally clamped
+// into the widget's aspect band + ceiling (cohesion over fill); without it,
+// behavior is unchanged.
+function scaleItems(items, cols, f, getConstraints) {
   return (items || []).map((it) => {
-    const w = Math.max(2, Math.min(cols, Math.round((it.w || 1) * f)))
+    const h = Math.max(1, Math.round(it.h || 1))
+    let w = Math.max(2, Math.min(cols, Math.round((it.w || 1) * f)))
+    if (getConstraints) w = Math.max(2, Math.min(cols, fitWidthToContract(getConstraints(it.i), w, h)))
     const x = Math.max(0, Math.min(Math.round((it.x || 0) * f), cols - w))
-    return { ...it, x, w, y: Math.max(0, Math.round(it.y || 0)), h: Math.max(1, Math.round(it.h || 1)) }
+    return { ...it, x, w, y: Math.max(0, Math.round(it.y || 0)), h }
   })
 }
 
@@ -88,8 +106,9 @@ function scaleItems(items, cols, f) {
 //     (styles.css) keeps the now-wider widgets readable.
 //   • NARROWER/equal tiers → constant-size shelf repack, so phones/tablets stack
 //     widgets at their normal size (unchanged).
-// Non-mutating. No source breakpoint present -> returned untouched.
-export function fillBreakpoints(layouts) {
+// Non-mutating. No source breakpoint present -> returned untouched. `getConstraints`
+// (optional) keeps the fill inside each widget's aspect band + max on wider tiers.
+export function fillBreakpoints(layouts, getConstraints) {
   const out = { ...(layouts || {}) }
   const present = Object.keys(COLS).filter((bp) => Array.isArray(out[bp]))
   if (!present.length) return out
@@ -97,7 +116,7 @@ export function fillBreakpoints(layouts) {
   for (const bp of Object.keys(COLS)) {
     if (Array.isArray(out[bp])) continue
     out[bp] = COLS[bp] > COLS[source]
-      ? scaleItems(out[source], COLS[bp], COLS[bp] / COLS[source])
+      ? scaleItems(out[source], COLS[bp], COLS[bp] / COLS[source], getConstraints)
       : repack(out[source], COLS[bp])
   }
   return out
