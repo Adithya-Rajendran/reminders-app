@@ -54,14 +54,39 @@ export function defaultLayouts(widgets, sizeFor) {
   return lay
 }
 
-// Append one new item below everything else at every breakpoint. y must stay
-// finite (Infinity would persist as null in JSON and corrupt the saved layout).
+// Next free slot for a w×h widget, scanning top→bottom then left→right (first-fit):
+// the widget flows into the next open spot on the RIGHT of a partly-filled row (or
+// a gap a removed widget left behind) and only wraps to a new row when the current
+// rows are full. Compaction-stable: the returned y is the smallest row with a free
+// w-wide slot, so the grid's vertical compactor can't pull the widget up into a
+// collision. Pure + node-tested.
+export function nextSlot(items, cols, w, h) {
+  const ww = Math.max(1, Math.min(cols, Math.round(w)))
+  const hh = Math.max(1, Math.round(h))
+  const list = items || []
+  const hits = (x, y) => list.some((it) => {
+    const ix = it.x || 0, iy = it.y || 0, iw = it.w || 1, ih = it.h || 1
+    return x < ix + iw && ix < x + ww && y < iy + ih && iy < y + hh
+  })
+  const maxY = list.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0)
+  for (let y = 0; y <= maxY; y++) {
+    for (let x = 0; x + ww <= cols; x++) {
+      if (!hits(x, y)) return { x, y }
+    }
+  }
+  return { x: 0, y: maxY } // every row is full -> start a fresh row at the left
+}
+
+// Place one new item in the next free slot (flow right, wrap down) at every
+// breakpoint. y must stay finite (Infinity would persist as null in JSON and
+// corrupt the saved layout).
 export function appendToLayouts(layouts, id, size) {
   const next = { ...layouts }
   for (const bp of Object.keys(COLS)) {
     const items = next[bp] || []
-    const y = items.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0)
-    next[bp] = [...items, { i: id, x: 0, y, w: size.w, h: size.h }]
+    const w = Math.max(1, Math.min(COLS[bp], size.w))
+    const { x, y } = nextSlot(items, COLS[bp], w, size.h)
+    next[bp] = [...items, { i: id, x, y, w, h: size.h }]
   }
   return next
 }
