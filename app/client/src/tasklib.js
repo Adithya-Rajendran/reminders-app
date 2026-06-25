@@ -49,6 +49,22 @@ export function cueTriggerOf(cue) {
 // date/priority/label tokens) is on the right.
 const ARROW_RE = /\s*(?:->|→)\s*/
 
+// Clock time in a quick-add line: "3pm", "3:30 pm", "at 9", "14:00", "noon",
+// "morning". Returns { h, m, matched } or null. ("tonight" is intentionally left
+// to parseDate — it's a date word that also implies 8pm.) Bare "at N" maps 1-6 to
+// PM so "at 3" reads as 3 PM; 7-12 stay AM/noon.
+const NAMED_TIME = { noon: [12, 0], midday: [12, 0], midnight: [0, 0], morning: [9, 0], afternoon: [14, 0], evening: [18, 0] }
+const TIME_RE = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,2}):(\d{2})\b|\bat\s+(\d{1,2})\b|\b(noon|midday|midnight|morning|afternoon|evening)\b/i
+function parseTime(text) {
+  const m = text.match(TIME_RE)
+  if (!m) return null
+  if (m[7]) { const [h, mm] = NAMED_TIME[m[7].toLowerCase()]; return { h, m: mm, matched: m[0] } }
+  if (m[3]) { let h = Number(m[1]) % 12; if (m[3].toLowerCase() === 'pm') h += 12; return { h, m: m[2] ? Number(m[2]) : 0, matched: m[0] } }
+  if (m[4] !== undefined) { const h = Number(m[4]), mm = Number(m[5]); return h > 23 || mm > 59 ? null : { h, m: mm, matched: m[0] } }
+  if (m[6] !== undefined) { let h = Number(m[6]); if (h >= 1 && h <= 6) h += 12; return h > 23 ? null : { h, m: 0, matched: m[0] } }
+  return null
+}
+
 // Parse "after erg -> Submit report tomorrow !2 *finance" -> structured fields.
 export function parseQuickAdd(input) {
   let cue
@@ -68,8 +84,19 @@ export function parseQuickAdd(input) {
   title = title.replace(LABEL_RE, ' ')
   const { date, matched } = parseDate(title)
   if (matched) title = title.replace(new RegExp('\\b' + matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), ' ')
+  // A clock time ("2pm", "at 9", "14:00") sets the time-of-day on the parsed date
+  // (or today, if only a time was given) instead of the 9am default, and is
+  // stripped from the title like the date word.
+  let due = date
+  const tm = parseTime(title)
+  if (tm) {
+    const base = isRealDate(date) ? new Date(date) : new Date()
+    base.setHours(tm.h, tm.m, 0, 0)
+    due = base.toISOString()
+    title = title.replace(new RegExp(tm.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ')
+  }
   title = title.replace(/\s+/g, ' ').trim()
-  return { title, priority, due_date: date || undefined, labels, ...(cue ? { cue, cue_trigger: cueTriggerOf(cue) } : {}) }
+  return { title, priority, due_date: due || undefined, labels, ...(cue ? { cue, cue_trigger: cueTriggerOf(cue) } : {}) }
 }
 
 // ---- due chip label + urgency class ----

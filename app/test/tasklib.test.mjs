@@ -96,6 +96,24 @@ ok(q5.title === 'Standup' && isRealDate(q5.due_date) &&
 const q6 = parseQuickAdd('Task !7')
 ok(q6.priority === 0 && q6.title === 'Task !7', "'Task !7' -> !7 not a valid priority (stays 0) and is NOT stripped from title")
 
+// --- parseQuickAdd: clock time sets the time-of-day (not the 9am default) ---
+const t1 = parseQuickAdd('Email Sam tomorrow 2pm')
+ok(t1.title === 'Email Sam' && localYMD(new Date(t1.due_date)) === localYMD(tomorrow) &&
+  new Date(t1.due_date).getHours() === 14 && new Date(t1.due_date).getMinutes() === 0,
+  "'Email Sam tomorrow 2pm' -> title 'Email Sam', due tomorrow at 14:00 ('2pm' not left in the title)")
+const t2 = parseQuickAdd('Standup today 9:30am')
+ok(t2.title === 'Standup' && new Date(t2.due_date).getHours() === 9 && new Date(t2.due_date).getMinutes() === 30, "'today 9:30am' -> 09:30")
+const t3 = parseQuickAdd('Sync friday 14:00')
+ok(t3.title === 'Sync' && new Date(t3.due_date).getHours() === 14 && new Date(t3.due_date).getMinutes() === 0, "24h 'friday 14:00' -> 14:00")
+const t4 = parseQuickAdd('Call mom 3pm')
+ok(t4.title === 'Call mom' && localYMD(new Date(t4.due_date)) === localYMD(new Date()) && new Date(t4.due_date).getHours() === 15, "bare '3pm' (no date word) -> today at 15:00")
+const t5 = parseQuickAdd('Lunch noon')
+ok(t5.title === 'Lunch' && new Date(t5.due_date).getHours() === 12, "'noon' -> today 12:00")
+const t6 = parseQuickAdd('Standby at 3')
+ok(t6.title === 'Standby' && new Date(t6.due_date).getHours() === 15, "'at 3' -> 3 PM (daytime heuristic)")
+const t7 = parseQuickAdd('Buy 2 apples')
+ok(t7.title === 'Buy 2 apples' && t7.due_date === undefined, "'Buy 2 apples' -> a bare number is not a time (no due)")
+
 // --- parseQuickAdd: if-then cue (arrow token) ---
 const cue1 = parseQuickAdd('after morning erg -> draft figure')
 ok(cue1.cue === 'after morning erg' && cue1.title === 'draft figure',
