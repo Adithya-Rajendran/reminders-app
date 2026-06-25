@@ -139,7 +139,10 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         lay = { ...lay }
         for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp]
         const before = Object.keys(lay).length
-        lay = fillBreakpoints(lay)
+        // Keep the ultrawide fill inside each widget's aspect band + max, so a wide
+        // screen doesn't stretch widgets past a cohesive shape (it may leave a gap).
+        const typeById = new Map(sw.map((w) => [w.i, w.type]))
+        lay = fillBreakpoints(lay, (id) => constraintsFor(typeById.get(id)))
         const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)

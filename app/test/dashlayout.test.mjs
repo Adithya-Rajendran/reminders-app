@@ -3,7 +3,7 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, fitWidthToContract, nextSlot,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -57,6 +57,24 @@ const allThere = defaultLayouts([{ i: 'w-1', type: 'a' }], () => ({ ...DEFAULT_S
 ok(fillBreakpoints(allThere) !== allThere && Object.keys(fillBreakpoints(allThere)).length === Object.keys(allThere).length, 'a fully-populated layout gains no breakpoints (returns a copy)')
 ok(Object.keys(fillBreakpoints(null)).length === 0 && Object.keys(fillBreakpoints({})).length === 0, 'null/empty input -> empty object (no throw)')
 
+// --- fitWidthToContract (keep the auto-fill width inside a widget's band/ceiling) ---
+ok(fitWidthToContract(null, 20, 9) === 20, 'no contract -> width unchanged')
+ok(fitWidthToContract({ aspect: { min: 0.9, max: 1.4 } }, 20, 9) === Math.round(9 * 1.4), 'aspect clamps width down to the band edge (anchored on height)')
+ok(fitWidthToContract({ aspect: { min: 0.9, max: 1.4 } }, 11, 9) === 11, 'a width already inside the band is not shrunk')
+ok(fitWidthToContract({ aspect: { min: 0.9, max: 1.4 } }, 5, 9) === 5, 'never widens up to the band min (only ever shrinks)')
+ok(fitWidthToContract({ max: { w: 13 } }, 20, 9) === 13, 'max ceiling clamps width')
+ok(fitWidthToContract({ max: { w: 10 }, aspect: { min: 0.9, max: 1.4 } }, 20, 9) === 10, 'max + aspect take the tighter bound')
+
+// --- fillBreakpoints with constraints (cohesion: clamp the ultrawide fill into-band) ---
+const gcAspect = (id) => (id === 'a' ? { aspect: { min: 0.9, max: 1.4 } } : null)
+const clampedFill = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }, gcAspect)
+ok(clampedFill.xxxxl[0].w === Math.round(9 * 1.4), 'auto-fill clamps a widget into its aspect band on a wider tier')
+ok(clampedFill.xxxxl[0].h === 9, 'the aspect clamp leaves height untouched')
+const clampedMax = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }, () => ({ max: { w: 12 } }))
+ok(clampedMax.xxxxl[0].w === 12, 'auto-fill clamps a widget to its max width on a wider tier')
+// Without constraints the fill is unchanged (back-compat with the calls above).
+ok(fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }).xxxxl[0].w === Math.round(10 * (COLS.xxxxl / COLS.lg)), 'no constraints -> fill scales to fill as before')
+
 // --- scaleLayouts ---
 const old12 = { lg: [{ i: 'a', x: 4, y: 0, w: 4, h: 9 }, { i: 'b', x: 8, y: 9, w: 1, h: 5 }] }
 const up = scaleLayouts(old12, 2.5)
@@ -85,6 +103,15 @@ ok(next.lg[3].y === 9, 'new item lands below the tallest existing item')
 ok(Number.isFinite(next.lg[3].y), 'y stays finite (Infinity would persist as null)')
 const fromEmpty = appendToLayouts({}, 'w-1', DEFAULT_SIZE)
 ok(Object.keys(fromEmpty).length === Object.keys(COLS).length && fromEmpty.lg[0].y === 0, 'append works on an empty board at every breakpoint')
+// Flow-right placement: a partly-filled row takes the new widget in its right-hand
+// gap (not a new row at the bottom); a full row wraps; an interior gap is filled.
+ok(nextSlot([{ x: 0, y: 0, w: 10, h: 9 }, { x: 10, y: 0, w: 10, h: 9 }], 30, 8, 7).x === 20, 'nextSlot flows into the open spot to the right of a partly-filled row')
+const flowed = appendToLayouts({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 10, y: 0, w: 10, h: 9 }] }, 'c', { w: 8, h: 7 })
+ok(flowed.lg[2].x === 20 && flowed.lg[2].y === 0, 'append flows the new widget right (same row) when there is room')
+const wrappedAdd = appendToLayouts({ lg: [{ i: 'a', x: 0, y: 0, w: 15, h: 9 }, { i: 'b', x: 15, y: 0, w: 15, h: 9 }] }, 'c', { w: 10, h: 7 })
+ok(wrappedAdd.lg[2].x === 0 && wrappedAdd.lg[2].y === 9, 'a full row wraps the new widget to the next row at x=0')
+const filledGap = appendToLayouts({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }, 'c', { w: 10, h: 9 })
+ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interior gap left within a row')
 
 // --- applyConstraints (per-widget floors + ceilings + resize policy) ---
 {
