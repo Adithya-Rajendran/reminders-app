@@ -343,7 +343,7 @@ export default function App() {
             accent={accent}
             onAccent={setAccent}
             onOpenSettings={openSettings}
-            onOpenPalette={() => setPalette({ mode: 'commands' })}
+            onOpenPalette={() => setPalette({ mode: 'notes' })}
           />
           <DashboardTabs
             dashboards={dashboards}
