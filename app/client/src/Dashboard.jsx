@@ -7,7 +7,7 @@ import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
 import { onOpenNote, emitOpenNote } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
-import { SkeletonRows } from './widget-sdk'
+import { SkeletonRows, UndoBar } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
@@ -69,6 +69,20 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   const [loaded, setLoaded] = useState(false)
   const [events, setEvents] = useState([])
   const saveTimer = useRef(null)
+  // Set by addWidget to the id of the just-added widget; an effect (below) then
+  // scrolls its freshly-rendered node into view and flashes it — a new widget is
+  // appended at the bottom of the board where it's easily missed.
+  const pendingScrollId = useRef(null)
+  // Transient Undo for the destructive "Reset layout" (mirrors the task list's 6s
+  // undo): holds { label, fn } to restore the pre-reset board.
+  const [undo, setUndo] = useState(null)
+  const undoTimer = useRef(null)
+  const showUndo = useCallback((label, fn) => {
+    clearTimeout(undoTimer.current)
+    setUndo({ label, fn })
+    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  }, [])
+  const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
 
   // Initial load: projects + saved layout (or a sensible default).
   useEffect(() => {
@@ -196,6 +210,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     setWidgets(nextWidgets)
     setLayouts(nextLayouts)
     persist(nextWidgets, nextLayouts)
+    pendingScrollId.current = w.i // scroll + flash it once it renders (effect below)
   }
 
   const removeWidget = (id) => {
@@ -208,11 +223,20 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   }
 
   // Escape hatch for a cluttered/confusing board: back to the clean default.
+  // Reset is destructive (overwrites every widget + its placement), so snapshot the
+  // current board first and offer a 6s Undo to restore it (parity with the rest of
+  // the app), rather than wiping it irrecoverably.
   const resetLayout = () => {
+    const prev = { widgets, layouts }
     const { widgets: def, layouts: lay } = buildDefault()
     setWidgets(def)
     setLayouts(lay)
     persist(def, lay)
+    showUndo('Layout reset.', () => {
+      setWidgets(prev.widgets)
+      setLayouts(prev.layouts)
+      persist(prev.widgets, prev.layouts)
+    })
   }
 
   // Group creation happens only in Settings now — open it with the typed name.
@@ -277,6 +301,23 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   // enforced live in onResize below.)
   const layoutsWithConstraints = useMemo(() => applyConstraints(layouts, widgets, constraintsFor), [layouts, widgets])
 
+  // After a widget is added it renders at the bottom of the board (off-screen on a
+  // full board), with no feedback. Once its node exists, scroll it into view and
+  // toggle a transient highlight (mirrors ReminderGroupsSection's scrollIntoView).
+  // Keyed on `widgets` so it fires on the render that includes the new node; the
+  // ref gate ensures it runs once per add, not on every layout/resize re-render.
+  useEffect(() => {
+    const id = pendingScrollId.current
+    if (!id) return
+    pendingScrollId.current = null
+    const node = document.querySelector(`[data-wid="${id}"]`)
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    node.classList.add('widget--added')
+    const t = setTimeout(() => node.classList.remove('widget--added'), 1200)
+    return () => clearTimeout(t)
+  }, [widgets])
+
   // Enforce a widget's aspect band live during AND after a resize. RGL has already
   // clamped to the item's minW/maxW before calling us; we layer the aspect band on
   // top, then re-clamp into [min,max] so the ratio can't push the widget past its own
@@ -332,6 +373,12 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
             <div className="state-title" style={{ fontSize: 16 }}>Your dashboard is empty</div>
             <div className="state-sub" style={{ margin: '6px auto 18px' }}>Add a widget to start assembling your workspace.</div>
             <AddWidgetMenu projects={projects} onAdd={addWidget} onNewGroup={onNewGroup} />
+            {/* A few concrete starters so a fresh board teaches its own shortcuts. */}
+            <ul className="empty-tips state-sub" style={{ margin: '18px auto 0', maxWidth: 320, textAlign: 'left' }}>
+              <li>Press ⌘K for the command palette</li>
+              <li>Drag a widget&apos;s header to rearrange</li>
+              <li>Quick-add like “gym tomorrow 7am !2 *health”</li>
+            </ul>
           </div>
         ) : (
           <Grid
@@ -357,8 +404,9 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
               // Gate on declared capability requirements the host can determine.
               const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
               return (
-                <div key={w.i}>
-                  <WidgetFrame type={w.type} title={titleFor(w)} onRemove={() => removeWidget(w.i)}>
+                // data-wid lets addWidget's effect find this node to scroll/flash it.
+                <div key={w.i} data-wid={w.i}>
+                  <WidgetFrame type={w.type} title={titleFor(w)} group={w.group} onRemove={() => removeWidget(w.i)}>
                     <WidgetMount spec={spec} w={w} ctx={ctx}>
                       {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
                     </WidgetMount>
@@ -369,6 +417,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
           </Grid>
         )}
       </div>
+      {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </>
   )
 }
@@ -505,7 +554,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
 }
 
 /* ---------- Widget frame ---------- */
-function WidgetFrame({ type, title, onRemove, children }) {
+function WidgetFrame({ type, title, group, onRemove, children }) {
   const Ic = WIDGET_TYPES.get(type)?.icon || IconList
   // One ResizeObserver per widget, on the body (the real scroll container). The
   // resulting size class is broadcast through context so any widget can adapt its
@@ -522,6 +571,9 @@ function WidgetFrame({ type, title, onRemove, children }) {
         <span className="widget-title">
           <Ic size={17} />
           <span className="t-text">{title}</span>
+          {/* A group-locked widget (pickGroup → w.group) only signals lock via its
+              title; surface it explicitly so the lock is legible, not inferred. */}
+          {group && <span className="lock-badge" title={`Locked to ${group}`}>Locked</span>}
         </span>
         <span className="widget-head-actions">
           <button

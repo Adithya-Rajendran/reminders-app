@@ -52,11 +52,12 @@
   --glow-strength: 1;
   --density: 1;
 
-  /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). `none`
-     lets it fill the display — the grid stays usable on ultra-wide screens via
-     the breakpoint ladder in dashlayout.js (more columns, not wider columns).
-     Set a px value here to re-cap and center the canvas. */
-  --canvas-max: none;
+  /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). Capped so
+     the board centers (via the auto margins on those rules) instead of stretching
+     edge-to-edge on a 3000px+ ultrawide. The breakpoint ladder in dashlayout.js
+     still adds columns up to this width; past it the canvas centers. Set to `none`
+     to let it fill the display again. */
+  --canvas-max: 2600px;
   /* Readable line-length cap for list/text widget bodies (~66ch ≈ WCAG 1.4.8).
      Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it
      keeps content left-aligned at a readable measure instead of 150-char lines. */
@@ -570,6 +571,24 @@ body {
 .widget-remove { opacity: 0; transition: opacity 150ms ease; }
 .widget:hover .widget-remove,
 .widget:focus-within .widget-remove { opacity: 1; }
+/* Touch / pointer-less devices have no hover — the Remove (X) would otherwise be
+   permanently invisible. Mirror the .task-del / .feed-actions touch overrides. */
+@media (hover: none) { .widget-remove { opacity: 1; } }
+
+/* Transient highlight pulse on a freshly added widget (toggled for ~1.2s by
+   Dashboard). Outline-only so it doesn't shift layout; tracks the accent token. */
+.widget--added { animation: widgetAdded 1.2s ease-out; }
+@keyframes widgetAdded {
+  0%   { box-shadow: 0 0 0 0 var(--accent-soft), 0 0 0 1px var(--accent); }
+  60%  { box-shadow: 0 0 0 6px transparent, 0 0 0 1px var(--accent); }
+  100% { box-shadow: var(--shadow-sm); }
+}
+
+/* Group-locked widget: a tiny muted lock marker beside the title in the head. */
+.lock-badge {
+  display: inline-flex; align-items: center; flex: 0 0 auto;
+  color: var(--faint); font-size: 12px; line-height: 1;
+}
 
 .widget-body {
   flex: 1;
@@ -921,6 +940,14 @@ body {
   .grid { grid-template-columns: 1fr; }
   .user-email { display: none; }
   .avatar-menu-btn { display: inline-flex; }
+  /* The avatar dropdown carries theme/accent/settings/logout on narrow screens,
+     so hide the inline cluster to avoid duplicate controls in the top bar. */
+  .topbar-actions { display: none; }
+  /* Keep the remaining popovers (avatar menu, accent picker) inside a ~360px
+     viewport. They anchor right:0 to their button, so capping the width is what
+     prevents the left edge (min-width:200px menu) from overflowing the screen. */
+  .topbar-right .menu,
+  .topbar-right .accent-pop { max-width: calc(100vw - 24px); }
 }
 
 /* ============================================================
@@ -957,6 +984,8 @@ body {
   border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); opacity: .45;
 }
 .react-grid-item:hover > .react-resizable-handle-se::after { opacity: 1; }
+/* No hover on touch — keep the resize cue at full strength so it's discoverable. */
+@media (hover: none) { .react-grid-item > .react-resizable-handle-se::after { opacity: 1; } }
 
 /* ============================================================
    FullCalendar v6 — themed via FC CSS vars + scoped overrides.
@@ -1051,6 +1080,13 @@ body {
 .task-stream { display: flex; flex-direction: column; gap: 1px; }
 .add-row.qa { margin-bottom: 2px; }
 .add-row.qa input { font-size: 13.5px; }
+/* One-line syntax hint under a quick-add form (e.g. "tomorrow 5pm !p1 #label").
+   Muted and ellipsised so it never wraps or competes with the input above it. */
+.qa-hint {
+  margin-top: 3px; padding: 0 10px;
+  font-size: 12px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* button-based animated checkbox */
 .check-btn {
@@ -1208,7 +1244,18 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .dash-tab-edit { background: var(--panel); border: 1px solid var(--accent); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text); width: 150px; outline: none; }
 .dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 18px; line-height: 1; cursor: pointer; transition: color .15s, border-color .15s; }
 .dash-tab-add:hover { color: var(--text); border-color: var(--accent); }
-@media (max-width: 720px) { .dash-tabs { padding-left: 16px; padding-right: 16px; } }
+@media (max-width: 720px) {
+  /* Scroll the tab strip sideways instead of wrapping into stacked rows that
+     push the board down. Thin/hidden scrollbar keeps the row visually clean. */
+  .dash-tabs {
+    padding-left: 16px; padding-right: 16px;
+    flex-wrap: nowrap; overflow-x: auto;
+    scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+  }
+  .dash-tabs::-webkit-scrollbar { height: 0; }
+  /* Tabs/add button must not shrink — they keep their size and scroll instead. */
+  .dash-tabs > * { flex: 0 0 auto; }
+}
 
 /* ---------- Notes widget + editor ---------- */
 .notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -1696,3 +1743,19 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .qa-chip.due.overdue { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
 .qa-chip.pri { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 30%, transparent); }
 .qa-chip.cue { font-style: italic; }
+
+/* === New UX-fix class hooks (palette pill, inline confirms, empty tips, etc.) === */
+.palette-pill { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 8px 0 10px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer; transition: color .12s, border-color .12s; }
+.palette-pill:hover { color: var(--text); border-color: color-mix(in oklab, var(--accent) 45%, var(--line-strong)); }
+.palette-pill-kbd { display: inline-flex; align-items: center; justify-content: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel-solid); font: inherit; font-size: 10.5px; color: var(--muted); }
+.dash-tab-confirm { gap: 6px; }
+.dash-tab-confirm-q, .rg-confirm-q { font-size: 12.5px; color: var(--muted); }
+.empty-tips { list-style: none; padding: 0; display: grid; gap: 6px; }
+.empty-tips li { position: relative; padding-left: 16px; }
+.empty-tips li::before { content: "\2192"; position: absolute; left: 0; color: var(--faint); }
+.cmdk-retry { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+.chip.from-text { opacity: .85; border-style: dashed; }
+@media (max-width: 560px) {
+  .palette-pill-text, .palette-pill-kbd { display: none; }
+  .palette-pill { padding: 0; width: 32px; justify-content: center; }
+}

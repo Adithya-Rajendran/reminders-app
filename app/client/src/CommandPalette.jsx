@@ -24,6 +24,10 @@ function Highlight({ text, positions }) {
   return segs
 }
 
+// Stable DOM id for a result row so aria-activedescendant can point the input at
+// the active option. Keyed by command id / note path (the same key as the row).
+const optionId = (r, cmdMode) => 'cmdk-opt-' + (cmdMode ? r.item.id : r.item.path)
+
 // App-wide command palette / quick-switcher (Obsidian Ctrl+O / Ctrl+P). Notes
 // mode fuzzy-jumps to any note; typing `>` switches to command mode. Fully
 // keyboard-driven; selecting a note emits on the notesbus so the widget opens it.
@@ -31,6 +35,7 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   const [raw, setRaw] = useState(initialMode === 'commands' ? '>' : '')
   const [notes, setNotes] = useState(null) // null = loading | [] | [...]
   const [unconfigured, setUnconfigured] = useState(false)
+  const [loadErr, setLoadErr] = useState(false) // list() failed — distinct from "no notes"
   const [sel, setSel] = useState(0)
   const listRef = useRef(null)
   const ref = useModalRef(onClose)
@@ -38,7 +43,11 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   const cmdMode = raw.startsWith('>')
   const term = (cmdMode ? raw.slice(1) : raw).trim()
 
-  // Load the note list once on open (cheap; the server caches it for 15s).
+  // Load the note list once on open (cheap; the server caches it for 15s). A
+  // failure sets loadErr (kept distinct from an empty list) so the user gets a
+  // retry affordance instead of a misleading "No matching note."
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = () => { setNotes(null); setLoadErr(false); setReloadKey((k) => k + 1) }
   useEffect(() => {
     let alive = true
     notesApi.list().then((r) => {
@@ -46,9 +55,9 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
       if (!r.configured) { setNotes([]); setUnconfigured(true); return }
       const list = (r.notes || []).slice().sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
       setNotes(list)
-    }).catch(() => { if (alive) setNotes([]) })
+    }).catch(() => { if (alive) { setNotes([]); setLoadErr(true) } })
     return () => { alive = false }
-  }, [])
+  }, [reloadKey])
 
   // Built-in note command + any app-level commands the host passes in (settings,
   // theme, dashboards, …) — so Ctrl/Cmd+K is a single keyboard-driven action spine.
@@ -85,13 +94,20 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
           <IconSearch size={17} className="cmdk-search-ic" />
           <input
             className="cmdk-input" value={raw} autoFocus role="combobox" aria-expanded="true" aria-label="Command palette"
+            aria-controls="cmdk-listbox" aria-haspopup="listbox"
+            aria-activedescendant={results[sel] ? optionId(results[sel], cmdMode) : undefined}
             placeholder={cmdMode ? 'Run a command…' : 'Search notes…   (type > for commands)'}
             onChange={(e) => setRaw(e.target.value)} onKeyDown={onKeyDown}
           />
         </div>
-        <div className="cmdk-list" ref={listRef} role="listbox">
+        <div className="cmdk-list" id="cmdk-listbox" ref={listRef} role="listbox">
           {loading ? (
             <div className="cmdk-empty"><IconSpinner size={18} /> Loading…</div>
+          ) : loadErr && !cmdMode ? (
+            // A failed list() must not masquerade as "no notes" — offer a retry.
+            <div className="cmdk-empty" role="alert">
+              Couldn’t load notes — <button type="button" className="cmdk-retry" onClick={retry}>retry</button>
+            </div>
           ) : unconfigured && !cmdMode ? (
             <div className="cmdk-empty">Notes aren’t configured yet — connect Nextcloud in Settings.</div>
           ) : results.length === 0 ? (
@@ -102,7 +118,7 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
             const Ic = isCmd ? (Item.icon || IconPlus) : IconNote
             return (
               <button
-                key={isCmd ? Item.id : Item.path} type="button" role="option" aria-selected={i === sel}
+                key={isCmd ? Item.id : Item.path} id={optionId(r, isCmd)} type="button" role="option" aria-selected={i === sel}
                 className={`cmdk-row${i === sel ? ' sel' : ''}`}
                 onMouseEnter={() => setSel(i)} onClick={() => activate(i)}
               >

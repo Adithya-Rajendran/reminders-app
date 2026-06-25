@@ -95,6 +95,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
         </form>
       )}
       {inboxId && !compact && <QuickAddPreview text={draft} />}
+      {inboxId && !compact && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
       {state === 'ready' && !compact && (tasks.length > 0 || quickOnly) && (
         <div className="up-filter">
           <button

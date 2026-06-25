@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
-  parseQuickAdd, dueChip, timeLabel, ZERO_DATE,
+  parseQuickAdd, dueChip, timeLabel, isRealDate, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
   SkeletonRows, EmptyState, ErrorState, UndoBar, QuickAddPreview, widgetStore,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame, IconSort,
@@ -86,11 +86,19 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const [draft, setDraft] = useState('')
   const [qaGroup, setQaGroup] = useState('')
   const [when, setWhen] = useState(defaultWhen)
+  const [whenTouched, setWhenTouched] = useState(false) // user picked a time via the When picker
   const [pickOpen, setPickOpen] = useState(false)
   const [err, setErr] = useState('')
   const [knownGroups, setKnownGroups] = useState([])
   const [collapsed, setCollapsed] = useState(() => store.loadStringSet(COLLAPSE_KEY))
   const whenRef = useRef(null)
+
+  // Parse the live draft once so the "When" chip/picker and add() agree on the
+  // due date. A typed NL date (e.g. "tomorrow 9am") overrides the picker, so the
+  // chip reflects what will actually be saved instead of a contradicting time.
+  const parsed = useMemo(() => parseQuickAdd(draft), [draft])
+  const effectiveWhen = isRealDate(parsed.due_date) ? parsed.due_date : when
+  const fromText = isRealDate(parsed.due_date)
 
   // Narrow: trim the quick-add to one capture line (the group + time pickers don't
   // fit and have sensible defaults) and drop the collapsible section chrome for a
@@ -124,9 +132,12 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
     // *label, "-> cue") so capture is one keystroke-friendly line. A typed date wins
     // over the When picker; otherwise the picker time is used. Inline *labels merge
     // with the picked group (group first, so server group-routing still applies).
-    const parsed = parseQuickAdd(raw)
+    // Reuse the draft's memoized parse instead of parsing again.
     const title = parsed.title || raw
-    const due = parsed.due_date || when
+    // If the user neither typed a date nor picked one, the picker still holds the
+    // stale now+1h from when the form first mounted — recompute it so a long-open
+    // form can't save a past time.
+    const due = parsed.due_date || (whenTouched ? when : defaultWhen())
     const g = group || qaGroup.trim() // locked widget forces its group
     const labels = [...new Set([...(g ? [g] : []), ...(parsed.labels || [])])]
     try {
@@ -140,7 +151,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
       })
       if (g) groupsCap.pushRecent(g)
-      setWhen(defaultWhen()); tasksCap.emitChanged(); load()
+      setWhen(defaultWhen()); setWhenTouched(false); tasksCap.emitChanged(); load()
     } catch (e2) {
       setDraft(raw)
       let msg = 'Could not add reminder.'
@@ -156,7 +167,9 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
     return s
   }, [events])
 
-  const chip = dueChip(when); const t = timeLabel(when)
+  // Drive the chip from effectiveWhen so a typed NL date updates the label
+  // immediately (instead of showing the picker's contradicting time).
+  const chip = dueChip(effectiveWhen); const t = timeLabel(effectiveWhen)
   // Only calendar-coupled groups count; uncoupled tags fold into the default group.
   const isGroup = useCallback((name) => knownGroups.includes(name), [knownGroups])
   const allGroups = [...knownGroups].sort()
@@ -230,11 +243,11 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
           )}
           {!compact && (
             <span className="inline-ctl">
-              <button type="button" ref={whenRef} className="chip due-chip due-soon" aria-haspopup="dialog" title="When to remind me" onClick={() => setPickOpen((o) => !o)}>
-                <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}
+              <button type="button" ref={whenRef} className={`chip due-chip due-soon${fromText ? ' from-text' : ''}`} aria-haspopup="dialog" title={fromText ? 'Set from your text' : 'When to remind me'} onClick={() => setPickOpen((o) => !o)}>
+                <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}{fromText ? ' (from text)' : ''}
               </button>
               {pickOpen && (
-                <DateTimePicker anchorRef={whenRef} value={when} hasReminder onApply={({ due_date }) => { if (due_date && due_date !== ZERO_DATE) setWhen(due_date); setPickOpen(false) }} onClose={() => setPickOpen(false)} />
+                <DateTimePicker anchorRef={whenRef} value={effectiveWhen} hasReminder onApply={({ due_date }) => { if (due_date && due_date !== ZERO_DATE) { setWhen(due_date); setWhenTouched(true) } setPickOpen(false) }} onClose={() => setPickOpen(false)} />
               )}
             </span>
           )}
@@ -242,6 +255,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         </form>
       )}
       {inboxId && <QuickAddPreview text={draft} />}
+      {inboxId && !compact && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
       {err && <div role="alert" className="rem-err">{err}</div>}
       {!compact && reminders.length > 1 && (
         <div className="rem-sortbar">

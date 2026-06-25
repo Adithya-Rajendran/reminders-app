@@ -13,14 +13,14 @@ const CONTENT_W = 2400
 const CONTENT_H = 1400
 const edgePath = (sx, sy, tx, ty) => `M ${sx} ${sy} C ${sx + 55} ${sy}, ${tx - 55} ${ty}, ${tx} ${ty}`
 
-function FlowNode({ task, pos, dragging, onMoveStart, onLinkStart, onToggle, onUnplace, onSetCue }) {
+function FlowNode({ task, pos, dragging, linkArmed, onMoveStart, onLinkStart, onLinkKey, onToggle, onUnplace, onSetCue }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(task.cue || '')
   const cue = (task.cue || '').trim()
   const stop = (e) => e.stopPropagation()
   const saveCue = () => { onSetCue(task, val.trim()); setEditing(false) }
   return (
-    <div className={`flow-node${dragging ? ' dragging' : ''}${task.done ? ' done' : ''}`} data-uid={task.uid} style={{ left: pos.x, top: pos.y, width: NODE_W }} onPointerDown={(e) => onMoveStart(task, e)}>
+    <div className={`flow-node${dragging ? ' dragging' : ''}${task.done ? ' done' : ''}${linkArmed ? ' link-armed' : ''}`} data-uid={task.uid} style={{ left: pos.x, top: pos.y, width: NODE_W }} onPointerDown={(e) => onMoveStart(task, e)}>
       <button className={`check-btn${task.done ? ' on' : ''}`} title="Complete" aria-label={`Complete: ${task.title}`} onPointerDown={stop} onClick={() => onToggle(task)} />
       <div className="flow-node-body" onDoubleClick={() => { setVal(task.cue || ''); setEditing(true) }}>
         <div className="flow-node-title" title={task.title}>{task.title}</div>
@@ -36,8 +36,18 @@ function FlowNode({ task, pos, dragging, onMoveStart, onLinkStart, onToggle, onU
           <div className="flow-node-cue">{cue ? <><span className="cue-arrow">→</span> {cue}</> : <span className="flow-cue-add">+ cue</span>}</div>
         )}
       </div>
+      <button type="button" className="flow-edit" title="Edit cue" aria-label={`Edit cue: ${task.title}`} onPointerDown={stop} onClick={() => { setVal(task.cue || ''); setEditing(true) }}>✎</button>
       <button className="flow-unplace" title="Remove from board" aria-label="Remove from board" onPointerDown={stop} onClick={() => onUnplace(task)}>×</button>
-      <span className="flow-handle" title="Drag to link to another card" onPointerDown={(e) => onLinkStart(task, e)} />
+      {/* Pointer-drag from this handle creates a link; it's a real <button> so it's
+          tab-focusable and announced. Keyboard users start the same link gesture
+          with Enter/Space, then pick a target card with another Enter. */}
+      <button
+        type="button" className="flow-handle"
+        title={linkArmed ? 'Press Enter on another card to finish the link (Esc to cancel)' : 'Drag (or press Enter) to link to another card'}
+        aria-label="Link to another card" aria-pressed={linkArmed}
+        onPointerDown={(e) => onLinkStart(task, e)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onLinkKey(task) } else if (e.key === 'Escape' && linkArmed) { e.preventDefault(); onLinkKey(null) } }}
+      />
     </div>
   )
 }
@@ -54,6 +64,10 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
   const [group, setGroup] = useState(initialGroup || '')
   const [knownGroups, setKnownGroups] = useState([])
   const [drag, setDrag] = useState(null)
+  // Keyboard equivalent of the drag-to-link gesture: the first Enter "arms" a
+  // source card, the second Enter on a different card completes the edge. Pointer
+  // drag is untouched; this only adds a no-mouse path.
+  const [linkArm, setLinkArm] = useState(null)
   const [queueOpen, setQueueOpen] = useState(false)
   const canvasRef = useRef(null)
 
@@ -137,6 +151,17 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
     }
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
   }
+  // Two-step keyboard link: arm on first card, complete (or re-arm) on the next.
+  // Passing null cancels. Mirrors the drag's "same/missing target = no-op" rule.
+  const onLinkKey = (task) => {
+    if (!task) { setLinkArm(null); return }
+    if (!linkArm) { setLinkArm(task.uid); return }
+    if (linkArm !== task.uid && placedByUid.has(task.uid)) {
+      const src = placedByUid.get(linkArm)
+      if (src) addEdge(src, task.uid)
+    }
+    setLinkArm(null)
+  }
 
   const edges = []
   for (const s of placed) {
@@ -178,7 +203,11 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
                 <marker id="flow-arrow" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" /></marker>
               </defs>
               {edges.map((e) => (
-                <g key={e.key} className="flow-edge" onClick={() => removeEdge(e.from, e.to)}>
+                <g
+                  key={e.key} className="flow-edge" tabIndex={0} role="button" aria-label="Remove link"
+                  onClick={() => removeEdge(e.from, e.to)}
+                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); removeEdge(e.from, e.to) } }}
+                >
                   <path className="flow-edge-hit" d={e.d} />
                   <path className="flow-edge-line" d={e.d} markerEnd="url(#flow-arrow)" />
                 </g>
@@ -187,8 +216,8 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
             </svg>
             {placed.map((t) => (
               <FlowNode
-                key={t.id} task={t} pos={posOf(t)} dragging={draggingMoveUid === t.uid}
-                onMoveStart={onMoveStart} onLinkStart={onLinkStart} onToggle={onToggle} onUnplace={unplace} onSetCue={setCue}
+                key={t.id} task={t} pos={posOf(t)} dragging={draggingMoveUid === t.uid} linkArmed={linkArm === t.uid}
+                onMoveStart={onMoveStart} onLinkStart={onLinkStart} onLinkKey={onLinkKey} onToggle={onToggle} onUnplace={unplace} onSetCue={setCue}
               />
             ))}
           </div>

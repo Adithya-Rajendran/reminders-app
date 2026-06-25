@@ -1,10 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useWidgetSize, atMostW, atLeastW, atLeastH, usePopover,
   buildTree, folderKids, noteKids, countNotes, canDropInto,
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
   widgetStore,
-  SkeletonRows, EmptyState, ErrorState,
+  SkeletonRows, EmptyState, ErrorState, UndoBar,
   IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash, IconSun,
 } from '../widget-sdk'
 import { NoteEditor, PromptModal, NoteContextMenu, TrashView } from '../widget-sdk/notes'
@@ -92,6 +92,19 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const [tplOpen, setTplOpen] = useState(false)
   const tplRef = usePopover(tplOpen, setTplOpen)
 
+  // Soft-delete (trash) confirmation + Undo, mirroring CalendarWidget's 6s
+  // delete→undo: trashing a note is reversible (notesApi.restore), so instead of
+  // a confirm we move it and offer a transient Undo bar.
+  const [undo, setUndo] = useState(null)
+  const undoTimer = useRef(null)
+  const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
+  const showUndo = useCallback((label, fn) => {
+    clearTimeout(undoTimer.current)
+    setUndo({ label, fn })
+    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  }, [])
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
+
   // Size class from the shared widget-size system (one observer lives in the
   // frame). Narrow collapses to a single master-detail column; a very wide widget
   // gets a roomier sidebar; a short widget drops the Pinned/Recent shortcuts so
@@ -137,7 +150,18 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const openCtx = (note, x, y) => setCtxMenu({ note, x, y })
   const doDuplicate = async (n) => { try { const r = await notesApi.duplicate(n.path); await load(); setOpenPath(r.path) } catch { /* ignore */ } }
   const doPin = async (n) => { try { await notesApi.setPinned(n.path, !n.pinned); await load() } catch { /* ignore */ } }
-  const doDelete = async (n) => { try { await notesApi.trash(n.path); if (openPath === n.path) setOpenPath(null); await load() } catch { /* ignore */ } }
+  // Move a note to Trash, then offer Undo (restore) — the editor's trash button
+  // funnels here too (onDeleted) so both paths share the confirmation bar.
+  const doDelete = async (n) => {
+    try {
+      await notesApi.trash(n.path)
+      if (openPath === n.path) setOpenPath(null)
+      await load()
+      showUndo('Moved to Trash', async () => {
+        try { await notesApi.restore(n.path); await load() } catch { /* best-effort restore */ }
+      })
+    } catch { /* ignore */ }
+  }
   const submitRename = async (newTitle) => {
     const p = renamePrompt; setRenamePrompt(null)
     try { const r = await notesApi.rename(p.path, newTitle); if (openPath === p.path && r?.path) setOpenPath(r.path); await load() } catch { /* ignore */ }
@@ -262,7 +286,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const showMain = !narrow || !!openPath || trashOpen
 
   return (
-    <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}${wide ? ' notes-wide' : ''}`}>
+    <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}${wide ? ' notes-wide' : ''}`} style={{ position: 'relative' }}>
       {showSidebar && (
         <aside className="notes-sidebar">
           <div className="note-toolbar">
@@ -378,7 +402,14 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                   inline path={openPath} notes={notes}
                   onClose={() => setOpenPath(null)}
                   onChanged={(np) => { if (np) setOpenPath(np); load() }}
-                  onDeleted={() => { setOpenPath(null); load() }}
+                  // The editor's trash button funnels through the widget's Undo
+                  // bar (same as a context-menu delete) — it passes the trashed
+                  // path so Undo can restore it.
+                  onDeleted={(p) => {
+                    const path = p || openPath
+                    setOpenPath(null); load()
+                    if (path) showUndo('Moved to Trash', async () => { try { await notesApi.restore(path); await load() } catch { /* best-effort restore */ } })
+                  }}
                 />
               )
               : (
@@ -411,6 +442,11 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
           onPin={() => doPin(ctxMenu.note)}
           onDelete={() => doDelete(ctxMenu.note)}
         />
+      )}
+      {undo && (
+        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, zIndex: 5 }}>
+          <UndoBar undo={undo} dismiss={dismissUndo} />
+        </div>
       )}
     </div>
   )

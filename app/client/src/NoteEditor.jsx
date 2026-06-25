@@ -102,7 +102,9 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   }
   const del = async () => {
     clearTimeout(saveTimer.current)
-    try { await notesApi.trash(path); (onDeleted || onClose)?.() } catch { setSaving('error') } // keep open on failure
+    // Pass the trashed path up so the host (notes widget) can offer an Undo that
+    // restores exactly this note; fall back to onClose when there's no handler.
+    try { await notesApi.trash(path); (onDeleted ? onDeleted(path) : onClose?.()) } catch { setSaving('error') } // keep open on failure
   }
 
   // tags + folder edits save immediately (discrete changes)

@@ -13,6 +13,28 @@ export default function NoteContextMenu({ note, x, y, onClose, onRename, onDupli
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [onClose])
+
+  // Move focus into the menu on open (the menu is keyboard-reachable from the
+  // ⋯ button / right-click) and run a roving-focus model over the menuitems:
+  // Arrow keys + Home/End move focus; Enter/Space activate via the button's
+  // native click. Querying the live DOM keeps this robust to the items rendered.
+  useEffect(() => {
+    const items = () => Array.from(ref.current?.querySelectorAll('[role="menuitem"]') || [])
+    items()[0]?.focus()
+    const onKey = (e) => {
+      const list = items()
+      if (!list.length) return
+      const i = list.indexOf(document.activeElement)
+      if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1 + list.length) % list.length]?.focus() }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length]?.focus() }
+      else if (e.key === 'Home') { e.preventDefault(); list[0]?.focus() }
+      else if (e.key === 'End') { e.preventDefault(); list[list.length - 1]?.focus() }
+      else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) { e.preventDefault(); list[i].click() }
+    }
+    const el = ref.current
+    el?.addEventListener('keydown', onKey)
+    return () => el?.removeEventListener('keydown', onKey)
+  }, [])
   const style = {
     position: 'fixed', zIndex: 90,
     left: Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 210),
