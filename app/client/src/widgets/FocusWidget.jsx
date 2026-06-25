@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, partitionByTier, widgetStore, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -63,11 +63,12 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
       {nowTask ? (
         <div className="focus-now">
           <div className="focus-eyebrow"><IconTarget size={14} /> Focus on</div>
-          <button className="focus-check" aria-label={`Complete: ${nowTask.title}`} onClick={() => onToggle(nowTask)} />
+          <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={() => onToggle(nowTask)} />
           <div className="focus-now-body">
             <div className="focus-title">{nowTask.title}</div>
             <div className="focus-meta">
-              <span className={`pdot ${pdotClass(nowTask.priority || 0)}`} />
+              <span className={`pdot ${pdotClass(nowTask.priority || 0)}`} aria-hidden="true" />
+              <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
               {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
               {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}
               {ranked.length > 1 && <button className="focus-skip" title="Show another task" onClick={() => setSkip((s) => s + 1)}>skip <IconChevR size={11} /></button>}
@@ -80,6 +81,9 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
 
       <div className={`focus-timer${running ? ' running' : ''}${done ? ' done' : ''}`}>
         <div className="focus-clock" aria-live="off">{done ? 'Done ✓' : fmtClock(remaining)}</div>
+        {/* The ticking clock stays aria-live="off"; completion is announced once via
+            this separate polite region (empty until done, so SRs read it on change). */}
+        <span className="sr-only" role="status" aria-live="polite">{done ? 'Focus session complete' : ''}</span>
         {!running && (
           <div className="focus-dur">
             <button className="iconbtn sm" aria-label="Less time" onClick={() => setDur(durationMin - 5)}>−</button>

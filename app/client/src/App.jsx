@@ -7,7 +7,7 @@ import { useGlobalHotkeys } from './useGlobalHotkeys.js'
 import { usePopover } from './usePopover.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
-  IconShield, IconKey, IconSpinner, IconPalette,
+  IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
 } from './icons.jsx'
 import { ACCENTS, applyAccent } from './accents.js'
 
@@ -94,11 +94,15 @@ function AccentPicker({ accent, onPick }) {
 }
 
 /* ---------- TopBar ---------- */
-function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }) {
+function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, onOpenPalette }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  // Accent submenu inside the avatar dropdown: on narrow screens the inline
+  // accent picker (.topbar-actions) is hidden, so the dropdown carries its own.
+  const [accentOpen, setAccentOpen] = useState(false)
   const ref = usePopover(menuOpen, setMenuOpen)
   const initials = initialsFor(user)
   const email = user?.email || user?.name || ''
+  const cmdKey = (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)) ? '⌘K' : 'Ctrl K'
   return (
     <header className="topbar">
       <div className="brand">
@@ -107,18 +111,29 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }
       </div>
       <div className="topbar-spacer" />
       <div className="topbar-right">
+        {/* Visible affordance for the command palette so mouse/touch users can
+            reach it (and the shortcut is advertised), not just Ctrl/Cmd+K. */}
+        <button className="palette-pill" onClick={onOpenPalette} aria-label="Search and commands" title="Search & commands">
+          <IconSearch size={15} />
+          <span className="palette-pill-text">Search…</span>
+          <kbd className="palette-pill-kbd">{cmdKey}</kbd>
+        </button>
         <span className="user-email">
           <span className="avatar">{initials}</span>
           <span className="email-text">{email}</span>
         </span>
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-        <AccentPicker accent={accent} onPick={onAccent} />
-        <button className="iconbtn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
-          <IconGear size={18} />
-        </button>
-        <a className="iconbtn danger-hover" href="/auth/logout" aria-label="Log out" title="Log out">
-          <IconLogout size={18} />
-        </a>
+        {/* Inline control cluster — hidden on narrow screens (the avatar menu
+            below carries equivalents); see '.topbar-actions' in styles.css. */}
+        <div className="topbar-actions">
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          <AccentPicker accent={accent} onPick={onAccent} />
+          <button className="iconbtn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
+            <IconGear size={18} />
+          </button>
+          <a className="iconbtn danger-hover" href="/auth/logout" aria-label="Log out" title="Log out">
+            <IconLogout size={18} />
+          </a>
+        </div>
 
         {/* mobile avatar menu */}
         <div style={{ position: 'relative' }} ref={ref}>
@@ -141,6 +156,25 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }
               <button className="menu-item" role="menuitem" onClick={() => { setMenuOpen(false); onToggleTheme() }}>
                 {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />} Toggle theme
               </button>
+              {/* Accent color lives here too so it survives the inline cluster
+                  being hidden on narrow screens. */}
+              <button className="menu-item" role="menuitem" aria-haspopup="menu" aria-expanded={accentOpen} onClick={() => setAccentOpen((o) => !o)}>
+                <IconPalette size={16} /> Accent color
+              </button>
+              {accentOpen && (
+                <div className="accent-grid" role="menu" style={{ padding: '4px 8px 8px' }}>
+                  {ACCENTS.map((a) => (
+                    <button
+                      key={a.key}
+                      className={`accent-swatch${a.key === accent ? ' active' : ''}`}
+                      title={a.name}
+                      aria-label={a.name}
+                      style={{ background: `linear-gradient(135deg, ${a.a}, ${a.b})` }}
+                      onClick={() => { onAccent(a.key); setAccentOpen(false); setMenuOpen(false) }}
+                    />
+                  ))}
+                </div>
+              )}
               <button className="menu-item" role="menuitem" onClick={() => { setMenuOpen(false); onOpenSettings() }}>
                 <IconGear size={16} /> Settings
               </button>
@@ -160,6 +194,9 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings }
 function DashboardTabs({ dashboards, active, onSelect, onAdd, onRename, onRemove }) {
   const [editing, setEditing] = useState(null)
   const [val, setVal] = useState('')
+  // Two-step delete: the '×' arms an inline confirm rather than removing the
+  // dashboard (and its layout) outright — deletion is irreversible.
+  const [confirmDel, setConfirmDel] = useState(null)
   const start = (d) => { setEditing(d.id); setVal(d.name) }
   const commit = () => { if (editing) onRename(editing, val); setEditing(null) }
   return (
@@ -180,7 +217,15 @@ function DashboardTabs({ dashboards, active, onSelect, onAdd, onRename, onRemove
             >{d.name}</button>
           )}
           {d.id === active && dashboards.length > 1 && editing !== d.id && (
-            <button className="dash-tab-x" aria-label={`Delete ${d.name}`} title="Delete dashboard" onClick={() => onRemove(d.id)}>×</button>
+            confirmDel === d.id ? (
+              <span className="rg-confirm dash-tab-confirm" role="group" aria-label={`Delete ${d.name}?`}>
+                <span className="dash-tab-confirm-q">Delete “{d.name}”?</span>
+                <button className="btn sm danger" onClick={() => { onRemove(d.id); setConfirmDel(null) }}>Delete</button>
+                <button className="btn sm ghost" autoFocus onClick={() => setConfirmDel(null)}>Cancel</button>
+              </span>
+            ) : (
+              <button className="dash-tab-x" aria-label={`Delete ${d.name}`} title="Delete dashboard" onClick={() => setConfirmDel(d.id)}>×</button>
+            )
           )}
         </span>
       ))}
@@ -298,6 +343,7 @@ export default function App() {
             accent={accent}
             onAccent={setAccent}
             onOpenSettings={openSettings}
+            onOpenPalette={() => setPalette({ mode: 'commands' })}
           />
           <DashboardTabs
             dashboards={dashboards}

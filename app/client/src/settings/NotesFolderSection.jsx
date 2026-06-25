@@ -31,6 +31,7 @@ export default function NotesFolderSection({ accounts }) {
           {saving === 'saving' ? <IconSpinner size={14} /> : saving === 'saved' ? <IconCheck size={14} /> : 'Save'}
         </button>
       </div>
+      {saving === 'err' && <div className="rem-err" role="alert">Couldn’t save — check your server.</div>}
       {folders.length > 0 && (
         <div className="notes-cfg-chips">
           {folders.slice(0, 12).map((f) => <button key={f} className={`chip notes-chip${val === f ? ' on' : ''}`} onClick={() => setVal(f)}>{f}</button>)}

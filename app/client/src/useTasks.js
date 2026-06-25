@@ -29,35 +29,40 @@ export function useTaskList(tasks, selector) {
   }, [])
   const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
 
+  // A caught mutation failure means we already reverted the optimistic change, but
+  // that revert is invisible — surface a brief, non-actionable status on the same
+  // undo-bar channel (no undo fn) so the user knows the save didn't reach the server.
+  const showSaveError = useCallback(() => showUndo('Couldn’t save — check your server', null), [showUndo])
+
   const onSetPriority = useCallback((task, priority) => {
     storePatch(task.id, { priority })
-    update(task.id, { priority }).then(emitChanged).catch(() => refresh())
-  }, [storePatch, update, emitChanged, refresh])
+    update(task.id, { priority }).then(emitChanged).catch(() => { refresh(); showSaveError() })
+  }, [storePatch, update, emitChanged, refresh, showSaveError])
 
   // Generic optimistic field patch (cue_trigger / dread / time_estimate / …):
   // patch the shared store immediately, then persist; on failure, refetch to
   // reconcile. Keeps widgets from each needing a bespoke setter per field.
   const onPatch = useCallback((task, patch) => {
     storePatch(task.id, patch)
-    update(task.id, patch).then(emitChanged).catch(() => refresh())
-  }, [storePatch, update, emitChanged, refresh])
+    update(task.id, patch).then(emitChanged).catch(() => { refresh(); showSaveError() })
+  }, [storePatch, update, emitChanged, refresh, showSaveError])
 
   // Set/clear the implementation-intention cue ("after X -> do Y").
   const onSetCue = useCallback((task, cue) => {
     storePatch(task.id, { cue })
-    update(task.id, { cue }).then(emitChanged).catch(() => refresh())
-  }, [storePatch, update, emitChanged, refresh])
+    update(task.id, { cue }).then(emitChanged).catch(() => { refresh(); showSaveError() })
+  }, [storePatch, update, emitChanged, refresh, showSaveError])
 
   // Set due date + (optionally) a reminder at the same instant, from the picker.
   // due_date is an ISO string or ZERO_DATE to clear; reminder is an ISO or null.
   const onSchedule = useCallback((task, { due_date, reminder }) => {
     const reminders = reminder ? [{ reminder }] : []
     storePatch(task.id, { due_date, reminders })
-    update(task.id, { due_date, reminders }).then(emitChanged).catch(() => refresh())
-  }, [storePatch, update, emitChanged, refresh])
+    update(task.id, { due_date, reminders }).then(emitChanged).catch(() => { refresh(); showSaveError() })
+  }, [storePatch, update, emitChanged, refresh, showSaveError])
 
   const onToggle = useCallback(async (task) => {
-    if (task.done) { storePatch(task.id, { done: false }); update(task.id, { done: false }).then(emitChanged).catch(() => refresh()); return }
+    if (task.done) { storePatch(task.id, { done: false }); update(task.id, { done: false }).then(emitChanged).catch(() => { refresh(); showSaveError() }); return }
     const snapshot = getTasks()
     storeRemove(task.id) // optimistic remove with exit animation handled in CSS
     try {
@@ -73,8 +78,8 @@ export function useTaskList(tasks, selector) {
       } else {
         showUndo('Completed', async () => { await update(task.id, { done: false }).catch(() => {}); emitChanged(); refresh() })
       }
-    } catch { replaceTasks(snapshot) }
-  }, [storePatch, storeRemove, replaceTasks, update, emitChanged, isRealDate, refresh, getTasks, showUndo])
+    } catch { replaceTasks(snapshot); showSaveError() }
+  }, [storePatch, storeRemove, replaceTasks, update, emitChanged, isRealDate, refresh, getTasks, showUndo, showSaveError])
 
   // Delete is permanent, so Undo re-creates the task (best effort: core fields +
   // reminders + labels). The restored task gets a new id.
@@ -100,8 +105,8 @@ export function useTaskList(tasks, selector) {
         } catch { /* best-effort restore */ }
         emitChanged(); refresh()
       })
-    } catch { replaceTasks(snapshot); refresh() }
-  }, [storeRemove, replaceTasks, del, create, update, attachLabels, emitChanged, isRealDate, refresh, getTasks, showUndo])
+    } catch { replaceTasks(snapshot); refresh(); showSaveError() }
+  }, [storeRemove, replaceTasks, del, create, update, attachLabels, emitChanged, isRealDate, refresh, getTasks, showUndo, showSaveError])
 
   return { tasks: view, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo }
 }

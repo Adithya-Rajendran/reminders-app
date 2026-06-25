@@ -113,7 +113,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             {!dense && !onPatch && task.time_estimate > 0 && <span className="chip est-chip" title="Estimated time">~{fmtEst(task.time_estimate)}</span>}
             {!dense && onSetDread && <DreadControl value={task.dread || 0} onSet={(d) => onSetDread(task, d)} />}
             {!dense && isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
-            {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{l.title}</span>)}
+            {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{`*${l.title}`}</span>)}
             {!dense && canSubtask && (
               <button type="button" className={`chip subtask-chip${total ? '' : ' empty'}`} aria-expanded={expanded} title={total ? `${doneKids}/${total} subtasks done` : 'Add a subtask'} onClick={() => setExpanded((e) => !e)}>
                 <IconChevR size={11} className={`rem-chev${expanded ? ' open' : ''}`} />
@@ -157,7 +157,7 @@ function PriorityControl({ value, onSet }) {
   const ref = usePopover(open, setOpen)
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className="pri-dot-btn" aria-label="Set priority" title="Priority" onClick={() => setOpen((o) => !o)}>
+      <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" onClick={() => setOpen((o) => !o)}>
         <span className={`pdot ${pdotClass(value)}`} />
       </button>
       {open && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -30,6 +31,23 @@ const fromInput = (v) => { const d = parseInput(v); return d ? d.toISOString() :
 // matches the picked day (avoids an off-by-one east of UTC). Shared by create,
 // edit, and the delete→undo re-create.
 const toIso = (v, allDay) => (allDay ? (v ? new Date(v + 'T00:00:00Z').toISOString() : null) : fromInput(v))
+// All-day iCal DTEND is EXCLUSIVE (midnight after the last day). Show/edit the
+// INCLUSIVE last day so a one-day event reads as one day, not two:
+//  - toEndInput: exclusive end -> inclusive <input> value (shift back a day).
+//  - toIsoEnd:   inclusive <input> value -> exclusive ISO for the server (+a day).
+// Timed ends are unchanged. '' / null pass through (server defaults end = start+1d).
+function toEndInput(d, allDay) {
+  if (!d) return ''
+  const dt = d instanceof Date ? new Date(d.getTime()) : new Date(d)
+  if (isNaN(dt.getTime())) return ''
+  if (allDay) dt.setDate(dt.getDate() - 1)
+  return toInput(dt, allDay)
+}
+const toIsoEnd = (v, allDay) => {
+  if (!allDay) return fromInput(v)
+  if (!v) return null
+  const d = new Date(v + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString()
+}
 
 function errText(e) {
   const m = String(e?.message || e || 'Something went wrong')
@@ -150,7 +168,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const onSelect = (arg) => {
     setModal({
       mode: 'create', key: 'c' + Date.now(),
-      initial: { title: '', allDay: arg.allDay, start: toInput(arg.start, arg.allDay), end: toInput(arg.end, arg.allDay) },
+      initial: { title: '', allDay: arg.allDay, start: toInput(arg.start, arg.allDay), end: toEndInput(arg.end, arg.allDay) },
     })
     calRef.current?.getApi().unselect()
   }
@@ -164,7 +182,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
       initial: {
         title: arg.event.title, allDay,
         start: toInput(arg.event.start, allDay),
-        end: toInput(arg.event.end || arg.event.start, allDay),
+        end: toEndInput(arg.event.end, allDay) || toInput(arg.event.start, allDay),
         accountId: p.accountId, objectUrl: p.objectUrl, listUrl: p.listUrl,
       },
     })
@@ -212,7 +230,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     // Capture what we'd need to re-create the event if the user hits Undo.
     const restore = {
       accountId: ev.accountId, listUrl: ev.listUrl, summary: ev.title,
-      start: toIso(ev.start, ev.allDay), end: toIso(ev.end, ev.allDay), allDay: !!ev.allDay,
+      start: toIso(ev.start, ev.allDay), end: toIsoEnd(ev.end, ev.allDay), allDay: !!ev.allDay,
     }
     try {
       await calendar.deleteEvent({ accountId: ev.accountId, objectUrl: ev.objectUrl })
@@ -239,7 +257,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         selectable
         selectMirror
         editable
-        dayMaxEvents
+        dayMaxEventRows={full ? 4 : 3}
         nowIndicator
         eventDisplay="block"
         eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
@@ -294,7 +312,7 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
     setBusy(true); setErr(null)
     try {
       const startIso = toIso(start, allDay)
-      const endIso = toIso(end, allDay)
+      const endIso = toIsoEnd(end, allDay)
       if (!title.trim()) throw new Error('Give the event a title.')
       if (!startIso) throw new Error('Pick a start date/time.')
       if (isCreate) {
@@ -311,7 +329,10 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
   // native confirm). The parent closes this modal and shows the UndoBar.
   const remove = () => { if (!busy) onDelete(initial) }
 
-  return (
+  // Portal to <body>: the widget lives inside react-grid-layout's CSS-transformed
+  // grid item, which would otherwise become the containing block for this
+  // position:fixed overlay and trap/clip it inside the calendar cell.
+  return createPortal((
     <div className="overlay" onMouseDown={onClose}>
       <div className="modal" style={{ maxWidth: 480 }} onMouseDown={(e) => e.stopPropagation()}
         ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
@@ -371,5 +392,5 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
         </form>
       </div>
     </div>
-  )
+  ), document.body)
 }

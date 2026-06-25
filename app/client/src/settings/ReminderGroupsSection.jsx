@@ -13,9 +13,15 @@ export default function ReminderGroupsSection({ initialCreate }) {
   const [newName, setNewName] = useState(initialCreate || '')
   const [newCal, setNewCal] = useState('__new') // '__new' = create a calendar named after the group
   const [creating, setCreating] = useState(false)
+  const [err, setErr] = useState(null) // last create/remap/delete failure
+  const [loadErr, setLoadErr] = useState(false) // initial load failed (vs. genuinely empty)
   const rootRef = useRef(null)
   const nameRef = useRef(null)
-  const load = useCallback(() => { api('/api/reminder-groups').then(setData).catch(() => setData({ groups: [], calendars: [] })) }, [])
+  const load = useCallback(() => {
+    return api('/api/reminder-groups')
+      .then((d) => { setData(d); setLoadErr(false) })
+      .catch(() => { setData({ groups: [], calendars: [] }); setLoadErr(true) })
+  }, [])
   useEffect(() => { load() }, [load])
 
   // Opened via "＋ New group…" from a picker — prefill, scroll into view, focus.
@@ -27,7 +33,7 @@ export default function ReminderGroupsSection({ initialCreate }) {
   }, [initialCreate])
 
   const remap = async (group, value) => {
-    setBusy(group)
+    setBusy(group); setErr(null)
     try {
       if (value === '__new') await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify({ group, createNew: true }) })
       else {
@@ -36,22 +42,22 @@ export default function ReminderGroupsSection({ initialCreate }) {
         if (id) await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify({ group, listId: Number(id) }) })
       }
       await load(); emitTasksChanged()
-    } catch { /* ignore */ } finally { setBusy(null) }
+    } catch { setErr('Couldn’t move that group — check your server and try again.') } finally { setBusy(null) }
   }
   const del = async (group) => {
-    setBusy(group)
-    try { await api('/api/reminder-groups?group=' + encodeURIComponent(group) + '&deleteCalendar=' + (delCal ? '1' : '0'), { method: 'DELETE' }); setConfirmDel(null); setDelCal(false); await load(); emitTasksChanged() } catch { /* ignore */ } finally { setBusy(null) }
+    setBusy(group); setErr(null)
+    try { await api('/api/reminder-groups?group=' + encodeURIComponent(group) + '&deleteCalendar=' + (delCal ? '1' : '0'), { method: 'DELETE' }); setConfirmDel(null); setDelCal(false); await load(); emitTasksChanged() } catch { setErr('Couldn’t delete that group — check your server and try again.') } finally { setBusy(null) }
   }
   const create = async (e) => {
     e?.preventDefault()
     const name = newName.trim()
     if (!name || creating) return
-    setCreating(true)
+    setCreating(true); setErr(null)
     try {
       const body = newCal === '__new' ? { group: name, createNew: true } : { group: name, listId: Number(newCal) }
       await api('/api/reminder-groups', { method: 'PUT', body: JSON.stringify(body) })
       setNewName(''); setNewCal('__new'); await load(); emitTasksChanged() // refresh widget group pickers
-    } catch { /* ignore */ } finally { setCreating(false) }
+    } catch { setErr('Couldn’t create that group — check your server and try again.') } finally { setCreating(false) }
   }
 
   const calendars = (data && data.calendars) || []
@@ -67,6 +73,8 @@ export default function ReminderGroupsSection({ initialCreate }) {
         </select>
         <button type="submit" className="btn primary sm" disabled={creating || !newName.trim()}>{creating ? <IconSpinner size={14} /> : 'Add'}</button>
       </form>
+      {err && <div className="rem-err" role="alert">{err}</div>}
+      {loadErr && <div className="rem-err" role="alert">Couldn’t load reminder groups — check your server.</div>}
       {data && data.groups.length > 0 && (
       <div className="rg-list">
         {data.groups.map((g) => (

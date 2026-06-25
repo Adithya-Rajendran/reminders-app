@@ -17,6 +17,8 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
   const [loading, setLoading] = useState(true)
   const [statusMap, setStatusMap] = useState({}) // id -> 'ok' | 'syncing' | 'err'
   const [busyId, setBusyId] = useState(null)
+  const [confirmDelId, setConfirmDelId] = useState(null) // account armed for removal
+  const [delError, setDelError] = useState(null) // visible error if a delete fails
 
   const [mode, setMode] = useState('list') // list | pick | form | discover
   const [provider, setProvider] = useState(null)
@@ -78,10 +80,15 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
 
   const deleteAcct = async (id) => {
     setBusyId(id)
+    setDelError(null)
     try {
       await api(`/api/caldav/accounts/${id}`, { method: 'DELETE' })
       setAccounts((a) => a.filter((x) => x.id !== id))
-    } catch { /* keep the row */ }
+      setConfirmDelId(null)
+    } catch {
+      // Don't silently keep a row the user asked to remove — tell them it failed.
+      setDelError('Couldn’t remove the account — check your server and try again.')
+    }
     setBusyId(null)
   }
 
@@ -189,26 +196,50 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                         </div>
                       </div>
                       <div className="acct-actions">
-                        <button
-                          className="iconbtn sm"
-                          aria-label={`Refresh ${a.name}`}
-                          onClick={() => refreshAcct(a.id)}
-                          disabled={busyId === a.id}
-                        >
-                          {busyId === a.id && st === 'syncing' ? <IconSpinner size={15} /> : <IconRefresh size={15} />}
-                        </button>
-                        <button
-                          className="iconbtn sm danger-hover"
-                          aria-label={`Remove ${a.name}`}
-                          onClick={() => deleteAcct(a.id)}
-                          disabled={busyId === a.id}
-                        >
-                          <IconTrash size={15} />
-                        </button>
+                        {confirmDelId === a.id ? (
+                          // Inline confirm before a destructive delete (mirrors ReminderGroupsSection).
+                          <span className="rg-confirm">
+                            <span className="rg-confirm-q">Remove account?</span>
+                            <button
+                              className="btn danger sm"
+                              onClick={() => deleteAcct(a.id)}
+                              disabled={busyId === a.id}
+                            >Delete</button>
+                            <button
+                              className="btn ghost sm"
+                              onClick={() => { setConfirmDelId(null); setDelError(null) }}
+                              disabled={busyId === a.id}
+                            >Cancel</button>
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              className="iconbtn sm"
+                              aria-label={`Refresh ${a.name}`}
+                              onClick={() => refreshAcct(a.id)}
+                              disabled={busyId === a.id}
+                            >
+                              {busyId === a.id && st === 'syncing' ? <IconSpinner size={15} /> : <IconRefresh size={15} />}
+                            </button>
+                            <button
+                              className="iconbtn sm danger-hover"
+                              aria-label={`Remove ${a.name}`}
+                              onClick={() => { setConfirmDelId(a.id); setDelError(null) }}
+                              disabled={busyId === a.id}
+                            >
+                              <IconTrash size={15} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   )
                 })}
+                {delError && (
+                  <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--danger)' }}>
+                    <IconX size={14} /> {delError}
+                  </div>
+                )}
                 <button className="btn ghost block" style={{ marginTop: 14 }} onClick={startAdd}>
                   <IconPlus size={15} /> Add account
                 </button>
@@ -218,8 +249,9 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                   return <Panel key={wg.type} accounts={accounts} />
                 })}
                 {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
-                {/* Widget wiring exists regardless of linked accounts — always shown. */}
-                <ConnectionsSection />
+                {/* Widget-wiring inspector is a dev-only diagnostic (the F7 panel). Vite
+                    statically strips this in production builds via import.meta.env.DEV. */}
+                {import.meta.env.DEV && <ConnectionsSection />}
               </div>
             )
           )}

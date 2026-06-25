@@ -18,7 +18,10 @@
 .flow-edge { pointer-events: auto; cursor: pointer; }
 .flow-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
 .flow-edge-line { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .85; }
-.flow-edge:hover .flow-edge-line { stroke: var(--danger); }
+.flow-edge:hover .flow-edge-line,
+.flow-edge:focus-visible .flow-edge-line { stroke: var(--danger); }
+/* SVG <g> outlines render unevenly; recolor the line as the focus cue instead. */
+.flow-edge:focus { outline: none; }
 .flow-edge-line.temp { stroke-dasharray: 5 4; opacity: .7; pointer-events: none; }
 .flow-edges marker path { fill: var(--accent); }
 .flow-node { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: var(--r-btn); border: 1px solid var(--line-strong); background: var(--panel-solid); box-shadow: var(--shadow-sm); cursor: grab; touch-action: none; user-select: none; }
@@ -33,6 +36,23 @@
 .flow-cue-input { font-size: 11.5px; padding: 2px 6px; margin-top: 3px; width: 100%; }
 .flow-unplace { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
 .flow-node:hover .flow-unplace { display: inline-flex; }
+/* Keyboard (focus reaches the control) and touch (no hover) must expose the
+   remove affordance too — mirrors the .task-del reveal pattern in styles.css. */
+.flow-node:focus-within .flow-unplace { display: inline-flex; }
+@media (hover: none) { .flow-unplace { display: inline-flex; } }
 .flow-unplace:hover { color: var(--danger); border-color: var(--danger); }
-.flow-handle { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel-solid); cursor: crosshair; }
+/* Now a real <button>; reset native chrome (padding/appearance) so it keeps the
+   same dot shape it had as a <span>. */
+.flow-handle { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; padding: 0; appearance: none; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel-solid); cursor: crosshair; }
 .flow-handle:hover { filter: brightness(1.2); }
+.flow-handle[aria-pressed="true"] { background: var(--danger); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Armed source card while a keyboard link is in progress. */
+.flow-node.link-armed { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+
+/* Always-available edit affordance (the cue is otherwise editable only by
+   double-click, which is invisible and not keyboard/touch friendly). Revealed
+   like .flow-unplace so it doesn't clutter at rest. */
+.flow-edit { position: absolute; bottom: -7px; right: -7px; width: 18px; height: 18px; padding: 0; appearance: none; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
+.flow-node:hover .flow-edit, .flow-node:focus-within .flow-edit { display: inline-flex; }
+@media (hover: none) { .flow-edit { display: inline-flex; } }
+.flow-edit:hover { color: var(--accent); border-color: var(--accent); }
