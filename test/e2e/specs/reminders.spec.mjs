@@ -19,10 +19,12 @@ test('capture a reminder and complete it', async ({ page, request }) => {
   const frame = widget(page, 'Reminders')
   await addReminder(frame, 'Drink water')
 
-  // Captured with a due date + reminder (the bell shows on the due chip).
+  // A bare capture is uncategorized by default — no due date, no reminder — and
+  // lands in the Inbox / Triage to be processed later (reminders are opt-in).
   const t = (await listTasks(request)).find((x) => x.title === 'Drink water')
   expect(t, 'task persisted to CalDAV').toBeTruthy()
-  expect(t.reminders.length, 'a reminder was set').toBeGreaterThan(0)
+  expect(t.reminders.length, 'uncategorized capture has no reminder').toBe(0)
+  expect(t.due_date, 'uncategorized capture has no due date').toBe('0001-01-01T00:00:00Z')
 
   await frame.getByRole('checkbox', { name: 'Complete: Drink water' }).click()
   await expect(page.locator('.undo-bar')).toContainText('Completed')
@@ -55,8 +57,8 @@ test('quick-add parses date, priority, label and cue tokens', async ({ page, req
   await expect.poll(async () => {
     const t = (await listTasks(request)).find((x) => x.title === 'Draft report')
     if (!t) return null
-    return { priority: t.priority, label: (t.labels || []).some((l) => l.title === 'Focus'), cue: t.cue, dated: t.due_date !== '0001-01-01T00:00:00Z' }
-  }).toEqual({ priority: 2, label: true, cue: 'after standup', dated: true })
+    return { priority: t.priority, label: (t.labels || []).some((l) => l.title === 'Focus'), cue: t.cue, dated: t.due_date !== '0001-01-01T00:00:00Z', reminded: (t.reminders || []).length > 0 }
+  }).toEqual({ priority: 2, label: true, cue: 'after standup', dated: true, reminded: true })
 })
 
 test('break a reminder into subtasks', async ({ page, request }) => {

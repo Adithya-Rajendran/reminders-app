@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { api } from './api.js'
+import { api, tk } from './api.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
+import QuickCaptureModal from './QuickCaptureModal.jsx'
 import { useGlobalHotkeys } from './useGlobalHotkeys.js'
 import { usePopover } from './usePopover.js'
+import { createTask } from './tasklib.js'
+import { insertTask } from './taskstore.js'
+import { emitTasksChanged } from './tasksbus.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
@@ -246,11 +250,29 @@ export default function App() {
   const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
   const [activeDash, setActiveDash] = useState('main')
   const [palette, setPalette] = useState(null) // null | { mode: 'notes' | 'commands' }
+  const [capture, setCapture] = useState(false) // global quick-capture popup
+  const [inboxId, setInboxId] = useState(null)  // first project (the inbox), resolved once on ready
 
-  // App-wide palette hotkeys (only meaningful once signed in).
+  // Resolve the inbox project so quick-capture can create from anywhere, with no
+  // task widget on the board (mirrors Dashboard's projects[0] inbox convention).
+  useEffect(() => {
+    if (status !== 'ready') return
+    tk('/projects').then((ps) => { const pr = Array.isArray(ps) ? ps.filter((p) => p.id > 0) : []; setInboxId(pr[0]?.id ?? null) }).catch(() => {})
+  }, [status])
+
+  // Create a captured task into the inbox + reconcile the shared store so any open
+  // widget reflects it immediately (widget-independent).
+  const captureCreate = async (fields) => {
+    const t = await createTask(inboxId, fields)
+    insertTask(t); emitTasksChanged()
+    return t
+  }
+
+  // App-wide palette + quick-capture hotkeys (only meaningful once signed in).
   useGlobalHotkeys({
     onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'notes' }) },
     onCommands: () => { if (status === 'ready') setPalette({ mode: 'commands' }) },
+    onQuickCapture: () => { if (status === 'ready' && inboxId) setCapture(true) },
   })
 
   // Theme: persist + reflect on <html data-theme>.
@@ -317,6 +339,7 @@ export default function App() {
   // App-level commands surfaced in the Ctrl/Cmd+K palette (alongside its built-in
   // note command), so the palette is a keyboard-driven spine for the whole app.
   const paletteCommands = [
+    ...(inboxId ? [{ id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, run: () => setCapture(true) }] : []),
     { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, run: () => openSettings() },
     { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, run: toggleTheme },
     { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
@@ -366,6 +389,10 @@ export default function App() {
 
       {status === 'ready' && palette && (
         <CommandPalette initialMode={palette.mode} commands={paletteCommands} onClose={() => setPalette(null)} />
+      )}
+
+      {status === 'ready' && capture && (
+        <QuickCaptureModal onSubmit={captureCreate} onClose={() => setCapture(false)} />
       )}
     </>
   )

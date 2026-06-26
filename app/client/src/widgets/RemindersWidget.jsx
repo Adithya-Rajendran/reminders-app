@@ -10,10 +10,6 @@ import {
 const COLLAPSE_KEY = 'reminders-collapsed-groups'
 const SORT_KEY = 'reminders-sort'
 
-function defaultWhen() {
-  const d = new Date(Date.now() + 3600e3); d.setSeconds(0, 0); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5); return d.toISOString()
-}
-
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
@@ -50,10 +46,11 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const isChild = useCallback((t) => !!(t.goal && byUid.has(t.goal)), [byUid])
 
   // Top-level reminder rows: open, non-recurring, not a subtask, and either
-  // carrying a reminder, parenting subtasks, or flagged as a goal (so goals show
-  // here with their progress instead of in a separate widget). Soonest first.
+  // carrying a reminder, parenting subtasks, flagged as a goal, OR uncategorized
+  // (no date + no reminder) — the capture Inbox shows here under "No group" and in
+  // the Triage queue to be processed later. Soonest first.
   const reminders = useMemo(() => {
-    let list = allTasks.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal))
+    let list = allTasks.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal || (!isRealDate(t.due_date) && (t.reminders || []).length === 0)))
     if (group) list = list.filter((t) => hasGroup(t, group))
     return list.sort(sortMode === 'priority' ? byImportanceThenDue : (a, b) => nextRemind(a) - nextRemind(b))
   }, [allTasks, group, isChild, childrenByParent, sortMode])
@@ -85,8 +82,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
 
   const [draft, setDraft] = useState('')
   const [qaGroup, setQaGroup] = useState('')
-  const [when, setWhen] = useState(defaultWhen)
-  const [whenTouched, setWhenTouched] = useState(false) // user picked a time via the When picker
+  const [when, setWhen] = useState(null) // optional reminder time; null = no reminder (uncategorized capture)
   const [pickOpen, setPickOpen] = useState(false)
   const [err, setErr] = useState('')
   const [knownGroups, setKnownGroups] = useState([])
@@ -134,24 +130,23 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
     // with the picked group (group first, so server group-routing still applies).
     // Reuse the draft's memoized parse instead of parsing again.
     const title = parsed.title || raw
-    // If the user neither typed a date nor picked one, the picker still holds the
-    // stale now+1h from when the form first mounted — recompute it so a long-open
-    // form can't save a past time.
-    const due = parsed.due_date || (whenTouched ? when : defaultWhen())
+    // Uncategorized by default: no due date or alarm unless the text parsed a date
+    // or the user set one via the When picker. A bare capture lands in the Inbox
+    // (No group) here and in the Triage queue to be processed later.
+    const due = parsed.due_date || when
     const g = group || qaGroup.trim() // locked widget forces its group
     const labels = [...new Set([...(g ? [g] : []), ...(parsed.labels || [])])]
     try {
       await tasksCap.create(inboxId, {
         title,
         priority: parsed.priority || 0,
-        due_date: due,
-        reminders: [{ reminder: due }],
+        ...(due ? { due_date: due, reminders: [{ reminder: due }] } : {}),
         ...(labels.length ? { labels } : {}),
         ...(parsed.cue ? { cue: parsed.cue } : {}),
         ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
       })
       if (g) groupsCap.pushRecent(g)
-      setWhen(defaultWhen()); setWhenTouched(false); tasksCap.emitChanged(); load()
+      setWhen(null); tasksCap.emitChanged(); load()
     } catch (e2) {
       setDraft(raw)
       let msg = 'Could not add reminder.'
@@ -247,11 +242,11 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
           )}
           {!compact && (
             <span className="inline-ctl">
-              <button type="button" ref={whenRef} className={`chip due-chip due-soon${fromText ? ' from-text' : ''}`} aria-haspopup="dialog" title={fromText ? 'Set from your text' : 'When to remind me'} onClick={() => setPickOpen((o) => !o)}>
-                <IconClock size={12} /> {chip ? chip.label : 'When'}{t ? ' · ' + t : ''}{fromText ? ' (from text)' : ''}
+              <button type="button" ref={whenRef} className={`chip due-chip${chip ? ' due-soon' : ' empty'}${fromText ? ' from-text' : ''}`} aria-haspopup="dialog" title={fromText ? 'Set from your text' : 'Add a reminder (optional)'} onClick={() => setPickOpen((o) => !o)}>
+                <IconClock size={12} /> {chip ? chip.label : 'Remind'}{t ? ' · ' + t : ''}{fromText ? ' (from text)' : ''}
               </button>
               {pickOpen && (
-                <DateTimePicker anchorRef={whenRef} value={effectiveWhen} hasReminder onApply={({ due_date }) => { if (due_date && due_date !== ZERO_DATE) { setWhen(due_date); setWhenTouched(true) } setPickOpen(false) }} onClose={() => setPickOpen(false)} />
+                <DateTimePicker anchorRef={whenRef} value={effectiveWhen} hasReminder onApply={({ due_date }) => { setWhen(due_date && due_date !== ZERO_DATE ? due_date : null); setPickOpen(false) }} onClose={() => setPickOpen(false)} />
               )}
             </span>
           )}
