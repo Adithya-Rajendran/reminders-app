@@ -1784,3 +1784,14 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; padding: 5px 10px; border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent); background: var(--warn-soft); color: var(--warn); border-radius: 8px; font-size: 12px; }
 .reconnect-banner span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .reconnect-banner .undo-btn { flex: 0 0 auto; }
+
+/* === Global quick-capture popup ('c') === */
+.capture-overlay { align-items: flex-start; padding-top: 14vh; }
+.capture { width: min(560px, calc(100vw - 32px)); }
+.capture-inner { background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 16px; }
+.capture-row { display: flex; align-items: center; gap: 10px; }
+.capture-row > svg { color: var(--accent); flex: 0 0 auto; }
+.capture-input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--text); font-size: 16px; padding: 6px 0; }
+.capture-input::placeholder { color: var(--muted); }
+.capture-hint { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.capture-hint kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
