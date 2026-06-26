@@ -3,7 +3,7 @@ import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
   parseQuickAdd, dueChip, timeLabel, isRealDate, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
-  SkeletonRows, EmptyState, ErrorState, UndoBar, QuickAddPreview, widgetStore,
+  SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, widgetStore,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame, IconSort,
 } from '../widget-sdk'
 
@@ -211,8 +211,12 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   const flatHabits = shownHabits.length ? <div className="task-stream">{shownHabits.map((st) => renderRow(st, true))}</div> : null
 
   let body
+  const hasData = reminders.length > 0 || habits.length > 0
   if (state === 'loading') body = <SkeletonRows />
-  else if (state === 'error') body = <ErrorState onRetry={load} />
+  // Only wipe to the full error card on an INITIAL-load failure (no data yet). A
+  // transient refresh blip with tasks already loaded keeps the stale list visible
+  // (the store retains last-good tasks) plus a small reconnect banner below.
+  else if (state === 'error' && !hasData) body = <ErrorState onRetry={load} />
   else if (reminders.length === 0 && habits.length === 0) {
     body = <EmptyState icon={IconBell} title={group ? `No reminders in ${group}` : 'No reminders yet'} sub={inboxId ? (group ? 'Add one above.' : 'Type one above, pick a group and a time, and hit +.') : 'Connect a CalDAV account in Settings to add reminders.'} />
   } else if (compact) {
@@ -264,6 +268,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
           </button>
         </div>
       )}
+      {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
       {body}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>

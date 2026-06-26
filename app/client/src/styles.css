@@ -1759,3 +1759,28 @@ button.rem-head:hover .g-title { color: var(--accent); }
   .palette-pill-text, .palette-pill-kbd { display: none; }
   .palette-pill { padding: 0; width: 32px; justify-content: center; }
 }
+
+/* === Quieter resting rows: empty placeholder controls reveal on hover/focus === */
+/* Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
+   intentionally NOT gated (scheduling is the primary triage action). */
+.task .cue-chip.empty,
+.task .est-chip.empty,
+.task .dread-chip.empty,
+.task .subtask-chip.empty { opacity: 0; transition: opacity 120ms ease; }
+.task:hover .cue-chip.empty,
+.task:hover .est-chip.empty,
+.task:hover .dread-chip.empty,
+.task:hover .subtask-chip.empty,
+.task:focus-within .cue-chip.empty,
+.task:focus-within .est-chip.empty,
+.task:focus-within .dread-chip.empty,
+.task:focus-within .subtask-chip.empty { opacity: 1; }
+@media (hover: none) {
+  .task .cue-chip.empty, .task .est-chip.empty,
+  .task .dread-chip.empty, .task .subtask-chip.empty { opacity: 1; }
+}
+
+/* === Reconnect banner: stale-list-visible on a sync blip (vs full ErrorState) === */
+.reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; padding: 5px 10px; border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent); background: var(--warn-soft); color: var(--warn); border-radius: 8px; font-size: 12px; }
+.reconnect-banner span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.reconnect-banner .undo-btn { flex: 0 0 auto; }

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectUpcoming, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
+import { useTaskList, selectUpcoming, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
 
 const COLLAPSE_KEY = 'upcoming-collapsed'
 // Default a quick-added task to today at 9am so it lands in the "Today" bucket
@@ -109,8 +109,9 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
         </div>
       )}
       {state === 'loading' && <SkeletonRows />}
-      {state === 'error' && <ErrorState onRetry={load} />}
-      {state === 'ready' && (shown.length === 0
+      {state === 'error' && shown.length === 0 && <ErrorState onRetry={load} />}
+      {state === 'error' && shown.length > 0 && <ReconnectBanner onRetry={load} />}
+      {(state === 'ready' || (state === 'error' && shown.length > 0)) && (shown.length === 0
         ? <EmptyState icon={IconClock} title={quickOnly ? 'No 2-minute wins' : 'Nothing upcoming'} sub={quickOnly ? 'Tag short tasks with a “2min” label to collect them here.' : 'Scheduled tasks appear here, grouped by when they’re due.'} />
         : compact
           ? (
