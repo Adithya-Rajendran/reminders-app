@@ -38,6 +38,19 @@ export function ErrorState({ sub, onRetry }) {
   )
 }
 
+// A refresh failed but we still have last-good data: keep the stale list visible
+// with a quiet "reconnecting" strip + retry, instead of wiping the widget to the
+// full ErrorState card. (Shown only when there ARE tasks; initial-load failure
+// still gets the full ErrorState.)
+export function ReconnectBanner({ onRetry }) {
+  return (
+    <div className="reconnect-banner" role="status">
+      <span><IconRefresh size={12} /> Can’t reach your server — showing the last synced copy.</span>
+      {onRetry && <button type="button" className="undo-btn" onClick={onRetry}>Retry</button>}
+    </div>
+  )
+}
+
 export function UndoBar({ undo, dismiss }) {
   return (
     <div className="undo-bar" role="status">

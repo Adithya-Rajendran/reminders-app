@@ -4,7 +4,7 @@
 // labels = CATEGORIES. Wired into the API routes by index.js.
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
-import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID } from './caldav.js'
+import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID, readFetchOptions } from './caldav.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
 import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from './vtodo_meta.js'
@@ -86,7 +86,7 @@ async function fetchObjectsCached(sub, account, listUrl) {
     knownCtag = cur // changed or unavailable → fall through (reseed ctag below; null = fail open)
   }
   const client = await clientFor(account)
-  const objs = await client.fetchCalendarObjects({ calendar: { url: listUrl }, filters: VTODO_FILTER })
+  const objs = await client.fetchCalendarObjects({ calendar: { url: listUrl }, filters: VTODO_FILTER, fetchOptions: readFetchOptions() })
   const parsed = objs.map((o) => ({ url: o.url, vt: safeParse(o.data).vt }))
   // Reuse the ctag the change-probe already fetched; only on a cold entry do we
   // pay one extra PROPFIND to seed it.

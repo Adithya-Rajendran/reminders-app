@@ -49,6 +49,11 @@ async function assertEgressAllowed(urlStr) {
 // (or a poller tick) open indefinitely. 0 disables. (tsdav's own reads use undici's
 // default timeouts; this covers all the raw safeFetch GET/PUT/DELETE/PROPFIND paths.)
 const FETCH_TIMEOUT_MS = Number(process.env.CALDAV_TIMEOUT_MS) || 15000
+// tsdav's own reads (fetchCalendarObjects) bypass safeFetch and rely on undici's
+// long defaults, so a hung/slow server could pin the INITIAL task/event REPORT
+// open and leave the client stuck on skeletons forever. Pass these fetchOptions
+// into those reads to bound them with the same timeout. undefined => no timeout.
+export const readFetchOptions = () => (FETCH_TIMEOUT_MS > 0 ? { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) } : undefined)
 
 // Guarded fetch: vet the destination, and never follow redirects (a redirect
 // could bounce an allowed host to a blocked internal one / enable DNS rebinding).
@@ -347,7 +352,7 @@ export async function fetchTasksHandler(req, res) {
       try { client = await clientFor(acc) } catch { return }
       await Promise.allSettled(lists.map(async (list) => {
         try {
-          const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: VTODO_FILTER })
+          const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: VTODO_FILTER, fetchOptions: readFetchOptions() })
           for (const o of objs) {
             tasks.push(...parseVtodos(o.data, {
               accountId: acc.id, accountName: acc.name, listUrl: list.url,
@@ -451,7 +456,7 @@ async function fetchEvents(userId, startISO, endISO) {
     try { client = await clientFor(acc) } catch { return }
     await Promise.allSettled(lists.map(async (list) => {
       try {
-        const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: veventFilter(startISO, endISO) })
+        const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: veventFilter(startISO, endISO), fetchOptions: readFetchOptions() })
         for (const o of objs) {
           events.push(...parseVevents(o.data, { accountId: acc.id, listUrl: list.url, objectUrl: o.url, etag: o.etag }))
         }
