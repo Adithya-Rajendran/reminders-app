@@ -34,23 +34,29 @@ test('create an event from the grid', async ({ page, request }) => {
   // FullCalendar fires `select` on a click-drag across day cells. Use Mon–Thu as
   // the start date so the next day is always in the same week row — the calendar
   // uses a Sunday-first layout, so dragging Sat→Sun crosses a row boundary and the
-  // select event never fires. Short dwell + intermediate moves ensure the selection
-  // reliably registers in headless.
+  // select event never fires. Use dragTo() so Playwright fires the full pointer
+  // event sequence (pointerover/pointerenter + pointerdown + pointermove + pointerup)
+  // that FullCalendar's interactionPlugin requires.
   const start = new Date()
   while (start.getDay() === 0 || start.getDay() >= 5) start.setDate(start.getDate() + 1)
   const next = new Date(start); next.setDate(start.getDate() + 1)
   const startDays = Math.round((start.getTime() - Date.now()) / 86400000)
-  await frame.locator('.fc-daygrid-body').scrollIntoViewIfNeeded()
-  const a = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(start)}"]`).boundingBox()
-  const b = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(next)}"]`).boundingBox()
-  const ay = a.y + a.height * 0.7, by = b.y + b.height * 0.7
-  await page.mouse.move(a.x + a.width / 2, ay)
-  await page.mouse.down()
-  await page.waitForTimeout(80)
-  await page.mouse.move(a.x + a.width / 2 + 6, ay, { steps: 4 })
-  await page.mouse.move(b.x + b.width / 2, by, { steps: 20 })
-  await page.waitForTimeout(80)
-  await page.mouse.up()
+
+  const startCell = frame.locator(`td.fc-daygrid-day[data-date="${ymd(start)}"]`)
+  const nextCell = frame.locator(`td.fc-daygrid-day[data-date="${ymd(next)}"]`)
+  // Ensure FullCalendar has fully mounted and the daygrid cells are ready before dragging.
+  await expect(startCell).toBeVisible()
+  await expect(nextCell).toBeVisible()
+
+  const aBox = await startCell.boundingBox()
+  const bBox = await nextCell.boundingBox()
+  // Drag in the lower portion of each cell (70% down) to land below the day-number
+  // header on the day-background area where FullCalendar registers selections.
+  // sourcePosition / targetPosition are relative to the element's top-left corner.
+  await startCell.dragTo(nextCell, {
+    sourcePosition: { x: Math.floor(aBox.width / 2), y: Math.floor(aBox.height * 0.7) },
+    targetPosition: { x: Math.floor(bBox.width / 2), y: Math.floor(bBox.height * 0.7) },
+  })
 
   const modal = page.locator('.modal', { hasText: 'New event' })
   await expect(modal).toBeVisible()
