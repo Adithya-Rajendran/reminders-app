@@ -31,21 +31,32 @@ test('create an event from the grid', async ({ page, request }) => {
   await gotoApp(page)
   const frame = widget(page, 'Calendar')
 
-  // FullCalendar fires `select` on a click-drag across day cells. Drag today ->
-  // tomorrow, starting in the cell BODY (below the date-number link) with a short
-  // dwell + intermediate moves so the selection reliably registers in headless.
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  await frame.locator('.fc-daygrid-body').scrollIntoViewIfNeeded()
-  const a = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(new Date())}"]`).boundingBox()
-  const b = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(tomorrow)}"]`).boundingBox()
-  const ay = a.y + a.height * 0.7, by = b.y + b.height * 0.7
-  await page.mouse.move(a.x + a.width / 2, ay)
-  await page.mouse.down()
-  await page.waitForTimeout(80)
-  await page.mouse.move(a.x + a.width / 2 + 6, ay, { steps: 4 })
-  await page.mouse.move(b.x + b.width / 2, by, { steps: 20 })
-  await page.waitForTimeout(80)
-  await page.mouse.up()
+  // FullCalendar fires `select` on a click-drag across day cells. Use Mon–Thu as
+  // the start date so the next day is always in the same week row — the calendar
+  // uses a Sunday-first layout, so dragging Sat→Sun crosses a row boundary and the
+  // select event never fires. Use dragTo() so Playwright fires the full pointer
+  // event sequence (pointerover/pointerenter + pointerdown + pointermove + pointerup)
+  // that FullCalendar's interactionPlugin requires.
+  const start = new Date()
+  while (start.getDay() === 0 || start.getDay() >= 5) start.setDate(start.getDate() + 1)
+  const next = new Date(start); next.setDate(start.getDate() + 1)
+  const startDays = Math.round((start.getTime() - Date.now()) / 86400000)
+
+  const startCell = frame.locator(`td.fc-daygrid-day[data-date="${ymd(start)}"]`)
+  const nextCell = frame.locator(`td.fc-daygrid-day[data-date="${ymd(next)}"]`)
+  // Ensure FullCalendar has fully mounted and the daygrid cells are ready before dragging.
+  await expect(startCell).toBeVisible()
+  await expect(nextCell).toBeVisible()
+
+  const aBox = await startCell.boundingBox()
+  const bBox = await nextCell.boundingBox()
+  // Drag in the lower portion of each cell (70% down) to land below the day-number
+  // header on the day-background area where FullCalendar registers selections.
+  // sourcePosition / targetPosition are relative to the element's top-left corner.
+  await startCell.dragTo(nextCell, {
+    sourcePosition: { x: Math.floor(aBox.width / 2), y: Math.floor(aBox.height * 0.7) },
+    targetPosition: { x: Math.floor(bBox.width / 2), y: Math.floor(bBox.height * 0.7) },
+  })
 
   const modal = page.locator('.modal', { hasText: 'New event' })
   await expect(modal).toBeVisible()
@@ -53,11 +64,8 @@ test('create an event from the grid', async ({ page, request }) => {
   await modal.getByRole('button', { name: 'Create' }).click()
   await expect(modal).toBeHidden()
 
-  // A multi-day all-day event (the drag spans today->tomorrow) renders one
-  // segment per week row, so it can resolve to >1 element when the span crosses a
-  // Sat/Sun row boundary — assert the first; existence is verified via the API below.
   await expect(frame.getByText('Team standup', { exact: true }).first()).toBeVisible()
-  const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(isoDaysFromNow(-2))}&end=${encodeURIComponent(isoDaysFromNow(2))}`)
+  const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(isoDaysFromNow(startDays - 1))}&end=${encodeURIComponent(isoDaysFromNow(startDays + 3))}`)
   expect((await r.json()).events.some((e) => e.title === 'Team standup')).toBe(true)
 })
 
