@@ -31,13 +31,18 @@ test('create an event from the grid', async ({ page, request }) => {
   await gotoApp(page)
   const frame = widget(page, 'Calendar')
 
-  // FullCalendar fires `select` on a click-drag across day cells. Drag today ->
-  // tomorrow, starting in the cell BODY (below the date-number link) with a short
-  // dwell + intermediate moves so the selection reliably registers in headless.
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+  // FullCalendar fires `select` on a click-drag across day cells. Use Mon–Thu as
+  // the start date so the next day is always in the same week row — the calendar
+  // uses a Sunday-first layout, so dragging Sat→Sun crosses a row boundary and the
+  // select event never fires. Short dwell + intermediate moves ensure the selection
+  // reliably registers in headless.
+  const start = new Date()
+  while (start.getDay() === 0 || start.getDay() >= 5) start.setDate(start.getDate() + 1)
+  const next = new Date(start); next.setDate(start.getDate() + 1)
+  const startDays = Math.round((start.getTime() - Date.now()) / 86400000)
   await frame.locator('.fc-daygrid-body').scrollIntoViewIfNeeded()
-  const a = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(new Date())}"]`).boundingBox()
-  const b = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(tomorrow)}"]`).boundingBox()
+  const a = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(start)}"]`).boundingBox()
+  const b = await frame.locator(`td.fc-daygrid-day[data-date="${ymd(next)}"]`).boundingBox()
   const ay = a.y + a.height * 0.7, by = b.y + b.height * 0.7
   await page.mouse.move(a.x + a.width / 2, ay)
   await page.mouse.down()
@@ -53,11 +58,8 @@ test('create an event from the grid', async ({ page, request }) => {
   await modal.getByRole('button', { name: 'Create' }).click()
   await expect(modal).toBeHidden()
 
-  // A multi-day all-day event (the drag spans today->tomorrow) renders one
-  // segment per week row, so it can resolve to >1 element when the span crosses a
-  // Sat/Sun row boundary — assert the first; existence is verified via the API below.
   await expect(frame.getByText('Team standup', { exact: true }).first()).toBeVisible()
-  const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(isoDaysFromNow(-2))}&end=${encodeURIComponent(isoDaysFromNow(2))}`)
+  const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(isoDaysFromNow(startDays - 1))}&end=${encodeURIComponent(isoDaysFromNow(startDays + 3))}`)
   expect((await r.json()).events.some((e) => e.title === 'Team standup')).toBe(true)
 })
 
