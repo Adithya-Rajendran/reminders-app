@@ -33,17 +33,20 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
 // --- coalesce: an externally-evicted (invalidated) promise can't evict its replacement ---
 {
   const map = new Map()
-  let release1
-  const gate1 = new Promise((r) => { release1 = r }) // created eagerly — fn runs on a microtask
+  let release1, release2
+  const gate1 = new Promise((r) => { release1 = r }) // gates created eagerly — fn runs on a microtask
+  const gate2 = new Promise((r) => { release2 = r })
   const first = coalesce(map, 'k', () => gate1)
   map.delete('k') // external invalidation (e.g. invalidateUserEventCache purging in-flight reads)
-  const second = coalesce(map, 'k', async () => 'post-mutation')
+  const second = coalesce(map, 'k', () => gate2)
   ok(second !== first, 'after eviction a new call runs fresh instead of joining the stale promise')
   release1('pre-mutation')
   await first
   await tick()
-  ok(map.has('k'), 'the superseded promise settling does not delete the replacement key')
-  ok(await coalesce(map, 'k', async () => 'unused') === 'post-mutation', 'callers keep coalescing onto the replacement')
+  ok(map.has('k'), 'the superseded promise settling does not delete the still-in-flight replacement')
+  ok(coalesce(map, 'k', async () => 'unused') === second, 'callers keep coalescing onto the replacement')
+  release2('post-mutation')
+  ok(await second === 'post-mutation', 'the replacement resolves with post-mutation data')
 }
 
 // --- coalesce: distinct keys are independent ---
