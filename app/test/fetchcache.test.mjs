@@ -64,8 +64,8 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m)
   const c = createFetchCache(() => 0)
   let calls = 0
   let release
-  const gated = () => new Promise((r) => { release = r }).then(() => ++calls)
-  const p = c.cached('k', gated)
+  const gate = new Promise((r) => { release = r }) // created eagerly — the fetcher itself runs on a microtask
+  const p = c.cached('k', () => gate.then(() => ++calls))
   c.invalidate('k') // e.g. the tasks bus invalidating groups mid-fetch
   release()
   ok(await p === 1, 'the in-flight caller still gets its value')
@@ -74,8 +74,8 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m)
 {
   const c = createFetchCache(() => 0)
   let release
-  const gated = () => new Promise((r) => { release = r })
-  const p = c.cached('k', gated)
+  const gate = new Promise((r) => { release = r })
+  const p = c.cached('k', () => gate)
   c.clear() // e.g. Settings closing mid-fetch
   const p2 = c.cached('k', async () => 'fresh') // re-populated after the clear
   release('stale')

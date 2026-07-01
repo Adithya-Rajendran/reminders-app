@@ -34,7 +34,8 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
 {
   const map = new Map()
   let release1
-  const first = coalesce(map, 'k', () => new Promise((r) => { release1 = r }))
+  const gate1 = new Promise((r) => { release1 = r }) // created eagerly — fn runs on a microtask
+  const first = coalesce(map, 'k', () => gate1)
   map.delete('k') // external invalidation (e.g. invalidateUserEventCache purging in-flight reads)
   const second = coalesce(map, 'k', async () => 'post-mutation')
   ok(second !== first, 'after eviction a new call runs fresh instead of joining the stale promise')
