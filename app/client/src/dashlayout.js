@@ -147,6 +147,35 @@ export function fillBreakpoints(layouts, getConstraints) {
   return out
 }
 
+// The ultrawide tiers are DERIVED from the base on every load (fillBreakpoints
+// above) — never authoritative — so they must never be persisted: they bloat the
+// saved payload and a de-scaled copy re-saved by react-grid-layout at a narrow
+// viewport would otherwise stick and leave the next wide load half-empty.
+export const DERIVED_TIERS = ['xl', 'xxl', 'xxxl', 'xxxxl']
+export function stripDerivedTiers(layouts) {
+  const out = {}
+  for (const bp of Object.keys(layouts || {})) { if (!DERIVED_TIERS.includes(bp)) out[bp] = layouts[bp] }
+  return out
+}
+
+// Canonical signature of the PERSISTED board state: widget identity/type/group +
+// authoritative-tier placements only, ignoring stamped constraint props
+// (minW/maxW/isResizable/…), item order, and derived tiers. Lets the dashboard
+// skip no-op saves — react-grid-layout fires onLayoutChange on mount and on
+// scrollbar jitter with nothing semantically changed. Pure + node-tested.
+export function boardSignature(widgets, layouts) {
+  const byI = (a, b) => (a.i < b.i ? -1 : a.i > b.i ? 1 : 0)
+  const w = (widgets || []).map(({ i, type, group }) => ({ i, type, group: group ?? null })).sort(byI)
+  const src = stripDerivedTiers(layouts)
+  const l = {}
+  for (const bp of Object.keys(src).sort()) {
+    l[bp] = (src[bp] || [])
+      .map((it) => ({ i: it.i, x: it.x || 0, y: it.y || 0, w: it.w || 1, h: it.h || 1 }))
+      .sort(byI)
+  }
+  return JSON.stringify({ w, l })
+}
+
 // Stamp per-widget size constraints (Apple-style floors + ceilings + resize policy)
 // onto every layout item, keyed by widget type via `widgets` ({ i, type }). The
 // host (compositor) half of a Wayland xdg_toplevel / ICCCM WM_NORMAL_HINTS-style

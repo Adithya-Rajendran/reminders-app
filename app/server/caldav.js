@@ -7,6 +7,7 @@ import net from 'node:net'
 import { createDAVClient } from 'tsdav'
 import ICAL from 'ical.js'
 import { baseOf, okPut, sanitizeCalDAVError } from './util.js'
+import { coalesce, cacheDecision } from './readcache.js'
 import {
   getAccount, listAccounts, insertAccount, deleteAccount, deleteAccountById,
   upsertList, pruneLists, listsForAccount, enabledListsForAccount, setListEnabled,
@@ -442,9 +443,30 @@ function parseVevents(icsData, ctx) {
   return out
 }
 
+// ---- per-user VEVENT read cache + request coalescing ----
+// The VTODO path has had a ctag-revalidated cache since the widget-stampede fix
+// (tasks_caldav.js); this is the same recipe for events, which previously paid
+// the full upstream REPORT fan-out on EVERY call (~10s against a slow home
+// server) — and concurrent duplicates queued behind each other upstream. Within
+// EV_FRESH_TTL an entry is trusted outright; past it, a cheap Depth:0 ctag
+// PROPFIND decides whether the REPORT can be skipped. Keyed per (list, range)
+// because the REPORT is time-range-filtered. Parsed events are only ever read,
+// so sharing the arrays across responses is safe.
+const EV_FRESH_TTL = 12000
+const EV_EVICT_MS = 5 * 60_000
+const evCache = new Map() // sub -> Map<listUrl|start|end, { events, ctag, at }>
+const evInflight = new Map() // sub|start|end -> in-flight fetchEvents promise
+const evUserCache = (sub) => { let c = evCache.get(sub); if (!c) { c = new Map(); evCache.set(sub, c) } return c }
+export const invalidateUserEventCache = (sub) => evCache.delete(sub)
+// Ranges the client stopped asking about (view switches, old weeks) would pile
+// up forever; drop anything untouched for a few minutes when a user map is used.
+function evEvictStale(c) { const cut = Date.now() - EV_EVICT_MS; for (const [k, e] of c) { if (e.at < cut) c.delete(k) } }
+
 async function fetchEvents(userId, startISO, endISO) {
   const accs = await listAccounts(userId)
   const events = []
+  const c = evUserCache(userId)
+  evEvictStale(c)
   // Fan out across accounts AND lists: every calendar-query REPORT is a full
   // round-trip to the CalDAV server (~250ms+ on a typical Nextcloud), so a
   // month view over N calendars was paying N×RTT sequentially. allSettled
@@ -452,14 +474,32 @@ async function fetchEvents(userId, startISO, endISO) {
   await Promise.allSettled(accs.map(async (acc) => {
     const lists = await enabledListsForAccount(acc.id)
     if (!lists.length) return
-    let client
-    try { client = await clientFor(acc) } catch { return }
+    // Lazy so an all-fresh account costs no client discovery; a rejected client
+    // is shared and caught per list below (= the old skip-the-account behavior).
+    let clientP = null
+    const getClient = () => (clientP ||= clientFor(acc))
     await Promise.allSettled(lists.map(async (list) => {
       try {
-        const objs = await client.fetchCalendarObjects({ calendar: { url: list.url }, filters: veventFilter(startISO, endISO), fetchOptions: readFetchOptions() })
-        for (const o of objs) {
-          events.push(...parseVevents(o.data, { accountId: acc.id, listUrl: list.url, objectUrl: o.url, etag: o.etag }))
+        const key = list.url + '|' + startISO + '|' + endISO
+        const entry = c.get(key)
+        const decision = cacheDecision(entry, Date.now(), EV_FRESH_TTL)
+        if (decision === 'fresh') { events.push(...entry.events); return }
+        let knownCtag = entry?.ctag || null
+        if (decision === 'ctag') {
+          const cur = await collectionCtag(acc, list.url).catch(() => null)
+          if (cur && cur === knownCtag) { entry.at = Date.now(); events.push(...entry.events); return } // unchanged → reuse parse
+          knownCtag = cur // changed or unavailable → fall through (reseed below; null = fail open)
         }
+        const objs = await (await getClient()).fetchCalendarObjects({ calendar: { url: list.url }, filters: veventFilter(startISO, endISO), fetchOptions: readFetchOptions() })
+        const parsed = []
+        for (const o of objs) {
+          parsed.push(...parseVevents(o.data, { accountId: acc.id, listUrl: list.url, objectUrl: o.url, etag: o.etag }))
+        }
+        // Reuse the ctag the change-probe already fetched; only on a cold entry
+        // do we pay one extra PROPFIND to seed it.
+        const ctag = knownCtag != null ? knownCtag : await collectionCtag(acc, list.url).catch(() => null)
+        c.set(key, { events: parsed, ctag, at: Date.now() })
+        events.push(...parsed)
       } catch { /* skip a failing / event-incapable list */ }
     }))
   }))
@@ -561,7 +601,11 @@ export async function calendarEventsHandler(req, res) {
   const { start, end } = req.query || {}
   if (!start || !end) return res.status(400).json({ error: 'start and end are required' })
   try {
-    res.json({ events: await fetchEvents(req.session.user.sub, start, end) })
+    // Concurrent identical requests (several widgets, a reload mid-fetch) share
+    // ONE upstream fan-out instead of each queuing ~10s behind the last.
+    const sub = req.session.user.sub
+    const events = await coalesce(evInflight, sub + '|' + start + '|' + end, () => fetchEvents(sub, start, end))
+    res.json({ events })
   } catch (e) {
     console.error(sanitizeCalDAVError(e, 'fetchEvents'))
     res.status(502).json({ error: 'could not fetch calendar events' })
@@ -580,6 +624,7 @@ export async function createEventHandler(req, res) {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc) return res.status(404).json({ error: 'not found' })
     const event = await createEvent(acc, { listUrl, summary, start, end, allDay: !!allDay })
+    invalidateUserEventCache(req.session.user.sub) // the user's own edit must show on the next fetch
     res.json({ ok: true, event })
   } catch (e) {
     console.error(sanitizeCalDAVError(e, 'createEvent'))
@@ -597,6 +642,7 @@ export async function updateEventHandler(req, res) {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc) return res.status(404).json({ error: 'not found' })
     await updateEvent(acc, { objectUrl, summary, start, end, allDay })
+    invalidateUserEventCache(req.session.user.sub)
     res.json({ ok: true })
   } catch (e) {
     console.error(sanitizeCalDAVError(e, 'updateEvent'))
@@ -611,6 +657,7 @@ export async function deleteEventHandler(req, res) {
     const acc = await getAccount(req.session.user.sub, accountId)
     if (!acc) return res.status(404).json({ error: 'not found' })
     await deleteEvent(acc, { objectUrl })
+    invalidateUserEventCache(req.session.user.sub)
     res.json({ ok: true })
   } catch (e) {
     console.error(sanitizeCalDAVError(e, 'deleteEvent'))

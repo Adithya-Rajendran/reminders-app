@@ -5,6 +5,7 @@
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID, readFetchOptions } from './caldav.js'
+import { cacheDecision } from './readcache.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
 import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from './vtodo_meta.js'
@@ -66,18 +67,14 @@ const userCache = (sub) => { let c = cache.get(sub); if (!c) { c = new Map(); ca
 export const invalidateUserCache = (sub) => cache.delete(sub)
 const invalidate = invalidateUserCache
 
-// Pure decision (exported for the unit test): 'fresh' = reuse without any network,
-// 'ctag' = probe the ctag before deciding, 'report' = do the full REPORT.
-export function cacheDecision(entry, now, ttl = FRESH_TTL) {
-  if (!entry) return 'report'
-  if (now - entry.at < ttl) return 'fresh'
-  return entry.ctag ? 'ctag' : 'report'
-}
+// The pure fresh/ctag/report decision moved to readcache.js so the VEVENT cache
+// (caldav.js) shares it; re-exported here for the existing unit test's import.
+export { cacheDecision } from './readcache.js'
 
 async function fetchObjectsCached(sub, account, listUrl) {
   const c = userCache(sub)
   const entry = c.get(listUrl)
-  const decision = cacheDecision(entry, Date.now())
+  const decision = cacheDecision(entry, Date.now(), FRESH_TTL)
   if (decision === 'fresh') return entry.parsed
   let knownCtag = entry?.ctag || null
   if (decision === 'ctag') {

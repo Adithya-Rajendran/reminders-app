@@ -11,7 +11,9 @@ import { SkeletonRows, UndoBar } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
+  stripDerivedTiers, boardSignature,
 } from './dashlayout.js'
+import { appCache } from './fetchcache.js'
 import { useElementSize, WidgetSizeContext } from './useWidgetSize.js'
 import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
@@ -24,6 +26,13 @@ import {
 } from './icons.jsx'
 
 const Grid = WidthProvider(Responsive)
+
+// Group counts derive from tasks, so any task mutation drops the cached groups
+// read. Module scope on purpose: bus handlers run in subscription order, and an
+// import-time registration precedes every widget's mount-effect subscription —
+// so the widgets' own bus-driven refetch misses the cache and pulls fresh
+// counts (one coalesced request between them, not one each).
+onTasksChanged(() => appCache.invalidate('groups'))
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -69,6 +78,9 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   const [loaded, setLoaded] = useState(false)
   const [events, setEvents] = useState([])
   const saveTimer = useRef(null)
+  // boardSignature of the last board we loaded or persisted — persist() skips
+  // the PUT when nothing semantically changed (see dashlayout.boardSignature).
+  const lastSavedSig = useRef(null)
   // Set by addWidget to the id of the just-added widget; an effect (below) then
   // scrolls its freshly-rendered node into view and flashes it — a new widget is
   // appended at the bottom of the board where it's easily missed.
@@ -96,9 +108,11 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
       refresh()
       // The three boot fetches are independent — run them concurrently instead
       // of paying three sequential round-trips before the grid can render.
+      // Projects/accounts go through the shared cache: App's inbox resolve and
+      // the calendar widget ask for the same things within the same breath.
       const [prR, acctR, savedR] = await Promise.allSettled([
-        tk('/projects'),
-        api('/api/caldav/accounts'),
+        appCache.cached('projects', () => tk('/projects'), { ttl: 60_000 }),
+        appCache.cached('caldav-accounts', () => api('/api/caldav/accounts'), { ttl: 60_000 }),
         api('/api/layouts/' + dashboardId),
       ])
       let pr = prR.status === 'fulfilled' ? prR.value : []
@@ -136,26 +150,30 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         // re-saves a de-scaled copy at a narrow viewport (otherwise that sticks
         // and the next wide load shows a half-empty board). fillBreakpoints scales
         // the base up into each wide tier; narrower tiers it leaves untouched.
-        lay = { ...lay }
-        for (const bp of ['xl', 'xxl', 'xxxl', 'xxxxl']) delete lay[bp]
-        const before = Object.keys(lay).length
+        lay = stripDerivedTiers(lay)
         // Keep the ultrawide fill inside each widget's aspect band + max, so a wide
         // screen doesn't stretch widgets past a cohesive shape (it may leave a gap).
         const typeById = new Map(sw.map((w) => [w.i, w.type]))
         lay = fillBreakpoints(lay, (id) => constraintsFor(typeById.get(id)))
-        const addedBp = Object.keys(lay).length !== before
         setWidgets(sw)
         setLayouts(lay)
-        if (sw.length !== original.length || needsGrid || addedBp || remapped) {
+        // Seed the no-op-save guard with what's on the server (as we'd persist
+        // it), so react-grid-layout's mount-time onLayoutChange echo doesn't PUT
+        // an identical board back on every plain page load. Rebuilding the
+        // derived tiers is NOT a persistable change (they're stripped from every
+        // save); only real cleanups below warrant a boot write.
+        lastSavedSig.current = boardSignature(sw, lay)
+        if (sw.length !== original.length || needsGrid || remapped) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
-            body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),
+            body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: stripDerivedTiers(lay) } }),
           }).catch(() => {})
         }
       } else {
         const { widgets: def, layouts: lay } = buildDefault()
         setWidgets(def)
         setLayouts(lay)
+        lastSavedSig.current = boardSignature(def, lay)
       }
       setLoaded(true)
     })()
@@ -191,12 +209,19 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     if (!loaded) return // gate saves until after hydration (RGL footgun)
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
+      // Skip no-op saves: RGL fires onLayoutChange on mount and on modal
+      // scrollbar jitter with nothing semantically changed — each was a
+      // needless PUT + SQLite write on every page view. Derived tiers are
+      // stripped from the persisted body (they're rebuilt on every load).
+      const sig = boardSignature(nextWidgets, nextLayouts)
+      if (sig === lastSavedSig.current) return
+      lastSavedSig.current = sig
       api('/api/layouts/' + dashboardId, {
         method: 'PUT',
-        body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: nextLayouts } }),
+        body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: stripDerivedTiers(nextLayouts) } }),
       }).catch(() => {})
     }, 600)
-  }, [loaded])
+  }, [loaded, dashboardId])
 
   const onLayoutChange = (_current, all) => {
     if (!loaded) return
@@ -260,7 +285,10 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     emitChanged: emitTasksChanged, onChanged: onTasksChanged, isRealDate,
   }), [])
   const groupsCap = useMemo(() => ({
-    fetch: reminderGroups, recent: recentGroups, pushRecent: pushRecentGroup, onNewGroup,
+    // Cached: several widgets ask for groups on the same triggers (mount, tasks
+    // bus). The bus invalidation registered at module scope keeps counts fresh.
+    fetch: () => appCache.cached('groups', reminderGroups, { ttl: 30_000 }),
+    recent: recentGroups, pushRecent: pushRecentGroup, onNewGroup,
   }), [onNewGroup])
   const notesCap = useMemo(() => ({ ...notesApi, onOpenNote, emitOpenNote }), [])
   const calendarCap = useMemo(() => ({
@@ -268,7 +296,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     createEvent: (body) => api('/api/calendar/events', { method: 'POST', body: JSON.stringify(body) }),
     updateEvent: (body) => api('/api/calendar/events', { method: 'PATCH', body: JSON.stringify(body) }),
     deleteEvent: (body) => api('/api/calendar/events', { method: 'DELETE', body: JSON.stringify(body) }),
-    accounts: () => api('/api/caldav/accounts'),
+    accounts: () => appCache.cached('caldav-accounts', () => api('/api/caldav/accounts'), { ttl: 60_000 }),
   }), [])
 
   // The app slots: every interface the canvas provides, with its live value. A

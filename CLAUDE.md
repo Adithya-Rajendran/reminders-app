@@ -41,6 +41,8 @@ app/client/src/
   usePopover.js            # shared outside-click/Esc popover hook
   notetree.js, savequeue.js, notepaths.js, storage.js  # pure logic (node-tested)
   api.js                   # fetch helpers (api/tk/notesApi), 401 -> login redirect
+  fetchcache.js            # shared TTL+coalescing cache for cheap reads (projects/accounts/groups) — node-tested
+  calevents.js             # task -> FullCalendar event mapping (calendar's task overlay) — node-tested
   useTasks.js, tasklib.js  # task-list hook (optimistic updates + undo), task utils
   tasksbus.js              # cross-widget "tasks changed" event bus
   icons.jsx, styles.css    # inline SVG icons; theme tokens (light/dark + accents)
@@ -50,6 +52,7 @@ app/server/
   index.js                 # Express app: session, auth guard, route mounting
   config.js                # SQLite (layouts, dashboards, encrypted account config)
   tasks_caldav.js, caldav.js, recurrence_caldav.js  # CalDAV VTODO/VEVENT layer
+  readcache.js             # read-path primitives: request coalescing + fresh/ctag/report decision — node-tested
   vtodo.js, util.js        # shared ICS parsing + tiny helpers (node-tested)
   notes.js, webdav.js      # Markdown notes over WebDAV
   reminder_groups.js       # group <-> calendar mapping

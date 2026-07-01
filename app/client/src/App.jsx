@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, tk } from './api.js'
+import { appCache } from './fetchcache.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
@@ -246,7 +247,10 @@ export default function App() {
   const [settings, setSettings] = useState(null) // null = closed | { createGroup? }
   // Accepts an optional { createGroup } to open Settings with the group create form
   // prefilled; called as a plain onClick handler elsewhere, so ignore event args.
-  const openSettings = (opts) => setSettings({ createGroup: opts && opts.createGroup ? String(opts.createGroup) : undefined })
+  // Stable identity (useCallback): it feeds Dashboard's capability memos — a fresh
+  // function every App render cascaded into widget effects refetching on every
+  // modal open/close.
+  const openSettings = useCallback((opts) => setSettings({ createGroup: opts && opts.createGroup ? String(opts.createGroup) : undefined }), [])
   const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
   const [activeDash, setActiveDash] = useState('main')
   const [palette, setPalette] = useState(null) // null | { mode: 'notes' | 'commands' }
@@ -257,7 +261,8 @@ export default function App() {
   // task widget on the board (mirrors Dashboard's projects[0] inbox convention).
   useEffect(() => {
     if (status !== 'ready') return
-    tk('/projects').then((ps) => { const pr = Array.isArray(ps) ? ps.filter((p) => p.id > 0) : []; setInboxId(pr[0]?.id ?? null) }).catch(() => {})
+    appCache.cached('projects', () => tk('/projects'), { ttl: 60_000 })
+      .then((ps) => { const pr = Array.isArray(ps) ? ps.filter((p) => p.id > 0) : []; setInboxId(pr[0]?.id ?? null) }).catch(() => {})
   }, [status])
 
   // Create a captured task into the inbox + reconcile the shared store so any open
@@ -385,7 +390,12 @@ export default function App() {
         </div>
       )}
 
-      {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => setSettings(null)} />}
+      {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => {
+        // Settings can change accounts, projects, and groups — drop every cached
+        // read so the board refetches fresh (same freshness as before the cache).
+        appCache.clear()
+        setSettings(null)
+      }} />}
 
       {status === 'ready' && palette && (
         <CommandPalette initialMode={palette.mode} commands={paletteCommands} onClose={() => setPalette(null)} />

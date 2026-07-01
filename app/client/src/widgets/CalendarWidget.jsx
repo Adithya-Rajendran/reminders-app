@@ -5,7 +5,8 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, ZERO_DATE, isTimedDue, useModalRef, UndoBar, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, useModalRef, UndoBar, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { tasksToCalendarEvents } from '../calevents.js'
 
 // Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
 // events, so they must never appear in — let alone default — the create picker.
@@ -110,7 +111,11 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     ? { left: 'prev,next', center: 'title', right: 'today' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
 
-  const refetch = () => calRef.current?.getApi().refetchEvents()
+  // The two event sources refresh independently: task mutations only refetch the
+  // store-backed overlay (zero network), and only event CRUD refetches VEVENTs —
+  // the slowest call in the app no longer rides along on every task change.
+  const refetchTasks = () => calRef.current?.getApi().getEventSourceById('tasks')?.refetch()
+  const refetch = () => calRef.current?.getApi().getEventSourceById('vevents')?.refetch()
 
   // Optimistic event delete with a 6s Undo (re-creates the event), mirroring the
   // task list's delete→undo — no jarring native confirm().
@@ -123,46 +128,31 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     undoTimer.current = setTimeout(() => setUndo(null), 6000)
   }, [])
 
-  // Refetch when the shared task store changes — including optimistic edits made
-  // in other widgets — so the calendar's task layer stays in sync.
-  useEffect(() => tasksCap.subscribe(() => calRef.current?.getApi().refetchEvents()), [tasksCap])
+  // Refetch the task layer when the shared task store changes — including
+  // optimistic edits made in other widgets. Only that layer: the store is local,
+  // so a capture/complete elsewhere updates the calendar with zero network.
+  useEffect(() => tasksCap.subscribe(refetchTasks), [tasksCap])
 
-  // ---- merged event source: reminders/tasks (from the shared store) + CalDAV events ----
-  const loadEvents = useCallback((info, success, failure) => {
-    const start = info.startStr, end = info.endStr
-    Promise.allSettled([
-      tasksCap.ensureLoaded(),
-      calendar.listEvents(start, end),
-    ]).then(([taskRes, evRes]) => {
-      const out = []
-      // (a) reminders/tasks with a date — shown once, draggable to reschedule.
-      // (Single source: /api/tasks IS the CalDAV store, so no separate VTODO feed.)
-      // Date-only tasks go in the all-day lane (not the timed grid, which would
-      // clutter it); a task with a real time shows on the grid. Dragging a date
-      // task onto a time slot sets a real time -> persisted as a time-block.
-      if (taskRes.status === 'fulfilled') {
-        for (const t of (Array.isArray(taskRes.value) ? taskRes.value : [])) {
-          if (t.done || !t.due_date || t.due_date === ZERO_DATE) continue
-          out.push({
-            id: 'task-' + t.id, title: t.title, start: t.due_date, allDay: !isTimedDue(t.due_date), editable: true,
-            classNames: ['cal-task', 'cal-task-local'],
-            extendedProps: { kind: 'task', source: 'local', taskId: t.id, done: !!t.done },
-          })
-        }
-      }
-      // (b) CalDAV events — indigo, editable
-      if (evRes.status === 'fulfilled') {
-        for (const e of (evRes.value?.events || [])) {
-          out.push({
-            id: e.id, title: e.title, start: e.start, end: e.end, allDay: !!e.allDay,
-            classNames: ['cal-event'],
-            extendedProps: { kind: 'event', accountId: e.accountId, objectUrl: e.objectUrl, listUrl: e.listUrl, etag: e.etag },
-          })
-        }
-      }
-      success(out)
-    }).catch(failure)
-  }, [tasksCap, calendar])
+  // ---- two event sources: (a) the task overlay from the shared store, (b) CalDAV VEVENTs ----
+  // Split (was one merged source) so each refetches on its own trigger. Each half
+  // resolves to [] on failure — one failing half must not blank the other (the
+  // old allSettled behavior).
+  const taskSource = useCallback((info, success) => {
+    tasksCap.ensureLoaded().then((ts) => success(tasksToCalendarEvents(ts))).catch(() => success([]))
+  }, [tasksCap])
+  const veventSource = useCallback((info, success) => {
+    calendar.listEvents(info.startStr, info.endStr).then((r) => {
+      success((r?.events || []).map((e) => ({
+        id: e.id, title: e.title, start: e.start, end: e.end, allDay: !!e.allDay,
+        classNames: ['cal-event'],
+        extendedProps: { kind: 'event', accountId: e.accountId, objectUrl: e.objectUrl, listUrl: e.listUrl, etag: e.etag },
+      })))
+    }).catch(() => success([]))
+  }, [calendar])
+  const eventSources = useMemo(() => [
+    { id: 'tasks', events: taskSource },
+    { id: 'vevents', events: veventSource },
+  ], [taskSource, veventSource])
 
   // ---- interactions ----
   const onSelect = (arg) => {
@@ -261,7 +251,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         nowIndicator
         eventDisplay="block"
         eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
-        events={loadEvents}
+        eventSources={eventSources}
         select={onSelect}
         eventClick={onEventClick}
         eventDrop={onEventChange}

@@ -10,6 +10,12 @@ let tasks = []
 let state = 'loading' // 'loading' | 'ready' | 'error'
 let inflight = null
 let started = false
+let fetchedAt = 0 // epoch ms of the last successful refresh
+// How recent a successful load must be for the first subscriber to skip its own
+// refresh. Covers the gap between Dashboard's boot warm and the first widget
+// mount (~200ms in practice) — the in-flight dedupe alone can't, because the
+// boot fetch has usually resolved by then.
+const FRESH_MS = 5000
 const subscribers = new Set()
 
 const notify = () => { for (const fn of subscribers) { try { fn() } catch { /* a dead subscriber must not break the others */ } } }
@@ -28,6 +34,7 @@ export function refresh() {
       const all = await tk('/tasks?per_page=250')
       tasks = Array.isArray(all) ? all : []
       state = 'ready'
+      fetchedAt = Date.now()
     } catch { state = 'error' }
     finally { inflight = null }
     notify()
@@ -64,7 +71,9 @@ export function subscribe(fn) {
     // store reconciles optimistic edits with server truth — the same contract
     // the per-widget hooks used to have, now centralized.
     onTasksChanged(() => { clearTimeout(busTimer); busTimer = setTimeout(refresh, 250) })
-    refresh()
+    // Skip the mount-time duplicate /api/tasks when the boot warm already
+    // delivered a fresh list; a stale or failed load still refetches.
+    if (state !== 'ready' || Date.now() - fetchedAt > FRESH_MS) refresh()
   }
   return () => subscribers.delete(fn)
 }
