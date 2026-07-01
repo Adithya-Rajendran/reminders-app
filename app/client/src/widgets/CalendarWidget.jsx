@@ -139,15 +139,28 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const taskSource = useCallback((info, success) => {
     tasksCap.ensureLoaded().then((ts) => success(tasksToCalendarEvents(ts))).catch(() => success([]))
   }, [tasksCap])
-  const veventSource = useCallback((info, success) => {
+  const veventSource = useCallback((info, success, failure) => {
     calendar.listEvents(info.startStr, info.endStr).then((r) => {
       success((r?.events || []).map((e) => ({
         id: e.id, title: e.title, start: e.start, end: e.end, allDay: !!e.allDay,
         classNames: ['cal-event'],
         extendedProps: { kind: 'event', accountId: e.accountId, objectUrl: e.objectUrl, listUrl: e.listUrl, etag: e.etag },
       })))
-    }).catch(() => success([]))
+      // A transient failure keeps the previously-rendered events on screen
+      // (failure(), not success([]) — which would blank the layer until the
+      // next CRUD or view change now that task mutations no longer refetch it).
+    }).catch(failure)
   }, [calendar])
+
+  // Recovery + cross-device freshness for the vevents layer: task mutations used
+  // to (wastefully) refetch it many times a session; now that they don't, pick
+  // up remote edits / heal a failed fetch when the user returns to the tab. The
+  // server's ctag-revalidated cache makes this near-free.
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) refetch() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
   const eventSources = useMemo(() => [
     { id: 'tasks', events: taskSource },
     { id: 'vevents', events: veventSource },

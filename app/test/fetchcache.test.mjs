@@ -59,6 +59,31 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m)
   ok(calls === 6, 'clear() drops everything')
 }
 
+// --- invalidate()/clear() during an in-flight fetch wins over the late resolution ---
+{
+  const c = createFetchCache(() => 0)
+  let calls = 0
+  let release
+  const gated = () => new Promise((r) => { release = r }).then(() => ++calls)
+  const p = c.cached('k', gated)
+  c.invalidate('k') // e.g. the tasks bus invalidating groups mid-fetch
+  release()
+  ok(await p === 1, 'the in-flight caller still gets its value')
+  ok(await c.cached('k', async () => ++calls) === 2, 'the settled value was NOT resurrected — the next call fetches fresh')
+}
+{
+  const c = createFetchCache(() => 0)
+  let release
+  const gated = () => new Promise((r) => { release = r })
+  const p = c.cached('k', gated)
+  c.clear() // e.g. Settings closing mid-fetch
+  const p2 = c.cached('k', async () => 'fresh') // re-populated after the clear
+  release('stale')
+  await p
+  ok(await c.cached('k', async () => 'later') === 'fresh', 'a superseded fetch cannot evict or overwrite its replacement')
+  ok(await p2 === 'fresh', 'the replacement kept its own value')
+}
+
 // --- different keys are independent ---
 {
   const c = createFetchCache(() => 0)

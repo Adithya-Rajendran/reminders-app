@@ -14,12 +14,16 @@ export function createFetchCache(now = Date.now) {
       if (e.promise) return e.promise
       if (now() - e.at < ttl) return e.value
     }
-    const p = Promise.resolve().then(fetcher).then(
-      (value) => { entries.set(key, { at: now(), value }); return value },
-      (err) => { entries.delete(key); throw err },
+    // Both settle paths check the entry still owns the key: an invalidate()/
+    // clear() while the fetch is in flight must win — otherwise the late
+    // resolution would resurrect a stale value for a full TTL.
+    const entry = { promise: null }
+    entry.promise = Promise.resolve().then(fetcher).then(
+      (value) => { if (entries.get(key) === entry) entries.set(key, { at: now(), value }); return value },
+      (err) => { if (entries.get(key) === entry) entries.delete(key); throw err },
     )
-    entries.set(key, { promise: p })
-    return p
+    entries.set(key, entry)
+    return entry.promise
   }
   // Drop a key or a key prefix ('' clears everything, like clear()).
   function invalidate(prefix = '') {

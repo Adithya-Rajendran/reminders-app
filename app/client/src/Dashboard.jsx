@@ -167,7 +167,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
             body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: stripDerivedTiers(lay) } }),
-          }).catch(() => {})
+          }).catch(() => { lastSavedSig.current = null }) // failed migration save -> the next real change re-persists it
         }
       } else {
         const { widgets: def, layouts: lay } = buildDefault()
@@ -219,7 +219,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
       api('/api/layouts/' + dashboardId, {
         method: 'PUT',
         body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: stripDerivedTiers(nextLayouts) } }),
-      }).catch(() => {})
+      }).catch(() => { lastSavedSig.current = null }) // failed save -> next layout event retries instead of no-op-skipping
     }, 600)
   }, [loaded, dashboardId])
 

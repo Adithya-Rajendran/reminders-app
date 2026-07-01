@@ -12,8 +12,10 @@ export function coalesce(map, key, fn) {
   const p = Promise.resolve().then(fn)
   map.set(key, p)
   // Release via .then(onDone, onDone) rather than .finally() — .finally would
-  // mint a second rejected promise nobody awaits (an unhandledRejection).
-  const done = () => map.delete(key)
+  // mint a second rejected promise nobody awaits (an unhandledRejection). The
+  // identity check keeps a superseded promise (evicted early by an external
+  // invalidation) from deleting its replacement when it finally settles.
+  const done = () => { if (map.get(key) === p) map.delete(key) }
   p.then(done, done)
   return p
 }

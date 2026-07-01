@@ -297,6 +297,7 @@ export async function addAccountHandler(req, res) {
     }
     await insertAccount(acc)
     const lists = await discover(acc)
+    invalidateUserEventCache(req.session.user.sub) // account set changed → cached events are suspect
     res.json({ account: acctPublic(acc, lists) })
   } catch (e) {
     if (acc) await deleteAccountById(acc.id).catch(() => {})
@@ -309,7 +310,9 @@ export async function discoverHandler(req, res) {
   try {
     const acc = await getAccount(req.session.user.sub, req.params.id)
     if (!acc) return res.status(404).json({ error: 'not found' })
-    res.json({ lists: await discover(acc) })
+    const lists = await discover(acc)
+    invalidateUserEventCache(req.session.user.sub) // list set may have changed
+    res.json({ lists })
   } catch (e) {
     console.error(sanitizeCalDAVError(e, 'discover'))
     res.status(400).json({ error: 'Discovery failed — check the connection.' })
@@ -322,6 +325,7 @@ export async function setListsHandler(req, res, next) {
     if (!acc) return res.status(404).json({ error: 'not found' })
     const enabled = new Set(Array.isArray(req.body?.enabled) ? req.body.enabled : [])
     for (const l of await listsForAccount(acc.id)) await setListEnabled(acc.id, l.url, enabled.has(l.url))
+    invalidateUserEventCache(req.session.user.sub) // enabled-list set changed
     res.json({ ok: true, lists: await listsForAccount(acc.id) })
   } catch (e) { next(e) }
 }
@@ -329,6 +333,7 @@ export async function setListsHandler(req, res, next) {
 export async function deleteAccountHandler(req, res, next) {
   try {
     await deleteAccount(req.session.user.sub, req.params.id)
+    invalidateUserEventCache(req.session.user.sub) // never serve events under a dead account id
     res.json({ ok: true })
   } catch (e) { next(e) }
 }
@@ -454,10 +459,17 @@ function parseVevents(icsData, ctx) {
 // so sharing the arrays across responses is safe.
 const EV_FRESH_TTL = 12000
 const EV_EVICT_MS = 5 * 60_000
-const evCache = new Map() // sub -> Map<listUrl|start|end, { events, ctag, at }>
+const evCache = new Map() // sub -> Map<accountId|listUrl|start|end, { events, ctag, at }>
 const evInflight = new Map() // sub|start|end -> in-flight fetchEvents promise
 const evUserCache = (sub) => { let c = evCache.get(sub); if (!c) { c = new Map(); evCache.set(sub, c) } return c }
-export const invalidateUserEventCache = (sub) => evCache.delete(sub)
+// Drop the cache AND the user's in-flight reads: a post-mutation refetch that
+// coalesced onto a pre-mutation fetch would otherwise return a snapshot missing
+// the user's own edit (the fetch itself isn't cancelled — it writes into its
+// now-orphaned map and is garbage-collected).
+export const invalidateUserEventCache = (sub) => {
+  evCache.delete(sub)
+  for (const k of evInflight.keys()) { if (k.startsWith(sub + '|')) evInflight.delete(k) }
+}
 // Ranges the client stopped asking about (view switches, old weeks) would pile
 // up forever; drop anything untouched for a few minutes when a user map is used.
 function evEvictStale(c) { const cut = Date.now() - EV_EVICT_MS; for (const [k, e] of c) { if (e.at < cut) c.delete(k) } }
@@ -480,7 +492,11 @@ async function fetchEvents(userId, startISO, endISO) {
     const getClient = () => (clientP ||= clientFor(acc))
     await Promise.allSettled(lists.map(async (list) => {
       try {
-        const key = list.url + '|' + startISO + '|' + endISO
+        // acc.id is part of the key because cached events carry it (the client
+        // round-trips it into event CRUD): after an account is deleted and
+        // re-added, entries keyed by URL alone would ctag-revalidate cleanly and
+        // keep serving the DEAD account id, 404-ing every edit.
+        const key = acc.id + '|' + list.url + '|' + startISO + '|' + endISO
         const entry = c.get(key)
         const decision = cacheDecision(entry, Date.now(), EV_FRESH_TTL)
         if (decision === 'fresh') { events.push(...entry.events); return }

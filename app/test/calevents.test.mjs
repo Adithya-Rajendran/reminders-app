@@ -26,11 +26,13 @@ ok(tasksToCalendarEvents(null).length === 0 && tasksToCalendarEvents(undefined).
 
 // --- all-day vs timed lane (local-time midnight = date-only -> all-day lane) ---
 {
-  const midnightLocal = new Date(); midnightLocal.setHours(0, 0, 0, 0)
+  // Pinned, transition-free local date (mid-July): constructing "today" would
+  // break in zones whose DST spring-forward skips midnight on the run day.
+  const midnightLocal = new Date(2026, 6, 15)
   const [dateOnly] = tasksToCalendarEvents([t({ due_date: midnightLocal.toISOString() })])
   ok(dateOnly.allDay === true, 'a date-only (local midnight) task goes to the all-day lane')
-  const nineAm = new Date(); nineAm.setHours(9, 30, 0, 0)
-  const [timed] = tasksToCalendarEvents([t({ due_date: nineAm.toISOString() })])
+  const nineThirty = new Date(2026, 6, 15, 9, 30)
+  const [timed] = tasksToCalendarEvents([t({ due_date: nineThirty.toISOString() })])
   ok(timed.allDay === false, 'a task with a real time shows on the timed grid')
 }
 
