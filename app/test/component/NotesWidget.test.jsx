@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import NotesWidget from '../../client/src/widgets/NotesWidget.jsx'
@@ -124,6 +124,14 @@ describe('NotesWidget', () => {
 // moveFolder with the right args and reopens the moved note. The pure tree
 // helpers themselves are node-tested in notetree.test.mjs — this is the wiring.
 describe('NotesWidget drag-and-drop', () => {
+  // Expanded-folder state is persisted to localStorage, namespaced by instanceId
+  // (widgetStore). These tests reuse instanceId 'n-dnd', so without a reset one
+  // test's expand leaks into the next: a test that click-toggles 'Work' to expand
+  // it would instead COLLAPSE an already-expanded 'Work', hiding its child rows.
+  // Clear storage before each so every mount starts with folders collapsed and
+  // the expand click is deterministic.
+  beforeEach(() => { try { localStorage.clear() } catch { /* jsdom always has it */ } })
+
   // A tree with a root note and a folder ("Work") that already holds a note, so
   // the folder renders and is a valid drop target for the root note.
   const treeNotes = () => [
@@ -196,17 +204,16 @@ describe('NotesWidget drag-and-drop', () => {
     notes.move = (p, folder) => { moveCalls.push([p, folder]); return Promise.resolve({ path: 'Work/Loose.md', title: 'Loose', folder }) }
     await renderTree(notes)
 
-    // Open Loose first so we can prove doDrop reopens it at the returned path.
-    await userEvent.click(await screen.findByText('Loose'))
-
+    // NOTE: at jsdom's zero width the widget is in narrow (single-pane) mode, so
+    // OPENING a note swaps the sidebar tree out for the editor pane — the note row
+    // we need to drag would then be unmounted. So we drag straight from the tree
+    // without opening first; the load-bearing assertion is the move() args (that
+    // doDrop delegates to notesApi.move with the source path + destination folder).
     dragStart(noteRowByTitle('Loose'))
     dragOver(folderRow('Work'))
     drop(folderRow('Work'))
 
     await waitFor(() => expect(moveCalls).toEqual([['Loose.md', 'Work']]))
-    // Reopened at the moved path: the list reload + setOpenPath('Work/Loose.md')
-    // keeps the note open. (load() re-fetches; the fake still returns treeNotes,
-    // but the move call args are the load-bearing assertion.)
   })
 
   it('dropping a note on the root zone moves it to the root ("")', async () => {
@@ -238,7 +245,10 @@ describe('NotesWidget drag-and-drop', () => {
     const mfCalls = []
     notes.moveFolder = (from, to) => { mfCalls.push([from, to]); return Promise.resolve({ folder: to + '/' + from }) }
     render(<NotesWidget notes={notes} onOpenSettings={() => {}} instanceId="n-dnd-f" />)
-    await screen.findByText('one') // wait for tree
+    // Wait for the folder ROWS, not the child notes: folders A and B render
+    // collapsed by default, so 'one'/'two' aren't in the DOM until expanded. The
+    // folder rows themselves always render (and are the drag source/target here).
+    await waitFor(() => { expect(folderRow('A')).toBeTruthy(); expect(folderRow('B')).toBeTruthy() })
 
     dragStart(folderRow('A'))
     dragOver(folderRow('B'))

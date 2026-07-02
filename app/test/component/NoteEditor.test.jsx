@@ -52,9 +52,12 @@ const { default: NoteEditor } = await import('../../client/src/NoteEditor.jsx')
 
 // Load the note (async get) and reach the ready state where the body textarea
 // mounts. Uses real timers; the caller switches to fake timers afterward.
+// Returns { textarea, rerender } so a test can re-render with new props (e.g. a
+// freshly-arrived extEtag) after the load has settled.
 async function mountReady(props = {}) {
-  render(<NoteEditor inline path="Alpha.md" notes={[]} {...props} />)
-  return screen.findByLabelText('note body')
+  const { rerender } = render(<NoteEditor inline path="Alpha.md" notes={[]} {...props} />)
+  const textarea = await screen.findByLabelText('note body')
+  return { textarea, rerender }
 }
 
 // The autosave debounce is 700ms (NoteEditor.onBody). Advance fake timers past it
@@ -73,7 +76,7 @@ describe('NoteEditor autosave', () => {
   afterEach(() => { vi.useRealTimers() })
 
   it('debounces a body edit and PUTs once after 700ms with the loaded etag', async () => {
-    const textarea = await mountReady()
+    const { textarea } = await mountReady()
     vi.useFakeTimers()
 
     await typeAndSettle(textarea, 'hello world')
@@ -86,7 +89,7 @@ describe('NoteEditor autosave', () => {
   })
 
   it('does not PUT before the debounce elapses', async () => {
-    const textarea = await mountReady()
+    const { textarea } = await mountReady()
     vi.useFakeTimers()
 
     await act(async () => { fireEvent.change(textarea, { target: { value: 'partial' } }) })
@@ -95,7 +98,7 @@ describe('NoteEditor autosave', () => {
   })
 
   it('applies the returned etag so a SECOND edit sends the NEW etag (no false 409)', async () => {
-    const textarea = await mountReady()
+    const { textarea } = await mountReady()
     vi.useFakeTimers()
 
     await typeAndSettle(textarea, 'first edit')
@@ -110,7 +113,7 @@ describe('NoteEditor autosave', () => {
   })
 
   it('surfaces the conflict banner on a 409 and does not auto-retry', async () => {
-    const textarea = await mountReady()
+    const { textarea } = await mountReady()
     vi.useFakeTimers()
     // Make the save 409 (etag conflict). The status field is how the queue/editor
     // distinguish a conflict from a generic network error.
@@ -131,7 +134,7 @@ describe('NoteEditor autosave', () => {
   })
 
   it('a NON-409 save error shows the generic "Save failed" retry chip', async () => {
-    const textarea = await mountReady()
+    const { textarea } = await mountReady()
     vi.useFakeTimers()
     server.saveImpl = () => { const e = new Error('network'); e.status = 500; return Promise.reject(e) }
 
@@ -145,7 +148,19 @@ describe('NoteEditor autosave', () => {
   it('applies an externally-supplied etag (extEtag) so the next save uses it', async () => {
     // A host action (pin from the tree menu) rewrites the open note server-side and
     // hands the editor the fresh etag via extEtag; the next autosave must send it.
-    const textarea = await mountReady({ extEtag: { path: 'Alpha.md', etag: 'etag-ext' } })
+    //
+    // extEtag arrives AFTER the note is already open — that's the real sequence
+    // (the pin acts on the loaded note). Supplying it at mount would be clobbered
+    // by the async load's own setEtag('etag-0'), which resolves later. So mount
+    // first, let the load settle, THEN re-render with the fresh extEtag so its
+    // effect (keyed on the extEtag prop) fires against the already-loaded path.
+    const { textarea, rerender } = await mountReady()
+    // Push the new etag in as a fresh object so the [extEtag] effect re-runs; flush
+    // its microtask so etagRef is updated before the next save reads it.
+    await act(async () => {
+      rerender(<NoteEditor inline path="Alpha.md" notes={[]} extEtag={{ path: 'Alpha.md', etag: 'etag-ext' }} />)
+      await Promise.resolve()
+    })
     vi.useFakeTimers()
 
     await typeAndSettle(textarea, 'edit after external pin')
