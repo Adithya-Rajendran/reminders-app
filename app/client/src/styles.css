@@ -688,12 +688,7 @@ body {
 .source-tag .sdot { width: 7px; height: 7px; border-radius: 50%; }
 
 /* ---------- Calendar widget ---------- */
-.cal { display: flex; flex-direction: column; height: 100%; }
-.cal-toolbar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 8px 10px;
-  flex-wrap: wrap;
-}
+/* Calendar-widget CSS (.cal-*) is co-located in widgets/CalendarWidget.css. */
 .seg {
   display: inline-flex;
   background: var(--panel2);
@@ -712,10 +707,6 @@ body {
 }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--accent-grad); color: #fff; box-shadow: 0 2px 8px -3px var(--accent); }
-.cal-nav { display: flex; align-items: center; gap: 4px; }
-.cal-period { font-size: 14px; font-weight: 700; min-width: 0; }
-
-.cal-body { flex: 1; overflow: auto; padding: 0 8px 8px; min-height: 0; }
 
 /* month grid */
 .month { display: flex; flex-direction: column; height: 100%; }
@@ -987,90 +978,10 @@ body {
 /* No hover on touch — keep the resize cue at full strength so it's discoverable. */
 @media (hover: none) { .react-grid-item > .react-resizable-handle-se::after { opacity: 1; } }
 
-/* ============================================================
-   FullCalendar v6 — themed via FC CSS vars + scoped overrides.
-   Colors re-pointed to the shared design tokens (theme-aware).
-   ============================================================ */
-.cal-wrap { height: 100%; }
-.cal-wrap .fc {
-  --fc-page-bg-color: transparent;
-  --fc-border-color: var(--line);
-  --fc-neutral-bg-color: var(--panel2);
-  --fc-today-bg-color: var(--accent-soft);
-  --fc-now-indicator-color: var(--danger);
-  --fc-list-event-hover-bg-color: var(--panel2);
-  --fc-event-bg-color: var(--accent);
-  --fc-event-border-color: var(--accent);
-  --fc-event-text-color: #fff;
-  height: 100%; color: var(--text); font: inherit;
-}
-.cal-wrap .fc a { color: inherit; text-decoration: none; }
-.cal-wrap .fc-theme-standard td,
-.cal-wrap .fc-theme-standard th,
-.cal-wrap .fc-theme-standard .fc-scrollgrid { border-color: var(--line); }
-
-/* Toolbar */
-.cal-wrap .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
-.cal-wrap .fc .fc-toolbar-title { font-size: 15px; font-weight: 650; color: var(--text); }
-
-/* Toolbar buttons */
-.cal-wrap .fc .fc-button {
-  background: var(--panel2); border: 1px solid var(--line-strong); color: var(--text);
-  font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 9px;
-  box-shadow: none; text-transform: capitalize; transition: filter .15s, background .15s;
-}
-.cal-wrap .fc .fc-button:hover { filter: brightness(1.15); }
-.cal-wrap .fc .fc-button:focus,
-.cal-wrap .fc .fc-button-primary:focus { box-shadow: none; outline: none; }
-.cal-wrap .fc .fc-button-primary:not(:disabled):focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
-.cal-wrap .fc .fc-button-primary:disabled { opacity: .5; }
-.cal-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
-.cal-wrap .fc .fc-button-primary:not(:disabled):active {
-  background: var(--accent-grad);
-  border-color: transparent; color: #fff;
-}
-.cal-wrap .fc .fc-button-group > .fc-button { border-radius: 0; }
-.cal-wrap .fc .fc-button-group > .fc-button:first-child { border-top-left-radius: 9px; border-bottom-left-radius: 9px; }
-.cal-wrap .fc .fc-button-group > .fc-button:last-child { border-top-right-radius: 9px; border-bottom-right-radius: 9px; }
-
-/* Headers, day numbers, axis labels */
-.cal-wrap .fc th { padding: 6px 0; }
-.cal-wrap .fc .fc-col-header-cell-cushion,
-.cal-wrap .fc .fc-daygrid-day-number,
-.cal-wrap .fc .fc-timegrid-axis-cushion,
-.cal-wrap .fc .fc-timegrid-slot-label-cushion,
-.cal-wrap .fc .fc-list-day-text,
-.cal-wrap .fc .fc-list-day-side-text { color: var(--muted); font-size: 12px; }
-.cal-wrap .fc .fc-day-today .fc-daygrid-day-number { color: var(--text); font-weight: 700; }
-.cal-wrap .fc .fc-daygrid-more-link { color: var(--accent); }
-
-/* Event chips */
-.cal-wrap .fc .fc-event {
-  border-radius: 6px; padding: 1px 5px; font-size: 11.5px; font-weight: 600;
-  cursor: pointer; border: 1px solid transparent; overflow: hidden;
-}
-.cal-wrap .fc .fc-event .fc-event-main,
-.cal-wrap .fc .fc-event .fc-event-time,
-.cal-wrap .fc .fc-event .fc-event-title { color: inherit; }
-.cal-wrap .fc .cal-event { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, transparent); color: var(--accent); }
-.cal-wrap .fc .cal-task { cursor: default; }
-.cal-wrap .fc .cal-task-local { background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 50%, transparent); color: var(--green); }
-.cal-wrap .fc .cal-task-caldav { background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 50%, transparent); color: var(--warn); }
-
-/* List / agenda view */
-.cal-wrap .fc .fc-list { border-color: var(--line); }
-.cal-wrap .fc .fc-list-day-cushion { background: var(--panel2); }
-.cal-wrap .fc .fc-list-event:hover td { background: var(--panel2); }
-.cal-wrap .fc .fc-list-event-title, .cal-wrap .fc .fc-list-event-time { color: var(--text); }
-.cal-wrap .fc .fc-list-empty { background: transparent; color: var(--muted); }
-
-/* "more" popover */
-.cal-wrap .fc .fc-popover { background: var(--panel-solid); border: 1px solid var(--line-strong); box-shadow: var(--shadow); }
-.cal-wrap .fc .fc-popover-header { background: var(--panel2); color: var(--text); }
+/* FullCalendar v6 theming (.cal-wrap …) is co-located in widgets/CalendarWidget.css. */
 
 /* Calendar widget / EventModal helpers */
 .allday-row { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text); cursor: pointer; user-select: none; }
-.cal-modal { width: 480px; max-width: 100%; }
 .field-row { display: flex; gap: 12px; }
 .field-row .field { flex: 1; min-width: 0; }
 .err { color: var(--danger); font-size: 12.5px; background: var(--danger-soft); border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent); padding: 8px 11px; border-radius: 10px; }
@@ -1212,7 +1123,6 @@ body {
 .rem-add .due-chip { flex: 0 0 auto; white-space: nowrap; }
 .rem-add .iconbtn.sm { flex: 0 0 auto; }
 .rem-err { color: var(--danger); font-size: 12px; padding: 0 10px 8px; }
-.rem-group-sec + .rem-group-sec { margin-top: 6px; }
 /* collapsible group header (minimize tab) */
 button.rem-head { display: flex; align-items: center; width: 100%; border: 0; cursor: pointer; font: inherit; z-index: 1; }
 button.rem-head:hover .g-title { color: var(--accent); }
@@ -1221,15 +1131,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
 .up-overdue > .up-head .g-title { color: var(--danger, #e5484d); }
-.rem-sortbar { display: flex; justify-content: flex-end; padding: 2px 8px 0; }
-.rem-sortbar .chip { cursor: pointer; }
 /* a widget whose lazy chunk failed to load (e.g. a stale tab after a deploy) */
 .widget-load-err { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 100%; min-height: 100px; padding: 20px; text-align: center; }
-
-/* Calendar: trimmed toolbar when the widget is narrow. */
-.cal-compact .fc-toolbar-title { font-size: 14px; }
-.cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
-.cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
 
 /* The dashboard canvas fills the display by default (--canvas-max: none). The
    grid measures .grid-wrap, so on ultra-wide screens the breakpoint ladder in
@@ -1263,49 +1166,16 @@ button.rem-head:hover .g-title { color: var(--accent); }
 }
 
 /* ---------- Notes widget + editor ---------- */
-.notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-/* folder-tree sidebar layout */
-.notes-widget.tree { flex-direction: row; gap: 0; }
-.notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
-.notes-widget.tree .notes-main { padding-left: 10px; }
-.notes-main .iconbtn.on { color: var(--accent); background: var(--accent-soft); }
-.notes-tree { width: 175px; flex: none; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); padding-right: 4px; }
-.notes-widget.tree.compact { flex-direction: column; }
-.notes-widget.tree.compact .notes-main { padding-left: 0; }
-.notes-widget.tree.compact .notes-tree { width: auto; border-right: none; border-bottom: 1px solid var(--line); max-height: 45%; margin-bottom: 6px; padding-right: 0; }
-.tree-head { display: flex; align-items: center; gap: 4px; padding: 2px 6px 6px; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-.tree-head-actions { margin-left: auto; display: flex; }
-.tree-row { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); white-space: nowrap; transition: background .12s ease, box-shadow .12s ease; }
-.tree-row:hover { background: var(--accent-soft); }
-.tree-row.sel { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.tree-row .ic { flex: none; opacity: .85; }
+/* NotesWidget-only classes (.notes-widget/.notes-tree/.tree-row/…) are co-located
+   in widgets/NotesWidget.css. .tree-chev stays here — Backlinks.jsx uses it too. */
 .tree-chev { flex: none; opacity: .65; transition: transform .12s; }
 .tree-chev.open { transform: rotate(90deg); }
-.tree-chev-pad { width: 12px; flex: none; }
-.tree-name { overflow: hidden; text-overflow: ellipsis; }
-.tree-empty { color: var(--muted); font-size: 11px; padding: 6px; }
-/* Obsidian-style explorer: single-pane file tree (folders + notes) */
-.notes-explorer { flex-direction: column; }
-.notes-explorer .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
-.tree-count { margin-left: auto; font-size: 10px; color: var(--muted); opacity: .8; padding-left: 6px; }
-.tree-row.tree-note { color: var(--text); }
-.tree-row.tree-note .ic { opacity: .6; }
-.tree-row.tree-note:hover { background: var(--accent-soft); }
-.tree-note .tree-name { flex: 1; min-width: 0; }
-.tree-section { margin-bottom: 2px; }
-.tree-pin-mark { color: var(--warn); flex: none; opacity: .9; }
-.tree-row-menu { flex: none; background: none; border: none; color: var(--faint); cursor: pointer; padding: 1px; margin: -2px 0; border-radius: 5px; display: inline-flex; opacity: 0; transition: opacity .12s; }
-.tree-row:hover .tree-row-menu, .tree-row:focus-within .tree-row-menu { opacity: 1; }
-.tree-row-menu:hover { color: var(--text); background: var(--accent-soft); }
 .note-ctx-menu { min-width: 190px; animation: menuIn 140ms ease; }
 .note-ctx-title { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 700; color: var(--text); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 
 /* New-from-template dropdown + Trash entry */
 .note-tpl { position: relative; display: inline-flex; }
 .note-tpl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; animation: menuIn 150ms ease; }
-.notes-trash-btn { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px; width: 100%; text-align: left; background: none; border: none; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; cursor: pointer; }
-.notes-trash-btn:hover, .notes-trash-btn.on { color: var(--text); }
-.notes-trash-btn .ic { color: var(--faint); }
 
 /* Trash view (main pane) */
 .trash-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -1317,7 +1187,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .trash-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .trash-row-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .trash-row-sub { font-size: 11.5px; color: var(--muted); }
-.tree-note-folder { margin-left: auto; font-size: 10px; color: var(--muted); padding-left: 6px; white-space: nowrap; }
 .note-tag.mini { font-size: 9.5px; padding: 0 5px; line-height: 1.5; }
 .note-toolbar { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
 .note-search { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--text); font-size: 13px; outline: none; }
@@ -1334,8 +1203,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Full-text "Found in contents" results under the sidebar search */
 .note-search-head { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 10px 8px 4px; }
-.tree-row.note-hit { align-items: flex-start; height: auto; padding-top: 5px; padding-bottom: 5px; }
-.tree-row.note-hit > .ic { margin-top: 2px; }
 .note-hit-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .note-hit-snip { font-size: 11px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .note-hit-snip mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; font-weight: 600; }
@@ -1430,34 +1297,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-info-bar span:not(:first-child)::before { content: '·'; margin: 0 8px; color: var(--faint); }
 .note-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 
-/* Split workspace: tree sidebar + note open in the main pane (Obsidian/VSCode). */
-.notes-split { flex-direction: row; gap: 0; align-items: stretch; }
-.notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
-.notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
-.notes-split .notes-main { padding-left: 12px; }
-/* On a very wide widget, give the tree more room so deep paths don't truncate. */
-.notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
-.notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
-.notes-main-empty .state-ic { margin-bottom: 4px; }
-.notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
 /* Inline editor pane — same chrome as the modal editor, sized to fill the pane. */
 .note-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .note-pane .note-edit-head { padding: 2px 2px 10px; border-bottom: 1px solid var(--line); background: none; }
 .note-pane .note-title-input { font-size: 16px; }
 .note-pane .note-edit-meta { padding: 8px 2px; background: none; }
 .note-pane .note-edit-body { flex: 1; min-height: 0; }
-.notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; padding: 2px 4px 8px; }
-.notes-back:hover { color: var(--text); }
-.tree-row.tree-note.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
-/* drag & drop: highlight the folder (or root) a note/folder will drop into */
-.tree-row[draggable="true"] { cursor: grab; }
-.tree-row[draggable="true"]:active { cursor: grabbing; }
-.tree-row.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.notes-tree.drag-over-root { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 8px; }
-/* Narrow widget: collapse to a single master-detail column. */
-.notes-split.narrow { flex-direction: column; }
-.notes-split.narrow .notes-sidebar { width: auto; flex: 1; border-right: none; padding-right: 0; }
-.notes-split.narrow .notes-main { padding-left: 0; }
 
 /* Themed prompt dialog (replaces window.prompt). */
 .prompt-overlay { align-items: center; justify-content: center; }
@@ -1832,9 +1677,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Quick-add: syntax nudge while typing, before any token parses. */
 .qa-preview-hint { color: var(--faint); font-size: 11.5px; }
-
-/* Calendar task chips: dragging is their one interaction — show it. */
-.cal-task { cursor: grab; }
 
 /* Triage: overflow indicator when more tasks need triage than the queue shows. */
 .tri-more { font-size: 12px; color: var(--muted); padding: 4px 2px; }

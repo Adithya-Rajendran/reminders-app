@@ -3,7 +3,7 @@
 // declared `plugs` (manifest.js) is validated against the app interface catalog
 // (connections.js), so a typo'd / retired / unsatisfiable interface fails CI
 // instead of silently dropping a widget at runtime.
-import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD } from '../client/src/widgets/manifest.js'
+import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetConfig } from '../client/src/widgets/manifest.js'
 import { APP_INTERFACES, resolveConnections, normalizePlugs } from '../client/src/connections.js'
 import { DEFAULT_SIZE } from '../client/src/dashlayout.js'
 
@@ -94,6 +94,66 @@ for (const m of WIDGET_MANIFEST) {
     ok(Array.isArray(m.resizeHandles) && m.resizeHandles.length > 0 && m.resizeHandles.every((h) => VALID_HANDLES.has(h)),
       `${m.type}: resizeHandles is a non-empty subset of the 8 valid handles`)
   }
+}
+
+// --- optional per-instance `config` schemas (rendered as a generic form, saved
+//     as w.config, delivered to the widget as the merged `config` prop) ---
+const CONFIG_TYPES = new Set(['number', 'boolean', 'select', 'text'])
+for (const m of WIDGET_MANIFEST) {
+  if (m.config === undefined) continue
+  ok(Array.isArray(m.config), `${m.type}: config is an array of field descriptors`)
+  const keys = new Set()
+  for (const f of (m.config || [])) {
+    ok(f && typeof f.key === 'string' && f.key, `${m.type}: config field has a non-empty key`)
+    ok(typeof f.label === 'string' && f.label, `${m.type}: config field "${f.key}" has a label`)
+    ok(CONFIG_TYPES.has(f.type), `${m.type}: config field "${f.key}" has a known type (got: ${f.type})`)
+    ok(f.default !== undefined, `${m.type}: config field "${f.key}" declares a default`)
+    ok(!keys.has(f.key), `${m.type}: config key "${f.key}" is unique within the widget`)
+    keys.add(f.key)
+    if (f.type === 'number') {
+      if (f.min !== undefined) ok(typeof f.min === 'number', `${m.type}.${f.key}: min is a number`)
+      if (f.max !== undefined) ok(typeof f.max === 'number', `${m.type}.${f.key}: max is a number`)
+      if (typeof f.min === 'number' && typeof f.max === 'number') ok(f.max >= f.min, `${m.type}.${f.key}: max >= min`)
+      ok(typeof f.default === 'number', `${m.type}.${f.key}: number default is a number`)
+      if (typeof f.min === 'number') ok(f.default >= f.min, `${m.type}.${f.key}: default >= min`)
+      if (typeof f.max === 'number') ok(f.default <= f.max, `${m.type}.${f.key}: default <= max`)
+    }
+    if (f.type === 'boolean') ok(typeof f.default === 'boolean', `${m.type}.${f.key}: boolean default is a boolean`)
+    if (f.type === 'select') {
+      ok(Array.isArray(f.options) && f.options.length > 0, `${m.type}.${f.key}: select declares options`)
+      ok((f.options || []).every((o) => o && o.value !== undefined && typeof o.label === 'string'), `${m.type}.${f.key}: each option has { value, label }`)
+      ok((f.options || []).some((o) => o.value === f.default), `${m.type}.${f.key}: default is one of the options`)
+    }
+    if (f.type === 'text') ok(typeof f.default === 'string', `${m.type}.${f.key}: text default is a string`)
+  }
+  // The defaults must themselves validate against their own schema: resolving an
+  // empty saved config yields exactly the declared defaults (round-trip identity).
+  const resolvedDefaults = resolveWidgetConfig(m.config, undefined)
+  for (const f of (m.config || [])) {
+    ok(resolvedDefaults[f.key] === f.default, `${m.type}.${f.key}: default round-trips through resolveWidgetConfig`)
+  }
+}
+
+// --- resolveWidgetConfig: merge/validate is total (never throws, always in-schema) ---
+{
+  const schema = [
+    { key: 'n', label: 'N', type: 'number', default: 5, min: 1, max: 10 },
+    { key: 'b', label: 'B', type: 'boolean', default: false },
+    { key: 's', label: 'S', type: 'select', default: 'a', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] },
+    { key: 't', label: 'T', type: 'text', default: '' },
+  ]
+  ok(JSON.stringify(resolveWidgetConfig(schema, undefined)) === JSON.stringify({ n: 5, b: false, s: 'a', t: '' }), 'resolve: missing saved -> all defaults')
+  const merged = resolveWidgetConfig(schema, { b: true, t: 'hi', junk: 1 })
+  ok(merged.b === true && merged.t === 'hi' && merged.n === 5 && merged.s === 'a', 'resolve: saved overlays defaults, gaps filled')
+  ok(!('junk' in merged), 'resolve: keys not in the schema are dropped')
+  ok(resolveWidgetConfig(schema, { n: 'not a number' }).n === 5, 'resolve: unparseable number -> default')
+  ok(resolveWidgetConfig(schema, { n: 100 }).n === 10, 'resolve: out-of-range number is clamped to max')
+  ok(resolveWidgetConfig(schema, { n: -3 }).n === 1, 'resolve: out-of-range number is clamped to min')
+  ok(resolveWidgetConfig(schema, { b: 'yes' }).b === false, 'resolve: wrong-typed boolean -> default')
+  ok(resolveWidgetConfig(schema, { s: 'zzz' }).s === 'a', 'resolve: unknown select option -> default')
+  ok(resolveWidgetConfig(schema, { t: 42 }).t === '', 'resolve: wrong-typed text -> default')
+  ok(JSON.stringify(resolveWidgetConfig(undefined, { a: 1 })) === '{}', 'resolve: no schema -> {}')
+  ok(JSON.stringify(resolveWidgetConfig(schema, null)) === JSON.stringify({ n: 5, b: false, s: 'a', t: '' }), 'resolve: null saved -> defaults (no throw)')
 }
 
 // --- the default board only references real widgets ---

@@ -1,7 +1,7 @@
 import { lazy } from 'react'
 import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconTrophy, IconSun, IconTarget } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
-import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
+import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetConfig } from './manifest.js'
 
 // Widgets are lazy: each becomes its own build chunk, fetched the first time it
 // appears on a board. Heavy dependencies (FullCalendar, the notes editor) stay
@@ -47,11 +47,20 @@ const FocusWidget = lazy(LOADERS.focus)
 //   render  (w, ctx) => element. `w` is the saved widget instance (per-instance
 //           options like w.group live on it); `ctx` holds EXACTLY the interfaces
 //           the descriptor's `plugs` connected to — nothing more (least privilege).
+//           A widget with a manifest `config` schema reads its MERGED config
+//           (defaults <- w.config, validated) via widgetConfig(w) — mirroring how
+//           instanceId flows: the widget declares the shape, the host delivers it.
 //   title   optional (w) => string for the frame header (default: the label)
 //   settingsPanel  optional component the widget type contributes to the Settings
 //           modal (rendered there with { accounts }); see widget-sdk/panels.js
 //   lifecycle  optional { onMount(w, ctx), onUnmount(w) } run once per widget
 //           instance by the dashboard (forward-looking; no widget uses it yet)
+
+// The merged, validated per-instance config for a saved widget: its type's config
+// SCHEMA (manifest) with the saved w.config overlaid and range/type-checked. A
+// widget type with no schema yields {} — so a renderer can pass it unconditionally.
+const widgetConfig = (w) => resolveWidgetConfig(WIDGET_MANIFEST_BY_TYPE.get(w.type)?.config, w.config)
+
 const RENDERERS = {
   reminders: {
     icon: IconBell,
@@ -60,7 +69,7 @@ const RENDERERS = {
       <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} group={w.group || null} instanceId={w.i} />
     ),
   },
-  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
+  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} config={widgetConfig(w)} /> },
   calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
   notes: {
     icon: IconNote,
@@ -74,6 +83,13 @@ const RENDERERS = {
   daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} plan={ctx.plan} instanceId={w.i} /> },
   focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} plan={ctx.plan} instanceId={w.i} /> },
 }
+
+// The type keys of the module-private RENDERERS/LOADERS maps, exposed only so the
+// registry↔manifest contract test can gate the reverse direction (no orphaned
+// renderer or loader — one whose type has no manifest descriptor). RENDERERS/LOADERS
+// stay private; only their key sets are public.
+export const RENDERER_TYPES = Object.keys(RENDERERS)
+export const LOADER_TYPES = Object.keys(LOADERS)
 
 // Each manifest descriptor + its renderer = a full widget entry, in menu order.
 // Throw loudly (dev/load time) if a descriptor has no renderer — the two halves

@@ -1,0 +1,7 @@
+/* Reminders widget — CSS for classes used only by RemindersWidget.
+   The other .rem-* classes (.rem-add/.rem-text/.rem-group/.rem-err/.rem-head/
+   .rem-chev) are shared with Daily/Upcoming/Focus and the widget-sdk TaskRow/
+   GroupPicker, so they stay in the global styles.css. */
+.rem-group-sec + .rem-group-sec { margin-top: 6px; }
+.rem-sortbar { display: flex; justify-content: flex-end; padding: 2px 8px 0; }
+.rem-sortbar .chip { cursor: pointer; }

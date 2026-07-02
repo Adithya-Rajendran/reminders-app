@@ -1,3 +1,4 @@
+import './RemindersWidget.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
