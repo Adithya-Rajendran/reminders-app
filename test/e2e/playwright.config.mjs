@@ -8,7 +8,13 @@ import { fileURLToPath } from 'node:url'
 // request (document + fetch/XHR) — the SPA never sends it on its own.
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ipFile = path.join(HERE, '.state', 'ip')
-const IP = fs.existsSync(ipFile) ? fs.readFileSync(ipFile, 'utf8').trim() : '127.0.0.1'
+// Fail fast rather than fall back to 127.0.0.1: the BFF's SSRF guard always
+// blocks loopback for its outbound CalDAV fetches, so a loopback base URL only
+// yields confusing downstream failures.
+if (!fs.existsSync(ipFile)) {
+  throw new Error('test/e2e/.state/ip not found — start the harness first: bash test/e2e/run.sh (or setup-backends.sh + start-bff.sh + provision.mjs).')
+}
+const IP = fs.readFileSync(ipFile, 'utf8').trim()
 
 export default defineConfig({
   testDir: './specs',
@@ -23,16 +29,15 @@ export default defineConfig({
     extraHTTPHeaders: { 'x-dev-user': 'e2e-user' },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    // Video needs Playwright's bundled ffmpeg (CDN-blocked in this sandbox); the
-    // trace already captures DOM snapshots, so video stays off. CI uses the
-    // normal `playwright install` and can re-enable if desired.
+    // Video off — the retained traces already capture DOM snapshots per action.
     video: 'off',
     actionTimeout: 12_000,
-    // PW_CHROME points at a manually-fetched Chrome-for-Testing when the
-    // Playwright CDN isn't reachable (local sandbox). Unset in CI -> bundled
-    // chromium. --no-sandbox because the harness can run as root.
+    // PW_CHROME: optional pre-fetched Chrome path for environments without
+    // Playwright-CDN access; unset in CI -> bundled chromium. --no-sandbox only
+    // when actually running as root (Chromium refuses the sandbox there);
+    // GitHub-hosted runners run as a normal user and keep the sandbox.
     launchOptions: {
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      args: [...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), '--disable-dev-shm-usage'],
       ...(process.env.PW_CHROME ? { executablePath: process.env.PW_CHROME } : {}),
     },
   },

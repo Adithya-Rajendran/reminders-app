@@ -4,7 +4,7 @@
 // sortTasks(tasks,sortBy,desc) ordering (incl. the ZERO-date-sorts-last rule).
 // Importing the module transitively opens SQLite via config.js, so point
 // CONFIG_DB_PATH at a throwaway file. Run with:
-//   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/serialize.test.db node:22 node test/serialize.test.mjs
+//   docker run --rm -v "$PWD":/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/serialize.test.db node:22 node test/serialize.test.mjs
 import { rmSync } from 'node:fs'
 process.env.CONFIG_STORE = 'sqlite'
 process.env.CONFIG_DB_PATH = process.env.CONFIG_DB_PATH || '/tmp/serialize.test.db'

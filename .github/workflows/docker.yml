@@ -9,9 +9,15 @@ permissions:
   contents: read
   packages: write
 
+# Serialize publishes; never cancel one mid-manifest-push.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -29,11 +35,26 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,format=short
-      - uses: docker/build-push-action@v6
+      # Build once locally and BOOT it before anything reaches the registry —
+      # a crash-on-boot image must never become :latest (the deploy workflow
+      # rolls the cluster onto whatever this pushes).
+      - name: Build image (loaded locally for the smoke test)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          load: true
+          push: false
+          tags: reminders-app:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Boot smoke test before pushing
+        run: bash app/scripts/smoke-image.sh reminders-app:smoke
+      - name: Push
+        # A pure gha-cache hit of the build above (~seconds) — same layers.
+        uses: docker/build-push-action@v6
         with:
           context: ./app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max

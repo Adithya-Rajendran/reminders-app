@@ -25,8 +25,8 @@ export function buildLayout(specs) {
   return { version: 1, gridV: GRID_V, widgets, layouts }
 }
 
-export async function seedLayout(request, specs) {
-  const r = await request.put('/api/layouts/main', { data: { layout: buildLayout(specs) } })
+export async function seedLayout(request, specs, dashId = 'main') {
+  const r = await request.put(`/api/layouts/${dashId}`, { data: { layout: buildLayout(specs) } })
   expect(r.ok(), `seedLayout -> ${r.status()}`).toBeTruthy()
 }
 

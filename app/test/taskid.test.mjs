@@ -2,7 +2,7 @@
 // codec for CalDAV tasks/labels. Locks the base64url("<listId>\x1f<objectUrl>")
 // round-trip, the 400-on-malformed-id contract, and the "cat_"+base64url label
 // scheme. Pure string/Buffer logic — no ical/DB imports. Run with:
-//   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/taskid.test.db node:22 node test/taskid.test.mjs
+//   docker run --rm -v "$PWD":/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/taskid.test.db node:22 node test/taskid.test.mjs
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from '../server/taskid.js'
 
 let pass = 0, fail = 0

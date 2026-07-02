@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Local one-shot: bring up backends + BFF, provision, run Playwright, tear down.
 # (CI runs the same steps individually — see .github/workflows/ci.yml.)
+# Runs unmodified on GitHub-hosted ubuntu-latest — no self-hosted infra, VM, or
+# cluster required.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

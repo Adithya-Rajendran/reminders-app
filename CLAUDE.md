@@ -23,9 +23,11 @@ docker build --target test app/
 the result, so a new test file is picked up with no wiring. Add `-- <substr>` to
 filter (e.g. `npm test -- connections`).
 
-CI (`.github/workflows/ci.yml`) runs exactly these: lint, build, syntax check,
-tests (the `docker` job also runs them in the image's `test` stage). Keep all
-four green. Lint is warning-free — don't add new warnings.
+CI (`.github/workflows/ci.yml`) runs: lint, build, syntax check, unit tests,
+component tests, the same checks in the image's `test` stage + a boot smoke of
+the production image (`app/scripts/smoke-image.sh`), and the Playwright e2e
+suite (`test/e2e/`, real Radicale + wsgidav backends — fully on GitHub-hosted
+runners). Keep ALL of them green. Lint is warning-free — don't add new warnings.
 
 ## Map
 

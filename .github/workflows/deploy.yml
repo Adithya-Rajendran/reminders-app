@@ -1,0 +1,68 @@
+# CD: roll the cluster deployment onto the freshly pushed :latest after the
+# docker workflow succeeds on main (or on demand via workflow_dispatch).
+#
+# OPT-IN: does nothing until the KUBE_CONFIG_DATA repo secret exists — a
+# base64-encoded kubeconfig for the cluster (e.g. a Rancher API token with a
+# long/no TTL, or a downstream ServiceAccount limited to rollout-restarting
+# this one Deployment; see k8s/README.md). Secrets are never exposed to fork
+# PRs, and this workflow only ever runs from main/dispatch.
+#
+# Verification note: the Deployment uses strategy Recreate on a ReadWriteOnce
+# PVC, so `kubectl rollout status` is expected to exceed its timeout while the
+# volume detaches — we poll pod readiness and the public /healthz instead.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [docker]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never cancel a mid-flight rollout
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Roll the deployment
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        run: |
+          if [ -z "$KUBE_CONFIG_DATA" ]; then
+            echo "::notice::KUBE_CONFIG_DATA secret not configured — skipping deploy (CI-only mode)."
+            exit 0
+          fi
+          echo "$KUBE_CONFIG_DATA" | base64 -d > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          kubectl rollout restart deployment/reminders-app -n reminders-app
+          # Recreate strategy: wait for the replacement pod to be Running/Ready.
+          for i in $(seq 1 60); do
+            ready=$(kubectl get pods -n reminders-app -o jsonpath='{range .items[*]}{.status.containerStatuses[0].ready}{"\n"}{end}' 2>/dev/null | grep -c true || true)
+            total=$(kubectl get pods -n reminders-app --no-headers 2>/dev/null | wc -l)
+            [ "$ready" -ge 1 ] && [ "$total" -eq 1 ] && { echo "pod ready"; break; }
+            sleep 5
+          done
+          kubectl get pods -n reminders-app
+
+      - name: Verify the app answers
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        run: |
+          if [ -z "$KUBE_CONFIG_DATA" ]; then exit 0; fi
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://tasks.rke.alaras.net/healthz || true)
+            [ "$code" = "200" ] && { echo "healthz 200"; exit 0; }
+            sleep 5
+          done
+          echo "::error::app did not answer 200 on /healthz after the rollout"
+          exit 1
