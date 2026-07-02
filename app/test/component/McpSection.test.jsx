@@ -409,5 +409,7 @@ describe('McpSection', () => {
     const calendarToggle = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
     expect(remindersToggle).toBeChecked()
     expect(calendarToggle).not.toBeChecked()
+    // One PUT (the failed delta) — the revert is client-local, no second request.
+    expect(putCallCount).toBe(1)
   })
 })

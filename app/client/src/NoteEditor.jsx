@@ -294,9 +294,9 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
           : <button className="iconbtn sm" title="Close" aria-label="Close note" onClick={close}><IconX size={16} /></button>}
       </div>
 
-      {/* 409 conflict banner: shown instead of the generic error chip. */}
+      {/* 409 conflict banner: shown instead of the generic error chip.
+          Announced via the live region in onState — no conditional role="alert". */}
       {isConflict && (
-        {/* Announced via the live region in onState — no conditional role="alert". */}
         <div className="note-conflict-bar">
           <span>This note changed somewhere else.</span>
           <button className="undo-btn" onClick={conflictReload}>Reload</button>
