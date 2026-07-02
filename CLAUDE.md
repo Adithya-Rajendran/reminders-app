@@ -53,6 +53,9 @@ app/server/
   config.js                # SQLite (layouts, dashboards, encrypted account config)
   tasks_caldav.js, caldav.js, recurrence_caldav.js  # CalDAV VTODO/VEVENT layer
   readcache.js             # read-path primitives: request coalescing + fresh/ctag/report decision — node-tested
+  daily_plan.js            # server-stored daily plan (GET/PUT /api/daily-plan) — node-tested
+  mcp.js, mcp_tools.js     # embedded MCP server (/mcp, bearer auth) + per-widget tool registry (docs/mcp.md)
+  mcp_token.js, mcp_validate.js  # token hash + input validator (pure, node-tested)
   vtodo.js, util.js        # shared ICS parsing + tiny helpers (node-tested)
   notes.js, webdav.js      # Markdown notes over WebDAV
   reminder_groups.js       # group <-> calendar mapping

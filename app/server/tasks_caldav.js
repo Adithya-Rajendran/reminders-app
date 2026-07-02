@@ -9,7 +9,7 @@ import { cacheDecision } from './readcache.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
 import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from './vtodo_meta.js'
-import { accountOf, baseOf, okPut } from './util.js'
+import { accountOf, baseOf, okPut, err } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
 import { advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo, isRecurring, registerTimezones } from './recurrence_caldav.js'
@@ -159,22 +159,27 @@ export async function listTasks(req, res, next) {
 
 // createTask/patchTask/deleteTask/attachLabel respond to upstream failures
 // directly (specific 4xx/502 messages the client shows) instead of next(e).
-export async function createTask(req, res) {
-  const uid = req.session.user.sub
-  const b = req.body || {}
+
+// ---- core functions (no req/res — called by HTTP handlers and the MCP tool layer) ----
+
+// Create a new VTODO. `projectId` may be null/undefined to trigger the
+// fallback-to-first-list path. Throws err(msg, status) on validation/upstream
+// failure so callers can map to the appropriate response.
+export async function createTaskCore(sub, projectId, body) {
+  const b = body || {}
   const title = (b.title || '').trim()
-  if (!title) return res.status(400).json({ error: 'title is required' })
-  let resolved = await getListById(uid, Number(req.params.id))
+  if (!title) throw err('title is required', 400)
+  let resolved = await getListById(sub, Number(projectId))
   if (!resolved || !resolved.list.supportsVtodo) {
-    const lists = (await listsWithId(uid)).filter((l) => l.supports_vtodo && l.enabled)
-    if (!lists.length) return res.status(409).json({ error: 'no task list — connect a CalDAV account in Settings' })
-    resolved = await getListById(uid, lists[0].id)
+    const lists = (await listsWithId(sub)).filter((l) => l.supports_vtodo && l.enabled)
+    if (!lists.length) throw err('no task list — connect a CalDAV account in Settings', 409)
+    resolved = await getListById(sub, lists[0].id)
   }
   // Route by reminder group: a mapped group's reminders live in its own calendar.
   const groupName = (Array.isArray(b.labels) && b.labels.length) ? String((b.labels[0] && (b.labels[0].title || b.labels[0])) || '').trim() : ''
   if (groupName) {
-    const mapped = await getGroupListId(uid, groupName)
-    if (mapped) { const r2 = await getListById(uid, mapped); if (r2 && r2.list.supportsVtodo) resolved = r2 }
+    const mapped = await getGroupListId(sub, groupName)
+    if (mapped) { const r2 = await getListById(sub, mapped); if (r2 && r2.list.supportsVtodo) resolved = r2 }
   }
   try {
     const uid2 = crypto.randomUUID()
@@ -205,21 +210,21 @@ export async function createTask(req, res) {
     const objectUrl = baseOf(resolved.list.url) + uid2 + '.ics'
     const put = await safeFetch(objectUrl, { method: 'PUT', headers: { Authorization: authHeader(resolved.account), 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' }, body: vcal.toString() })
     if (!okPut(put)) { const e = new Error('create failed (' + put.status + ')'); e.status = put.status; throw e }
-    invalidate(uid)
-    res.status(201).json(serializeVtodo(vt, resolved.list.id, objectUrl))
+    invalidate(sub)
+    return serializeVtodo(vt, resolved.list.id, objectUrl)
   } catch (e) {
     console.error('caldav createTask failed:', e?.message || e)
-    if (e.status === 403) return res.status(403).json({ error: 'That list is read-only — choose a writable list.' })
-    res.status(502).json({ error: 'could not create task' })
+    if (e.status === 403) throw err('That list is read-only — choose a writable list.', 403)
+    throw err('could not create task', 502)
   }
 }
 
-export async function patchTask(req, res) {
-  const uid = req.session.user.sub
-  let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
-  const b = req.body || {}
-  const resolved = await getListById(uid, dec.listId)
-  if (!resolved) return res.status(404).json({ error: 'not found' })
+// Patch an existing VTODO. `taskId` is the encoded task id. Throws err(msg, status).
+export async function patchTaskCore(sub, taskId, body) {
+  let dec; try { dec = decodeTaskId(taskId) } catch { throw err('bad task id', 400) }
+  const b = body || {}
+  const resolved = await getListById(sub, dec.listId)
+  if (!resolved) throw err('not found', 404)
   try {
     const out = await getModifyPut(resolved, dec.objectUrl, (vcal, vt) => {
       if ('title' in b) { const t = (b.title || '').trim(); if (!t) { const e = new Error('title cannot be empty'); e.status = 400; throw e } vt.updatePropertyWithValue('summary', t) }
@@ -242,43 +247,80 @@ export async function patchTask(req, res) {
         if (b.done && !curDone && isRecurring(vt)) {
           registerTimezones(vcal)
           const now = ICAL.Time.now()
-          const res = advanceRecurringVtodo(vt, now)
+          const advResult = advanceRecurringVtodo(vt, now)
           // Record the completion day for habit streaks — but only when an
           // occurrence was actually completed (advanced to the next one, or the
           // final one for a finite recurrence). A no-op advance (e.g. no anchor)
           // didn't complete anything, so it must not be logged. Fires exactly
           // once per real completion → no double-count against the wire path.
-          if (res.advanced || res.done) appendHabitLog(vt, now.toJSDate().toISOString().slice(0, 10))
+          if (advResult.advanced || advResult.done) appendHabitLog(vt, now.toJSDate().toISOString().slice(0, 10))
         }
         else if (b.done) { vt.updatePropertyWithValue('status', 'COMPLETED'); vt.updatePropertyWithValue('percent-complete', 100); vt.updatePropertyWithValue('completed', ICAL.Time.now()) }
         else { vt.updatePropertyWithValue('status', 'NEEDS-ACTION'); vt.updatePropertyWithValue('percent-complete', 0); vt.removeAllProperties('completed') }
       }
       vt.updatePropertyWithValue('last-modified', ICAL.Time.now()); vt.updatePropertyWithValue('dtstamp', ICAL.Time.now())
     })
-    invalidate(uid)
-    res.json(serializeVtodo(out.vt, dec.listId, dec.objectUrl))
+    invalidate(sub)
+    return serializeVtodo(out.vt, dec.listId, dec.objectUrl)
   } catch (e) {
-    if (e.status === 400) return res.status(400).json({ error: e.message })
-    if (e.status === 404) return res.status(404).json({ error: 'not found' })
+    if (e.status === 400) throw err(e.message, 400)
+    if (e.status === 404) throw err('not found', 404)
     console.error('caldav patchTask failed:', e?.message || e)
-    res.status(e.status === 409 ? 409 : 502).json({ error: 'could not update task' })
+    throw err('could not update task', e.status === 409 ? 409 : 502)
   }
 }
 
-export async function deleteTask(req, res) {
-  const uid = req.session.user.sub
-  let dec; try { dec = decodeTaskId(req.params.id) } catch { return res.status(400).json({ error: 'bad task id' }) }
-  const resolved = await getListById(uid, dec.listId)
-  if (!resolved) return res.status(404).json({ error: 'not found' })
+// Delete a VTODO. `taskId` is the encoded task id. Throws err(msg, status).
+export async function deleteTaskCore(sub, taskId) {
+  let dec; try { dec = decodeTaskId(taskId) } catch { throw err('bad task id', 400) }
+  const resolved = await getListById(sub, dec.listId)
+  if (!resolved) throw err('not found', 404)
   try {
     let etag
     try { const r = await safeFetch(dec.objectUrl, { headers: { Authorization: authHeader(resolved.account) } }); if (r.ok) etag = r.headers.get('etag') } catch { /* unconditional delete */ }
     const headers = { Authorization: authHeader(resolved.account) }; if (etag) headers['If-Match'] = etag
     const del = await safeFetch(dec.objectUrl, { method: 'DELETE', headers })
     if (!del.ok && del.status !== 204 && del.status !== 404) throw new Error('delete failed (' + del.status + ')')
-    invalidate(uid)
+    invalidate(sub)
+    return { ok: true }
+  } catch (e) { console.error('caldav deleteTask failed:', e?.message || e); throw err('could not delete task', 502) }
+}
+
+// ---- HTTP handlers — thin wrappers over the core functions ----
+
+export async function createTask(req, res) {
+  try {
+    const result = await createTaskCore(req.session.user.sub, req.params.id, req.body)
+    res.status(201).json(result)
+  } catch (e) {
+    if (e.status === 400) return res.status(400).json({ error: e.message })
+    if (e.status === 403) return res.status(403).json({ error: e.message })
+    if (e.status === 409) return res.status(409).json({ error: e.message })
+    res.status(502).json({ error: e.message || 'could not create task' })
+  }
+}
+
+export async function patchTask(req, res) {
+  try {
+    const result = await patchTaskCore(req.session.user.sub, req.params.id, req.body)
+    res.json(result)
+  } catch (e) {
+    if (e.status === 400) return res.status(400).json({ error: e.message })
+    if (e.status === 404) return res.status(404).json({ error: 'not found' })
+    if (e.status === 409) return res.status(409).json({ error: e.message })
+    res.status(502).json({ error: e.message || 'could not update task' })
+  }
+}
+
+export async function deleteTask(req, res) {
+  try {
+    await deleteTaskCore(req.session.user.sub, req.params.id)
     res.json({ ok: true, message: 'Successfully deleted.' })
-  } catch (e) { console.error('caldav deleteTask failed:', e?.message || e); res.status(502).json({ error: 'could not delete task' }) }
+  } catch (e) {
+    if (e.status === 400) return res.status(400).json({ error: e.message })
+    if (e.status === 404) return res.status(404).json({ error: 'not found' })
+    res.status(502).json({ error: e.message || 'could not delete task' })
+  }
 }
 
 export async function listLabels(req, res, next) {

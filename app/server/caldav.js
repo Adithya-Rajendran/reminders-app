@@ -474,7 +474,7 @@ export const invalidateUserEventCache = (sub) => {
 // up forever; drop anything untouched for a few minutes when a user map is used.
 function evEvictStale(c) { const cut = Date.now() - EV_EVICT_MS; for (const [k, e] of c) { if (e.at < cut) c.delete(k) } }
 
-async function fetchEvents(userId, startISO, endISO) {
+export async function fetchEvents(userId, startISO, endISO) {
   const accs = await listAccounts(userId)
   const events = []
   const c = evUserCache(userId)
@@ -522,7 +522,7 @@ async function fetchEvents(userId, startISO, endISO) {
   return events
 }
 
-async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
+export async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
   const uid = crypto.randomUUID()
   const vcal = new ICAL.Component('vcalendar')
   vcal.updatePropertyWithValue('prodid', CALDAV_PRODID)
@@ -552,7 +552,7 @@ async function createEvent(acc, { listUrl, summary, start, end, allDay }) {
   return parseVevents(vcal.toString(), { accountId: acc.id, listUrl, objectUrl, etag: put.headers.get('etag') })[0]
 }
 
-async function updateEvent(acc, { objectUrl, summary, start, end, allDay }) {
+export async function updateEvent(acc, { objectUrl, summary, start, end, allDay }) {
   const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })
   if (!r.ok) throw new Error('fetch failed (' + r.status + ')')
   const etag = r.headers.get('etag')
@@ -601,7 +601,7 @@ async function updateEvent(acc, { objectUrl, summary, start, end, allDay }) {
   if (!put.ok && put.status !== 204) throw new Error('update failed (' + put.status + ')')
 }
 
-async function deleteEvent(acc, { objectUrl }) {
+export async function deleteEvent(acc, { objectUrl }) {
   let etag
   try {
     const r = await safeFetch(objectUrl, { headers: { Authorization: authHeader(acc) } })

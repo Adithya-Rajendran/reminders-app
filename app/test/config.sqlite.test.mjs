@@ -92,9 +92,30 @@ await cfg.deleteAccount(U, 'ca-1')
 ok((await cfg.getAccount(U, 'ca-1')) === null, 'deleteAccount removes the account')
 ok((await cfg.listsWithId(U)).length === 0, 'deleting an account cascades to its lists')
 
+// --- MCP token + settings ---
+ok((await cfg.getMcpToken(U)) === null, 'no MCP token before one is set')
+await cfg.setMcpToken(U, 'hash-1')
+ok((await cfg.getMcpToken(U))?.token_hash === 'hash-1', 'setMcpToken stores the hash')
+ok((await cfg.getMcpTokenByHash('hash-1'))?.user_id === U, 'getMcpTokenByHash resolves the user')
+ok((await cfg.getMcpToken(U))?.last_used_at == null, 'a fresh token has no last_used_at')
+await cfg.touchMcpToken(U)
+ok((await cfg.getMcpToken(U))?.last_used_at != null, 'touchMcpToken stamps last_used_at')
+await cfg.setMcpToken(U, 'hash-2') // regenerate replaces
+ok((await cfg.getMcpTokenByHash('hash-1')) === null, 'regenerating invalidates the old hash')
+ok((await cfg.getMcpToken(U))?.last_used_at == null, 'regenerating resets last_used_at')
+await cfg.deleteMcpToken(U)
+ok((await cfg.getMcpToken(U)) === null, 'deleteMcpToken revokes')
+ok((await cfg.getMcpSettings(U)).enabled === false, 'MCP is disabled by default')
+await cfg.setMcpSettings(U, { enabled: true, widgets: { reminders: true, daily: false } })
+const mcpS = await cfg.getMcpSettings(U)
+ok(mcpS.enabled === true && mcpS.widgets.reminders === true && mcpS.widgets.daily === false, 'setMcpSettings roundtrips enabled + widget toggles')
+ok((await cfg.getMcpSettings(U2)).enabled === false, 'MCP settings are per-user')
+cfg.sqlite.prepare('UPDATE mcp_settings SET widgets_json=? WHERE user_id=?').run('{oops', U)
+ok(typeof (await cfg.getMcpSettings(U)).widgets === 'object', 'corrupt widgets_json reads as {} (never throws)')
+
 // --- only config tables exist (no task/reminder data lives in the DB) ---
 const tables = cfg.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((t) => t.name).sort()
-const expected = ['caldav_accounts', 'caldav_lists', 'user_dashboards', 'daily_plans']
+const expected = ['caldav_accounts', 'caldav_lists', 'user_dashboards', 'daily_plans', 'mcp_tokens', 'mcp_settings']
 ok(expected.every((t) => tables.includes(t)) && !tables.some((t) => /task|reminder|project|label/i.test(t)),
   'schema holds only config/layout tables — no task/reminder/project/label tables: [' + tables.join(', ') + ']')
 
