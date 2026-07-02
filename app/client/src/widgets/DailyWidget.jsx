@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectStalled, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
+import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, appSharedStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
 import './DailyWidget.css'
 
 const PLAN_KEY = 'daily-plan' // { date, ids: [] }
@@ -25,8 +25,17 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
 
   const [mode, setMode] = useState('plan') // 'plan' | 'shutdown'
   const [draft, setDraft] = useState('')
-  const [planIds, setPlanIds] = useState(() => { const s = store.loadJson(PLAN_KEY, null); return s && s.date === todayKey ? s.ids : [] })
-  const savePlan = (ids) => { setPlanIds(ids); store.saveJson(PLAN_KEY, { date: todayKey, ids }) }
+  const [err, setErr] = useState('')
+  // PLAN_KEY is written to the shared store so FocusWidget (and any other widget)
+  // can read today's plan without knowing which DailyWidget instance wrote it.
+  const [planIds, setPlanIds] = useState(() => { const s = appSharedStore.loadJson(PLAN_KEY, null); return s && s.date === todayKey ? s.ids : [] })
+  const savePlan = (ids) => {
+    setPlanIds(ids)
+    appSharedStore.saveJson(PLAN_KEY, { date: todayKey, ids })
+    // Notify other widgets (e.g. FocusWidget) that the plan changed, so they
+    // can re-read without polling.
+    window.dispatchEvent(new CustomEvent('reminders:plan-changed'))
+  }
   const [note, setNote] = useState(() => { const n = store.loadJson(NOTE_KEY, null); return n && n.date === todayKey ? n.text : '' })
   const saveNote = (text) => { setNote(text); store.saveJson(NOTE_KEY, { date: todayKey, text }) }
 
@@ -42,6 +51,10 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
     const add = (t) => { if (t && !chosenSet.has(t.id) && !seen.has(t.id)) { seen.add(t.id); out.push(t) } }
     open.filter((t) => isRealDate(t.due_date) && ['overdue', 'today'].includes(dueBucket(t.due_date).k)).sort(byImportanceThenDue).forEach(add)
     selectStalled(tasks).slice().sort(byImportanceThenDue).forEach(add)
+    // Also surface tasks that are already triaged (estimate + schedule) for the
+    // near future — the user decided on these, so they're warm candidates for
+    // pulling into today rather than discovering them only on the due date.
+    selectTriagedThisWeek(tasks).slice().sort(byImportanceThenDue).forEach(add)
     return out.slice(0, SUGGEST_CAP)
   }, [open, tasks, planIds])
 
@@ -52,7 +65,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
   const addTask = async (e) => {
     e.preventDefault()
     const raw = draft.trim(); if (!raw || !inboxId) return
-    setDraft('')
+    setErr(''); setDraft('')
     const parsed = parseQuickAdd(raw)
     try {
       const created = await tasksCap.create(inboxId, {
@@ -65,7 +78,12 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
       })
       if (created?.id) savePlan([...new Set([...planIds, created.id])])
       tasksCap.emitChanged(); load()
-    } catch { setDraft(raw) }
+    } catch (e2) {
+      setDraft(raw)
+      let msg = 'Could not add task.'
+      try { msg = JSON.parse(e2.message).error || msg } catch { /* keep default */ }
+      setErr(msg)
+    }
   }
 
   const doneToday = useMemo(() => {
@@ -98,6 +116,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
               <button type="submit" className="iconbtn sm" aria-label="Add" title="Add to today"><IconPlus size={16} /></button>
             </form>
           )}
+          {err && <div role="alert" className="rem-err">{err}</div>}
           {inboxId && <QuickAddPreview text={draft} />}
 
           <div className="group-head daily-secline">

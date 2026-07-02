@@ -77,7 +77,12 @@ export function QuickAddPreview({ text }) {
   }
   for (const l of (p.labels || [])) chips.push({ k: `lbl-${l}`, cls: 'qa-chip lbl', label: `*${l}`, title: `Group / label: ${l}` })
   if (p.cue) chips.push({ k: 'cue', cls: 'qa-chip cue', label: `⤳ ${p.cue}`, title: `Cue: ${p.cue}` })
-  if (!chips.length) return null
+  // Nothing parsed yet but the user IS typing: teach the syntax right where it
+  // would take effect (the tokens are invisible until one parses otherwise).
+  if (!chips.length) {
+    if (!(text || '').trim()) return null
+    return <div className="qa-preview qa-preview-hint" aria-live="polite">try “friday 2pm” · !2 · *label</div>
+  }
   return (
     <div className="qa-preview" aria-live="polite">
       {chips.map((c) => <span key={c.k} className={c.cls} title={c.title}>{c.label}</span>)}

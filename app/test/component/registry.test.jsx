@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WIDGETS, WIDGET_TYPES } from '../../client/src/widgets/registry.jsx'
+import { WIDGETS, WIDGET_TYPES, LOADERS, preloadWidgets } from '../../client/src/widgets/registry.jsx'
 import { WIDGET_MANIFEST } from '../../client/src/widgets/manifest.js'
 
 // CI gate for the manifest↔registry contract. The registry throws at import time
@@ -19,6 +19,13 @@ describe('widget registry ↔ manifest parity', () => {
   it('indexes every widget by its stable type', () => {
     expect(WIDGET_TYPES.size).toBe(WIDGET_MANIFEST.length)
     for (const m of WIDGET_MANIFEST) expect(WIDGET_TYPES.get(m.type)).toBeTruthy()
+  })
+
+  it('has a preloadable chunk loader for every manifest type', () => {
+    // preloadWidgets warms chunks from a persisted type list — a manifest type
+    // missing from LOADERS would silently skip its preload (waterfall returns).
+    for (const m of WIDGET_MANIFEST) expect(typeof LOADERS[m.type], `${m.type} loader`).toBe('function')
+    expect(() => preloadWidgets(['not-a-widget', null, undefined])).not.toThrow()
   })
 
   it('supports widget-contributed Settings panels', () => {

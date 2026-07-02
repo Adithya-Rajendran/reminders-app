@@ -21,6 +21,8 @@ export default function DreadControl({ value = 0, onSet }) {
         className={`chip dread-chip${v ? ' on' : ' empty'}`}
         title="Dread: how much you want to avoid this. A dreaded, important task becomes today’s frog."
         aria-label={v ? `Dread ${v} of 5` : 'Set dread'}
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
         {v ? `dread ${v}` : 'dread'}
