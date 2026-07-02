@@ -26,6 +26,20 @@ test('a scheduled task appears on the calendar', async ({ page, request }) => {
   await expect(frame.getByText('Dentist task', { exact: true })).toBeVisible()
 })
 
+test('complete a task from its chip popover', async ({ page, request }) => {
+  await createTask(request, 1, { title: 'Dentist task', due_date: isoDaysFromNow(0, 10) })
+  await seedLayout(request, [{ type: 'calendar' }])
+  await gotoApp(page)
+  const frame = widget(page, 'Calendar')
+
+  // Clicking a task chip opens its quick-actions popover (portaled to <body>).
+  await frame.locator('.fc-event', { hasText: 'Dentist task' }).click()
+  const pop = page.locator('.task-pop')
+  await expect(pop).toBeVisible()
+  await pop.getByRole('button', { name: 'Complete' }).click()
+  await expect(frame.getByText('Dentist task', { exact: true })).toBeHidden()
+})
+
 test('create an event from the grid', async ({ page, request }) => {
   await seedLayout(request, [{ type: 'calendar' }])
   await gotoApp(page)

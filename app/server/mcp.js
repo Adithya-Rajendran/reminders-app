@@ -133,7 +133,11 @@ export async function putSettingsHandler(req, res, next) {
       if (!b.widgets || typeof b.widgets !== 'object' || Array.isArray(b.widgets)) {
         return res.status(400).json({ error: 'widgets must be an object of { widgetType: boolean }' })
       }
-      widgets = {}
+      // MERGE into current rather than wholesale-replace: a client sending only
+      // one key (e.g. a single-widget delta) cannot clobber keys it didn't name.
+      // Validation still rejects unknown types so stale clients can't introduce
+      // phantom keys.
+      widgets = { ...cur.widgets }
       for (const [k, v] of Object.entries(b.widgets)) {
         if (!MCP_WIDGET_TYPES.includes(k)) return res.status(400).json({ error: `unknown widget type: ${k}` })
         widgets[k] = !!v

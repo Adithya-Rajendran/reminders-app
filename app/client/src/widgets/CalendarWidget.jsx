@@ -5,7 +5,8 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, useModalRef, UndoBar, tasksToCalendarEvents, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, useModalRef, useTaskList, UndoBar, tasksToCalendarEvents, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import TaskPopover from './TaskPopover.jsx'
 
 // Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
 // events, so they must never appear in — let alone default — the create picker.
@@ -59,6 +60,21 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const wrapRef = useRef(null)
   const [accounts, setAccounts] = useState([])
   const [modal, setModal] = useState(null) // null | { mode, key, initial }
+
+  // Adopt the shared task-list hook so the task-chip popover's Complete gets the
+  // exact recurring-aware semantics + Undo the row widgets have (not a bespoke
+  // tasksCap.update copy that would drift). The hook's store subscription is the
+  // same store the task event-source below reads, so both stay in lockstep.
+  const selectAll = useCallback((all) => all, [])
+  const { tasks: storeTasks, onToggle, onSchedule, undo: taskUndo, dismissUndo: dismissTaskUndo } = useTaskList(tasksCap, selectAll)
+
+  // The clicked task chip's popover. We keep { taskId, rect }: the id resolves to
+  // the LIVE task at render (chips' extendedProps go stale the moment the store
+  // mutates) and the rect — captured at click time — anchors the popover, since
+  // FullCalendar may replace the chip element under us on any refetch.
+  const [taskPop, setTaskPop] = useState(null)
+  const popTask = taskPop ? storeTasks.find((tk) => tk.id === taskPop.taskId && !tk.done) : null
+  useEffect(() => { if (taskPop && !popTask) setTaskPop(null) }, [taskPop, popTask]) // task gone (completed/deleted anywhere) -> close
 
   // Size class comes from the shared widget-size system (one observer in the
   // frame), so the toolbar, view, and compact styling adapt with the widget.
@@ -122,10 +138,14 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const undoTimer = useRef(null)
   const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
   const showUndo = useCallback((label, fn) => {
+    dismissTaskUndo() // one bottom bar slot — the newest notice wins (see render)
     clearTimeout(undoTimer.current)
     setUndo({ label, fn })
     undoTimer.current = setTimeout(() => setUndo(null), 6000)
-  }, [])
+  }, [dismissTaskUndo])
+  // …and symmetrically: a fresh task undo (complete from the chip popover)
+  // supersedes a pending event undo, so the single bar never shows a stale action.
+  useEffect(() => { if (taskUndo) { clearTimeout(undoTimer.current); setUndo(null) } }, [taskUndo])
 
   // Refetch the task layer when the shared task store changes — including
   // optimistic edits made in other widgets. Only that layer: the store is local,
@@ -177,7 +197,15 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
 
   const onEventClick = (arg) => {
     const p = arg.event.extendedProps
-    if (p.kind !== 'event') return // tasks open nothing here — manage them in a task widget (they ARE draggable to reschedule)
+    // A task chip opens its quick-actions popover (Complete / Reschedule),
+    // anchored to the chip's rect captured NOW — the element itself may be
+    // replaced by FullCalendar before the popover re-renders.
+    if (p.kind === 'task' && p.source === 'local') {
+      const r = arg.el.getBoundingClientRect()
+      setTaskPop({ taskId: p.taskId, rect: { top: r.top, left: r.left, bottom: r.bottom, width: r.width } })
+      return
+    }
+    if (p.kind !== 'event') return
     const allDay = arg.event.allDay
     setModal({
       mode: 'edit', key: arg.event.id,
@@ -263,8 +291,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         nowIndicator
         eventDisplay="block"
         eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
-        // Task chips look inert (click does nothing) — say what they CAN do.
-        eventDidMount={({ event, el }) => { if (event.extendedProps.kind === 'task') el.title = 'Drag to reschedule · manage in a task widget' }}
+        eventDidMount={({ event, el }) => { if (event.extendedProps.kind === 'task') el.title = 'Click for actions · drag to reschedule' }}
         eventSources={eventSources}
         select={onSelect}
         eventClick={onEventClick}
@@ -282,9 +309,20 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
           onClose={() => setModal(null)}
         />
       )}
-      {undo && (
+      {popTask && (
+        <TaskPopover
+          task={popTask}
+          anchorRect={taskPop.rect}
+          onComplete={(tk) => { setTaskPop(null); onToggle(tk) }}
+          onSchedule={(tk, payload) => { setTaskPop(null); onSchedule(tk, payload) }}
+          onClose={() => setTaskPop(null)}
+        />
+      )}
+      {/* One bottom bar slot shared by the task undo (chip popover actions) and the
+          event undo — whichever is active; each new notice dismisses the other. */}
+      {(taskUndo || undo) && (
         <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, zIndex: 5 }}>
-          <UndoBar undo={undo} dismiss={dismissUndo} />
+          <UndoBar undo={taskUndo || undo} dismiss={taskUndo ? dismissTaskUndo : dismissUndo} />
         </div>
       )}
     </div>
@@ -304,10 +342,18 @@ function EventModal({ mode, initial, calendars, onSubmit, onDelete, onClose }) {
   const noCalendars = isCreate && calendars.length === 0
   const dialogRef = useModalRef(onClose, { autoFocus: false }) // form's title input keeps autoFocus
 
+  // Toggling all-day → timed used to inherit the parsed local-midnight time, so
+  // the event silently landed at 00:00. Default to a working-hours time instead
+  // (9:00 start / 10:00 end — matching the task scheduler's 9am default) while
+  // preserving the picked date; a real non-midnight time is kept as-is.
   const switchAllDay = (next) => {
     setAllDay(next)
-    setStart((v) => toInput(parseInput(v), next))
-    setEnd((v) => toInput(parseInput(v), next))
+    const sane = (d, h) => {
+      if (!d || next || d.getHours() !== 0 || d.getMinutes() !== 0) return d
+      const x = new Date(d); x.setHours(h, 0, 0, 0); return x
+    }
+    setStart((v) => toInput(sane(parseInput(v), 9), next))
+    setEnd((v) => toInput(sane(parseInput(v), 10), next))
   }
 
   const submit = async (e) => {

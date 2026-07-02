@@ -10,6 +10,11 @@ export function onOpenNote(fn) {
   return () => listeners.delete(fn)
 }
 
+// Whether anything on the current board would actually open a note — lets the
+// "new note" action refuse instead of creating an orphaned Untitled note that
+// nothing displays.
+export const hasOpenNoteListener = () => listeners.size > 0
+
 export function emitOpenNote(path) {
   for (const fn of listeners) {
     try { fn(path) } catch { /* a dead listener must not break the others */ }

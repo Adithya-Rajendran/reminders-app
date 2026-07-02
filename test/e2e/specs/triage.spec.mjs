@@ -31,11 +31,20 @@ test('matrix sorts tasks into the right quadrant', async ({ page }) => {
   await expect(frame.locator('.eq-Q3')).toContainText('Task C')
 })
 
-test('matrix items show priority and due info', async ({ page }) => {
+// Quadrants now hold real (dense) TaskRows — due info shows and the row acts.
+test('matrix rows show due info and are actionable', async ({ page }) => {
   await gotoApp(page)
   const frame = widget(page, 'Triage')
   await frame.getByRole('tab', { name: 'Matrix' }).click()
-  const item = frame.locator('.eq-Q1 .eq-item', { hasText: 'Task B' })
-  await expect(item.locator('.pdot')).toBeVisible()
-  await expect(item.locator('.chip')).toBeVisible() // overdue due-chip
+  const row = frame.locator('.eq-Q1 .task', { hasText: 'Task B' })
+  await expect(row.locator('.due-chip')).toBeVisible() // overdue due-chip (opens the scheduler)
+  await expect(row.getByRole('checkbox', { name: 'Complete: Task B' })).toBeVisible()
+})
+
+test('complete a task straight from the matrix', async ({ page }) => {
+  await gotoApp(page)
+  const frame = widget(page, 'Triage')
+  await frame.getByRole('tab', { name: 'Matrix' }).click()
+  await frame.getByRole('checkbox', { name: 'Complete: Task B' }).click()
+  await expect(frame.locator('.eq-Q1')).not.toContainText('Task B')
 })

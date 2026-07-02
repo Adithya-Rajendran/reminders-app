@@ -2,7 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import Suggestion from '@tiptap/suggestion'
-import { WIKILINK_RE, parseWikilink, resolveWikilink } from '../wikilinks.js'
+import { WIKILINK_RE, parseWikilink, resolveWikilink, insideWikilink } from '../wikilinks.js'
 import { fuzzyRank } from '../fuzzy.js'
 
 // Wikilinks stay as plain `[[Target]]` text in the doc (and on disk) — we never
@@ -77,7 +77,14 @@ export const Wikilink = Extension.create({
       char: '[[',
       allowSpaces: true,
       startOfLine: false,
-      allow: ({ editor }) => editor.isEditable && !editor.isActive('codeBlock'),
+      // Never open the autocomplete when the trigger `[[` belongs to a link
+      // that is already complete — a click parks the caret inside the link
+      // text, and firing the suggestion there corrupts the note (see
+      // insideWikilink). The deco plugin is registered first, so its ranges
+      // are current for this state.
+      allow: ({ editor, state, range }) =>
+        editor.isEditable && !editor.isActive('codeBlock') &&
+        !insideWikilink(decoKey.getState(state)?.ranges, range.from),
       items: ({ query }) => {
         const notes = options.getNotes() || []
         const out = fuzzyRank(query, notes, (n) => n.title).slice(0, 8).map((r) => ({ title: r.item.title }))

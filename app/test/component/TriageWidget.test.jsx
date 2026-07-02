@@ -53,4 +53,34 @@ describe('TriageWidget', () => {
     act(() => cap._set([{ ...task, done: true, done_at: todayIso() }]))
     expect(screen.getByText(/Level 2!/)).toBeInTheDocument()
   })
+
+  it('matrix quadrants render actionable rows — completing one removes it from the quadrant', async () => {
+    const overdue = () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(9, 0, 0, 0); return d.toISOString() }
+    const cap = fakeTasks([
+      { id: 1, title: 'Frog task', priority: 5, dread: 5, done: false, labels: [] },
+      { id: 2, title: 'Urgent important', priority: 3, due_date: overdue(), done: false, labels: [] }, // → Q1
+    ])
+    render(<TriageWidget tasks={cap} instanceId="triage-matrix-rows" />)
+    await userEvent.click(screen.getByRole('tab', { name: /matrix/i }))
+    // The quadrant renders a real TaskRow (role=checkbox), not a read-only echo…
+    const box = screen.getByRole('checkbox', { name: /complete: urgent important/i })
+    await userEvent.click(box)
+    // …and completing delegates to the capability + optimistically leaves the grid.
+    expect(cap.calls.update).toContainEqual([2, { done: true }])
+    expect(screen.queryByText('Urgent important')).not.toBeInTheDocument()
+  })
+
+  it('the level badge opens the XP explainer with computed level numbers', async () => {
+    const cap = fakeTasks([
+      { id: 1, title: 'Tax return', priority: 3, dread: 4, time_estimate: 90, done: false, labels: [] },
+    ])
+    render(<TriageWidget tasks={cap} instanceId="triage-xp-explainer" />)
+    await userEvent.click(screen.getByRole('button', { name: /lv 1/i }))
+    const dialog = screen.getByRole('dialog', { name: /how xp works/i })
+    // Live-computed numbers (no completions yet → level 1, 0 into the 100 span),
+    // the frog example, and the trust line.
+    expect(dialog).toHaveTextContent(/Level 1 — 0 \/ 100 XP/)
+    expect(dialog).toHaveTextContent(/Tax return/)
+    expect(dialog).toHaveTextContent(/can’t be lost/)
+  })
 })

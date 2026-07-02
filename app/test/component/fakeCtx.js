@@ -56,7 +56,8 @@ export function fakeGroups(names = []) {
 }
 
 // Stand-in for ctx.notes (the notesApi client + open-note bus). Only the methods
-// NotesWidget calls on mount are needed; the rest resolve to no-ops.
+// NotesWidget calls on mount are needed; the rest resolve to no-ops. Tests that
+// need to assert on a specific method can override it after calling fakeNotes().
 export function fakeNotes({ configured = true, notes = [] } = {}) {
   const calls = { list: 0, folders: 0, search: 0 }
   return {
@@ -66,6 +67,16 @@ export function fakeNotes({ configured = true, notes = [] } = {}) {
     search: () => { calls.search++; return Promise.resolve({ results: [] }) },
     onOpenNote: () => () => {},
     emitOpenNote() {},
+    // Mutation stubs — override in tests that need them:
+    create: () => Promise.resolve({ path: 'Untitled.md', title: 'Untitled', folder: '' }),
+    rename: (p, t) => Promise.resolve({ path: p, title: t }),
+    move: (p, folder) => Promise.resolve({ path: p, title: p.split('/').pop(), folder }),
+    moveFolder: () => Promise.resolve({ folder: '' }),
+    duplicate: (p) => Promise.resolve({ path: p, title: p, folder: '' }),
+    setPinned: () => Promise.resolve({ ok: true }),
+    trash: () => Promise.resolve({ ok: true }),
+    restore: () => Promise.resolve({ path: 'Restored.md', title: 'Restored', folder: '' }),
+    createFolder: (f) => Promise.resolve({ folder: f }),
   }
 }
 

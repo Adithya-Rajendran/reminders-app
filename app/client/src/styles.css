@@ -1132,7 +1132,12 @@ body {
 .mini-item:hover, .mini-item.active { background: var(--accent-soft); }
 
 /* undo bar */
-.undo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 4px 2px; background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; box-shadow: var(--shadow-sm); animation: slideup .2s ease; }
+/* Sticky: the bar renders at the END of the widget's scrollable content, so on
+   a long list a delete near the top would slide it in below the fold — present
+   but never seen (two live audits independently reported "delete has no undo").
+   position:sticky pins it to the visible bottom of the scrollport; on short
+   content it degrades to normal flow. */
+.undo-bar { position: sticky; bottom: 2px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 4px 2px; background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; box-shadow: var(--shadow); animation: slideup .2s ease; }
 .undo-btn { background: transparent; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; font-size: 12.5px; }
 
 /* reminders feed actions */
@@ -1675,7 +1680,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* dread chip + 1–5 dot picker (shared widget-sdk control; used by TaskRow + Triage) */
 .dread-chip { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 34%, transparent); cursor: pointer; }
 .dread-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
-.dread-menu { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* top offset: hug the chip so the picker can't read as the next row's control. */
+.dread-menu { display: flex; align-items: center; gap: 8px; min-width: 0; top: calc(100% + 2px); }
 .dread-dots { display: inline-flex; gap: 5px; padding: 2px; }
 .dread-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: transparent; cursor: pointer; padding: 0; }
 .dread-dot.on { background: var(--warn); border-color: var(--warn); }
@@ -1764,10 +1770,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* === Quieter resting rows: empty placeholder controls reveal on hover/focus === */
 /* Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
    intentionally NOT gated (scheduling is the primary triage action). */
+/* Dim-but-visible at rest (was opacity 0 until hover — an affordance you had
+   to already know about); hover/focus-within below raise to full strength. */
 .task .cue-chip.empty,
 .task .est-chip.empty,
 .task .dread-chip.empty,
-.task .subtask-chip.empty { opacity: 0; transition: opacity 120ms ease; }
+.task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
 .task:hover .cue-chip.empty,
 .task:hover .est-chip.empty,
 .task:hover .dread-chip.empty,
@@ -1864,3 +1872,39 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .mcp-widget-label { font-size: 13px; font-weight: 600; }
 .mcp-widget-desc { font-size: 11.5px; color: var(--muted); }
 .mcp-tool-chip { flex: 0 0 auto; }
+
+/* === UX polish round 2 (shared) === */
+/* The app-wide live region (announcer.jsx): visually hidden, never display:none
+   (that silences screen readers). */
+.sr-only-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Error flavor of the notice bar (NoticeBar kind='error'). */
+.undo-bar.notice-error { border-color: color-mix(in oklab, var(--danger) 45%, transparent); background: var(--danger-soft); }
+.undo-bar.notice-error > span { color: var(--danger); }
+
+/* Notes: 409-conflict banner between the editor header and the meta bar. */
+.note-conflict-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--danger-soft); border-bottom: 1px solid color-mix(in oklab, var(--danger) 25%, transparent); font-size: 13px; color: var(--text); }
+.note-conflict-bar .undo-btn { flex-shrink: 0; }
+/* Notes: save-state chip (idle/unsaved/saving/saved/error share the slot). */
+.note-save-state { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; transition: opacity 0.4s; }
+.note-save-state.err { color: var(--danger); }
+/* Notes: "search is narrowed by an active tag" hint above search results. */
+.note-search-scope { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 2px 4px 4px; font-size: 12px; color: var(--muted); background: var(--panel2); border-radius: 6px; }
+.note-search-scope strong { color: var(--text); font-weight: 600; }
+
+/* ---- Calendar task-chip quick-actions popover (TaskPopover.jsx; portals to
+   <body>, so it can't live in a widget-scoped stylesheet). Surface comes from
+   the shared .menu class; this is layout only. ---- */
+.task-pop { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+.task-pop-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--text); min-width: 0; }
+.task-pop-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-pop-meta { display: flex; align-items: center; gap: 6px; }
+.task-pop-actions { display: flex; gap: 8px; }
+
+/* ---- Group picker: visible/clearable active filter. .gp-wrap takes over the
+   flex sizing the bare trigger used to have in the quick-add row. ---- */
+.gp-wrap { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 124px; min-width: 78px; }
+.gp-wrap .gp-trigger { flex: 1 1 auto; min-width: 0; }
+.gp-trigger.active { border-color: color-mix(in oklab, var(--accent) 45%, transparent); background: var(--accent-soft); }
+.gp-trigger.active .gp-val { color: var(--accent); font-weight: 600; }
+.gp-clear { flex: 0 0 auto; color: var(--faint); }
+.gp-clear:hover { color: var(--danger); }

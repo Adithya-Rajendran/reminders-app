@@ -20,6 +20,7 @@ import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
 import { recentGroups, pushRecentGroup } from './groups.js'
 import { saveJson } from './storage.js'
+import { publishBoard, onGoToWidget } from './boardbus.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
@@ -65,13 +66,23 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 const newId = () => 'w-' + crypto.randomUUID()
 
+// Scroll a widget's frame into view and flash it — shared by the add-widget
+// feedback and the palette's "Go to <widget>" commands.
+function scrollFlash(id) {
+  const node = document.querySelector(`[data-wid="${id}"]`)
+  if (!node) return
+  node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  node.classList.add('widget--added')
+  setTimeout(() => node.classList.remove('widget--added'), 1200)
+}
+
 // A clean default dashboard (DEFAULT_BOARD in the registry), placed left to right.
 function buildDefault() {
   const def = DEFAULT_BOARD.map((type) => ({ i: newId(), type }))
   return { widgets: def, layouts: defaultLayouts(def, sizeFor) }
 }
 
-export default function Dashboard({ onOpenSettings, dashboardId = 'main', title }) {
+export default function Dashboard({ onOpenSettings, dashboardId = 'main', title, metaTick = 0 }) {
   const [projects, setProjects] = useState([])
   const [caldavAccounts, setCaldavAccounts] = useState(null) // null until loaded
   const [widgets, setWidgets] = useState([])
@@ -354,13 +365,34 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     const id = pendingScrollId.current
     if (!id) return
     pendingScrollId.current = null
-    const node = document.querySelector(`[data-wid="${id}"]`)
-    if (!node) return
-    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    node.classList.add('widget--added')
-    const t = setTimeout(() => node.classList.remove('widget--added'), 1200)
-    return () => clearTimeout(t)
+    scrollFlash(id)
   }, [widgets])
+
+  // Publish the board contents for the palette's "Go to <widget>" commands, and
+  // honor go-to requests with the same scroll+flash the add-widget path uses.
+  useEffect(() => {
+    publishBoard(widgets.map((w) => ({ i: w.i, title: titleFor(w) })))
+    return () => publishBoard([])
+  }, [widgets])
+  useEffect(() => onGoToWidget(scrollFlash), [])
+
+  // Settings closed (metaTick bumped): accounts/projects may have changed —
+  // re-check the onboarding meta so a freshly connected account lifts the gate
+  // without a page reload. appCache was cleared by App, so these re-fetch.
+  useEffect(() => {
+    if (!metaTick) return
+    let alive = true
+    ;(async () => {
+      const [prR, acctR] = await Promise.allSettled([
+        appCache.cached('projects', () => tk('/projects'), { ttl: 60_000 }),
+        appCache.cached('caldav-accounts', () => api('/api/caldav/accounts'), { ttl: 60_000 }),
+      ])
+      if (!alive) return
+      if (prR.status === 'fulfilled') setProjects(Array.isArray(prR.value) ? prR.value.filter((p) => p.id > 0) : [])
+      if (acctR.status === 'fulfilled') setCaldavAccounts((acctR.value?.accounts || []).length)
+    })()
+    return () => { alive = false }
+  }, [metaTick])
 
   // Enforce a widget's aspect band live during AND after a resize. RGL has already
   // clamped to the item's minW/maxW before calling us; we layer the aspect band on
@@ -453,7 +485,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
                 <div key={w.i} data-wid={w.i}>
                   <WidgetFrame type={w.type} title={titleFor(w)} group={w.group} onRemove={() => removeWidget(w.i)}>
                     <WidgetMount spec={spec} w={w} ctx={ctx}>
-                      {unmet.length ? <WidgetRequirement reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
+                      {unmet.length ? <WidgetRequirement title={titleFor(w)} reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
                     </WidgetMount>
                   </WidgetFrame>
                 </div>
@@ -509,12 +541,12 @@ function WidgetMount({ spec, w, ctx, children }) {
 }
 
 /* ---------- Unmet capability requirement (manifest.requires) ---------- */
-function WidgetRequirement({ reqs, onOpenSettings }) {
+function WidgetRequirement({ title, reqs, onOpenSettings }) {
   const what = reqs.map((r) => REQUIREMENT_LABEL[r] || r).join(' & ')
   return (
     <div className="state">
       <div className="state-ic"><IconCloud size={22} /></div>
-      <div className="state-title">Needs {what}</div>
+      <div className="state-title">{title ? `${title} needs ${what}` : `Needs ${what}`}</div>
       <div className="state-sub">Connect it in Settings to use this widget.</div>
       <button className="btn primary sm" style={{ marginTop: 10 }} onClick={() => onOpenSettings?.()}>
         <IconCloud size={14} /> Open Settings

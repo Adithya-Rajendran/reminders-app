@@ -60,6 +60,98 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
   ok(states.join() === 'saving,error,saving,saved', 'retry reports saving -> saved')
 }
 
+// ---- error carries the Error object through to onState ----
+{
+  const errors = []
+  const boom = new Error('network blip')
+  const q = createSaveQueue({
+    save: async () => { throw boom },
+    onState: (s, err) => { if (s === 'error') errors.push(err) },
+  })
+  q.markDirty()
+  await q.flush()
+  ok(errors.length === 1 && errors[0] === boom, 'error object is passed as second arg to onState')
+}
+
+// ---- 409 conflict: queue is NOT re-marked dirty; no auto-retry ----
+{
+  const states = []
+  let attempts = 0
+  const conflict = new Error('conflict')
+  conflict.status = 409
+  const q = createSaveQueue({
+    save: async () => { attempts++; throw conflict },
+    onState: (s, err) => states.push({ s, status: err?.status }),
+  })
+  q.markDirty()
+  await q.flush()
+  ok(!q.isDirty(), '409 does NOT re-mark dirty (no auto-retry)')
+  ok(states.length === 2 && states[1].s === 'error' && states[1].status === 409, '409 error surfaces to onState with status')
+  // A second flush should be a no-op because dirty is false.
+  await q.flush()
+  ok(attempts === 1, '409 is never auto-retried — only one save attempt')
+}
+
+// ---- non-409 errors DO re-mark dirty ----
+{
+  let attempts = 0
+  const netErr = new Error('gateway timeout')
+  netErr.status = 502
+  const q = createSaveQueue({
+    save: async () => { attempts++; if (attempts < 3) throw netErr },
+    onState: () => {},
+  })
+  q.markDirty()
+  await q.flush()
+  ok(q.isDirty(), '502 re-marks dirty for later retry')
+  await q.flush()
+  ok(q.isDirty(), 'still dirty after second 502')
+  await q.flush()
+  ok(!q.isDirty() && attempts === 3, 'succeeds on third attempt, no longer dirty')
+}
+
+// ---- flush during an in-flight save waits for FULL quiescence ----
+// This is the editor-close contract: close() awaits flush() and then reads the
+// state set by onState — so the promise must not resolve while a save (or its
+// trailing coalesced save) is still mid-air.
+{
+  let release
+  const gate = new Promise((r) => { release = r })
+  let saves = 0
+  const q = createSaveQueue({ save: async () => { saves++; if (saves === 1) await gate } })
+  q.markDirty()
+  q.flush() // save #1 in flight, holding on the gate
+  q.markDirty()
+  const closeWait = q.flush() // the editor-close await
+  let resolvedEarly = false
+  closeWait.then(() => { resolvedEarly = true })
+  await tick()
+  ok(!resolvedEarly, 'flush() during an in-flight save does not resolve early')
+  release()
+  await closeWait
+  ok(saves === 2, 'quiescence includes the trailing coalesced save')
+}
+
+// ---- a trailing failure is reported via onState BEFORE the awaited flush resolves ----
+{
+  const states = []
+  let release
+  const gate = new Promise((r) => { release = r })
+  let saves = 0
+  const netErr = new Error('down'); netErr.status = 502
+  const q = createSaveQueue({
+    save: async () => { saves++; if (saves === 1) { await gate; return } throw netErr },
+    onState: (s) => states.push(s),
+  })
+  q.markDirty(); q.flush()
+  q.markDirty()
+  const wait = q.flush()
+  release()
+  await wait
+  ok(states[states.length - 1] === 'error', 'trailing failure lands in onState before the quiescence promise resolves')
+  ok(q.isDirty(), 'trailing non-409 failure re-marks dirty')
+}
+
 // ---- reset forgets unsaved state ----
 {
   let saves = 0

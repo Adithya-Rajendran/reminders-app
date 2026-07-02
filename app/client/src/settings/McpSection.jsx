@@ -114,8 +114,6 @@ export default function McpSection() {
   // Inline confirm state: 'regenerate' | 'revoke' | null
   const [confirmAction, setConfirmAction] = useState(null)
 
-  // Tracks whether any PUT is in flight for widget toggles.
-  const [toggleBusy, setToggleBusy] = useState(false)
   // Last toggle error message (separate from top-level `status` so it doesn't
   // overwrite the master-switch saved flash).
   const [toggleErr, setToggleErr] = useState(null)
@@ -125,6 +123,10 @@ export default function McpSection() {
   const [tokenBusy, setTokenBusy] = useState(false)
 
   const isMounted = useRef(true)
+  // Monotonically-increasing sequence counter for widget toggle PUTs.
+  // Each PUT stamps its own seq; responses whose seq < latestSeq are stale
+  // (out-of-order) and are discarded rather than overwriting newer local state.
+  const latestSeq = useRef(0)
   useEffect(() => {
     isMounted.current = true
     return () => { isMounted.current = false }
@@ -163,53 +165,71 @@ export default function McpSection() {
   }
 
   // Toggle an individual widget.
+  // Sends only a single-key delta { widgets: { [type]: bool } } — server merges
+  // it into current state, so a stale client map can’t clobber other keys.
   const setWidgetEnabled = async (type, on) => {
     if (!settings) return
     const prevWidgets = settings.widgets || {}
-    const nextWidgets = { ...prevWidgets, [type]: on }
-    // Optimistic update.
-    setSettings((s) => ({ ...s, widgets: nextWidgets }))
-    setToggleBusy(true)
+    // Optimistic update: flip just this key. No busy-lockout on the switches —
+    // per-key deltas + server merge + the seq guard make concurrent toggles
+    // safe, and locking every switch during a PUT made toggling a list of
+    // widgets needlessly serial.
+    setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: on } }))
     setToggleErr(null)
+    // Stamp this request with a monotonically-increasing seq so that if two
+    // rapid PUTs resolve out of order we can discard the stale one.
+    const mySeq = ++latestSeq.current
     try {
       const next = await api('/api/mcp/settings', {
         method: 'PUT',
-        body: JSON.stringify({ widgets: nextWidgets }),
+        // Delta only — server merges; never sends the whole map.
+        body: JSON.stringify({ widgets: { [type]: on } }),
       })
-      if (isMounted.current) setSettings(next)
+      if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
-        // Revert the optimistic change.
-        setSettings((s) => ({ ...s, widgets: prevWidgets }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
+        // The revert must respect the seq guard too: if a newer PUT owns the
+        // state, restoring this request's snapshot would clobber it — re-sync
+        // from the server instead.
+        if (mySeq === latestSeq.current) {
+          // Revert only the toggled key, not the whole map.
+          setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: prevWidgets[type] } }))
+        } else {
+          load()
+        }
       }
-    } finally {
-      if (isMounted.current) setToggleBusy(false)
     }
   }
 
   // Enable all MCP-capable widgets at once.
+  // Sends the full all-true map; safe with merge semantics and not a delta
+  // (intent is to enable everything, so sending the complete set is correct).
   const enableAll = async () => {
     if (!settings) return
     const prevWidgets = settings.widgets || {}
     const nextWidgets = { ...prevWidgets }
     for (const m of MCP_WIDGETS) nextWidgets[m.type] = true
     setSettings((s) => ({ ...s, widgets: nextWidgets }))
-    setToggleBusy(true)
     setToggleErr(null)
+    const mySeq = ++latestSeq.current
     try {
       const next = await api('/api/mcp/settings', {
         method: 'PUT',
         body: JSON.stringify({ widgets: nextWidgets }),
       })
-      if (isMounted.current) setSettings(next)
+      if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
-        setSettings((s) => ({ ...s, widgets: prevWidgets }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
+        // Same seq-guarded revert as setWidgetEnabled — the whole-map restore
+        // is only safe while this request is still the latest.
+        if (mySeq === latestSeq.current) {
+          setSettings((s) => ({ ...s, widgets: prevWidgets }))
+        } else {
+          load()
+        }
       }
-    } finally {
-      if (isMounted.current) setToggleBusy(false)
     }
   }
 
@@ -266,8 +286,9 @@ export default function McpSection() {
   const tokenForSnippet = freshToken ?? '<your token>'
   const cliSnippet = `claude mcp add --transport http reminders ${endpoint} --header "Authorization: Bearer ${tokenForSnippet}"`
 
-  // All widget toggles are disabled when MCP is off or something is saving.
-  const widgetDisabled = !enabled || toggleBusy
+  // Widget toggles are disabled only while MCP itself is off — in-flight PUTs
+  // don't lock them (deltas + merge + seq guard make concurrency safe).
+  const widgetDisabled = !enabled
 
   return (
     <div className="notes-cfg">

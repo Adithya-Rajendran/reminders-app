@@ -63,13 +63,25 @@ export default function DateTimePicker({ anchorRef, value, hasReminder, onApply,
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [anchorRef, onClose])
 
-  // Focus into the dialog on open, trap Tab, and restore focus to the chip on close.
+  // Restore focus to whatever opened us (the chip) on unmount. Captured at
+  // mount — before the dialog steals focus — and deliberately NOT keyed on
+  // `pos`: place() rebuilds that object on every scroll/resize, and re-running
+  // this cleanup mid-life would re-capture `prev` from inside the dialog, so
+  // closing would "restore" focus to a node that just unmounted (body).
+  useEffect(() => {
+    const prev = document.activeElement
+    return () => { if (prev && prev.focus) prev.focus() }
+  }, [])
+
+  // Focus into the dialog once it's placed, and trap Tab. `ready` flips
+  // false->true exactly once, so repositioning never yanks focus back to the
+  // first chip.
+  const ready = !!pos
   useEffect(() => {
     const node = popRef.current
-    if (!node || !pos) return undefined
-    const prev = document.activeElement
+    if (!node || !ready) return undefined
     const q = 'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
-    const focusables = () => [...node.querySelectorAll(q)].filter((el) => !el.disabled && el.offsetParent !== null)
+    const focusables = () => [...node.querySelectorAll(q)].filter((el) => !el.disabled && el.offsetParent !== null && el.tabIndex !== -1)
     const t = setTimeout(() => { const f = focusables(); (f[0] || node).focus() }, 0)
     const onTab = (e) => {
       if (e.key !== 'Tab') return
@@ -79,8 +91,8 @@ export default function DateTimePicker({ anchorRef, value, hasReminder, onApply,
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
     }
     node.addEventListener('keydown', onTab)
-    return () => { clearTimeout(t); node.removeEventListener('keydown', onTab); if (prev && prev.focus) prev.focus() }
-  }, [pos])
+    return () => { clearTimeout(t); node.removeEventListener('keydown', onTab) }
+  }, [ready])
 
   const preset = (kind) => {
     const d = new Date()
@@ -102,6 +114,41 @@ export default function DateTimePicker({ anchorRef, value, hasReminder, onApply,
   const todayV = { y: now.getFullYear(), m: now.getMonth(), d: now.getDate() }
   const grid = monthGrid(view.y, view.m)
 
+  // Roving tabindex over the day grid (ARIA calendar pattern): exactly one day
+  // is a Tab stop — 31 sequential Tab presses to cross a month is unusable —
+  // and arrows move by day/week, PageUp/Down by month, Home/End across the week.
+  const [focusD, setFocusD] = useState(null) // day-of-month currently holding the tab stop
+  const gridFocusPending = useRef(false)
+  const daysInView = new Date(view.y, view.m + 1, 0).getDate()
+  const rovingDay = Math.min(
+    focusD ?? ((sel && sel.y === view.y && sel.m === view.m) ? sel.d
+      : (todayV.y === view.y && todayV.m === view.m) ? todayV.d : 1),
+    daysInView,
+  )
+  const onGridKey = (e) => {
+    const cur = Number(e.target?.dataset?.day) || rovingDay
+    const dow = new Date(view.y, view.m, cur).getDay()
+    const dayDelta = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1
+      : e.key === 'ArrowUp' ? -7 : e.key === 'ArrowDown' ? 7
+      : e.key === 'Home' ? -dow : e.key === 'End' ? 6 - dow : null
+    const monthDelta = e.key === 'PageUp' ? -1 : e.key === 'PageDown' ? 1 : 0
+    if (dayDelta === null && !monthDelta) return
+    e.preventDefault()
+    const t = monthDelta
+      ? new Date(view.y, view.m + monthDelta, Math.min(cur, new Date(view.y, view.m + monthDelta + 1, 0).getDate()))
+      : new Date(view.y, view.m, cur + dayDelta)
+    setView({ y: t.getFullYear(), m: t.getMonth() })
+    setFocusD(t.getDate())
+    gridFocusPending.current = true
+  }
+  // Move DOM focus to the new tab stop after the (possibly month-switching)
+  // re-render it triggered.
+  useEffect(() => {
+    if (!gridFocusPending.current) return
+    gridFocusPending.current = false
+    popRef.current?.querySelector(`.dt-grid [data-day="${rovingDay}"]`)?.focus()
+  })
+
   if (!pos) return null
   return createPortal(
     <div ref={popRef} className="dtpick" role="dialog" aria-modal="true" aria-label="Pick date and time" tabIndex={-1} style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}>
@@ -116,12 +163,12 @@ export default function DateTimePicker({ anchorRef, value, hasReminder, onApply,
         <button type="button" className="iconbtn sm" aria-label="Next month" onClick={() => shiftMonth(1)}>›</button>
       </div>
       <div className="dt-dow">{DOW.map((d) => <span key={d}>{d}</span>)}</div>
-      <div className="dt-grid">
+      <div className="dt-grid" onKeyDown={onGridKey}>
         {grid.map((d, i) => d === null
           ? <span key={i} />
           : (
             <button
-              type="button" key={i}
+              type="button" key={i} data-day={d} tabIndex={d === rovingDay ? 0 : -1}
               className={`dt-day${sameDay(sel, view.m, d, view) ? ' sel' : ''}${(todayV.y === view.y && todayV.m === view.m && todayV.d === d) ? ' today' : ''}`}
               aria-label={`${MONTHS[view.m]} ${d}, ${view.y}`}
               aria-pressed={!!sameDay(sel, view.m, d, view)}

@@ -7,6 +7,7 @@ import { IconX } from './icons.jsx'
 // command palette ("Keyboard shortcuts"), so each surface advertises the other.
 const GLOBAL = [
   ['c', 'Capture a task from anywhere'],
+  ['n', 'New note'],
   ['Ctrl/⌘ K', 'Command palette (or Ctrl/⌘ P)'],
   ['Ctrl/⌘ O', 'Search notes'],
   ['Ctrl/⌘ [ · ]', 'Previous / next dashboard'],
@@ -15,6 +16,7 @@ const GLOBAL = [
 const PALETTE = [
   ['>', 'Switch to command mode'],
   ['↑ ↓', 'Navigate results'],
+  ['PgUp PgDn', 'Jump by page (Home/End when empty)'],
   ['Enter', 'Open / run'],
   ['Esc', 'Close'],
 ]
