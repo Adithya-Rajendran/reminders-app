@@ -1,7 +1,8 @@
 /* ---------- Notes widget ---------- */
-/* Editor/shared classes (.note-*, .trash-*, .prompt-*, .cmdk-*, .notes-cfg*/.notes-chip
-   settings selectors, and .tree-chev which Backlinks also uses) stay in the global
-   styles.css — only the classes rendered solely by NotesWidget live here. */
+/* Editor/shared classes (.note-x, .trash-x, .prompt-x, .cmdk-x, the .notes-cfg /
+   .notes-chip settings selectors, and .tree-chev which Backlinks also uses) stay
+   in the global styles.css — only the classes rendered solely by NotesWidget live
+   here. */
 .notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 /* folder-tree sidebar layout */
 .notes-widget.tree { flex-direction: row; gap: 0; }
