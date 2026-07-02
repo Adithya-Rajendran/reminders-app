@@ -9,7 +9,13 @@ export async function api(path, opts = {}) {
     window.location.href = '/auth/login'
     throw new Error('unauthenticated')
   }
-  if (!res.ok) throw new Error((await res.text()) || res.statusText)
+  if (!res.ok) {
+    const e = new Error((await res.text()) || res.statusText)
+    // Attach the HTTP status so callers can distinguish 409 (conflict) from
+    // 5xx network errors without parsing the message string.
+    e.status = res.status
+    throw e
+  }
   const ct = res.headers.get('content-type') || ''
   return ct.includes('json') ? res.json() : res.text()
 }

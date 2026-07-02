@@ -17,6 +17,16 @@ export function serializeWikilink({ target, alias } = {}) {
 // The text to show for a wikilink (alias if present, else target).
 export const wikilinkLabel = (inner) => { const { target, alias } = parseWikilink(inner); return alias || target }
 
+// Whether a `[[` suggestion trigger at `pos` falls inside an already-complete
+// [[...]] range. Clicking a wikilink parks the caret inside the link text, and
+// without this guard the autocomplete would open there — one Enter away from
+// splicing `[[title]]` into the middle of the existing link (leaving orphaned
+// brackets), possibly after the click has already swapped the editor to the
+// target note. `pos` is the match start (the `[[`), so a match that begins
+// anywhere inside a complete link — including one whose query would swallow
+// the closing `]]` — is rejected.
+export const insideWikilink = (ranges, pos) => (ranges || []).some((r) => pos >= r.from && pos < r.to)
+
 // Resolve a target (a note title) to a note from the list. Case-insensitive; on a
 // title collision prefer the same folder, then the most recently updated.
 export function resolveWikilink(target, notes, fromFolder = '') {

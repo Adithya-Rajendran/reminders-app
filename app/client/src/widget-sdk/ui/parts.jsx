@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { IconRefresh, IconInbox } from '../../icons.jsx'
 import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate, PRIORITIES } from '../../tasklib.js'
+import { announce } from './announcer.jsx'
 
 export function SkeletonRows({ n = 5 }) {
   return (
@@ -43,21 +45,38 @@ export function ErrorState({ sub, onRetry }) {
 // full ErrorState card. (Shown only when there ARE tasks; initial-load failure
 // still gets the full ErrorState.)
 export function ReconnectBanner({ onRetry }) {
+  // Announced through the app-level live region (see announcer.jsx) — a
+  // conditionally-mounted role="status" node is rarely read by screen readers.
+  useEffect(() => { announce('Can’t reach your server — showing the last synced copy.') }, [])
   return (
-    <div className="reconnect-banner" role="status">
+    <div className="reconnect-banner">
       <span><IconRefresh size={12} /> Can’t reach your server — showing the last synced copy.</span>
       {onRetry && <button type="button" className="undo-btn" onClick={onRetry}>Retry</button>}
     </div>
   )
 }
 
-export function UndoBar({ undo, dismiss }) {
+// Transient widget notice: undo (accent), error (danger) or info. The visual
+// bar is a plain div; screen-reader announcement goes through the app-level
+// LiveAnnouncer so it is actually read (see announcer.jsx).
+//   notice = { kind?: 'undo'|'error'|'info', label, action?: { label, fn } }
+export function NoticeBar({ notice, dismiss }) {
+  useEffect(() => { announce(notice.label) }, [notice.label])
+  const kind = notice.kind || 'undo'
   return (
-    <div className="undo-bar" role="status">
-      <span>{undo.label}</span>
-      {undo.fn && <button className="undo-btn" onClick={() => { undo.fn(); dismiss() }}>Undo</button>}
+    <div className={`undo-bar${kind === 'error' ? ' notice-error' : ''}`}>
+      <span>{notice.label}</span>
+      {notice.action?.fn && (
+        <button className="undo-btn" onClick={() => { notice.action.fn(); dismiss() }}>{notice.action.label}</button>
+      )}
     </div>
   )
+}
+
+// Back-compat shell used across every widget: { undo: { label, fn? } }. Kept as
+// a one-line adapter so ten call sites don't churn.
+export function UndoBar({ undo, dismiss }) {
+  return <NoticeBar notice={{ kind: 'undo', label: undo.label, action: undo.fn ? { label: 'Undo', fn: undo.fn } : undefined }} dismiss={dismiss} />
 }
 
 // Live, read-only preview of the tokens parseQuickAdd will pull from a quick-add

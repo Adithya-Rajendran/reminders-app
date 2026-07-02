@@ -25,6 +25,8 @@ export function useTaskList(tasks, selector) {
   const showUndo = useCallback((label, fn) => {
     clearTimeout(undoTimer.current)
     setUndo({ label, fn })
+    // No announce() here: the UndoBar this feeds is a NoticeBar, which already
+    // announces its label on mount — announcing both would double-speak.
     undoTimer.current = setTimeout(() => setUndo(null), 6000)
   }, [])
   const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])

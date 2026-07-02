@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 // (browser Back/Forward uses Cmd+arrow, so the brackets are safe to claim).
 // Modifier combos preventDefault so the browser's Open/Print don't fire.
 const isTyping = (el) => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-export function useGlobalHotkeys({ onQuickSwitch, onCommands, onQuickCapture, onHelp, onCycleDash }) {
+export function useGlobalHotkeys({ onQuickSwitch, onCommands, onQuickCapture, onNewNote, onHelp, onCycleDash }) {
   useEffect(() => {
     const onKey = (e) => {
       const mod = e.metaKey || e.ctrlKey
@@ -17,6 +17,10 @@ export function useGlobalHotkeys({ onQuickSwitch, onCommands, onQuickCapture, on
       // Bare 'c' = quick-capture from anywhere (no modifier), unless typing.
       if (!mod && !e.altKey && !e.shiftKey && k === 'c' && onQuickCapture && !isTyping(document.activeElement)) {
         e.preventDefault(); onQuickCapture(); return
+      }
+      // Bare 'n' = new note, same guards (mirrors 'c' for the notes half).
+      if (!mod && !e.altKey && !e.shiftKey && k === 'n' && onNewNote && !isTyping(document.activeElement)) {
+        e.preventDefault(); onNewNote(); return
       }
       // Bare '?' = shortcut cheat sheet. Shift is inherently held for '?', so
       // match on e.key and exempt the shift check.
@@ -30,5 +34,5 @@ export function useGlobalHotkeys({ onQuickSwitch, onCommands, onQuickCapture, on
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onQuickSwitch, onCommands, onQuickCapture, onHelp, onCycleDash])
+  }, [onQuickSwitch, onCommands, onQuickCapture, onNewNote, onHelp, onCycleDash])
 }

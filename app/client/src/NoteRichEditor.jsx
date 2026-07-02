@@ -20,6 +20,7 @@ import { usePopover } from './usePopover.js'
 import { RES_PREFIX, sceneNameFor, toDisplay, toDisk, EXT } from './notepaths.js'
 import { resolveWikilink } from './wikilinks.js'
 import { emitOpenNote } from './notesbus.js'
+import { emitNotice } from './notices.js'
 import { notesApi } from './api.js'
 import { IconSpinner } from './icons.jsx'
 
@@ -153,14 +154,32 @@ export default function NoteRichEditor({ value, onChange, notes = [], folder = '
     const ed = editorRef.current
     if (!ed) return
     const name = crypto.randomUUID() + '.' + (EXT[file.type] || 'png')
-    try { await notesApi.uploadResource(name, file, file.type); ed.chain().focus().setImage({ src: RES_PREFIX + name, alt: file.name || 'image' }).run() } catch { /* ignore */ }
+    try {
+      await notesApi.uploadResource(name, file, file.type)
+      ed.chain().focus().setImage({ src: RES_PREFIX + name, alt: file.name || 'image' }).run()
+    } catch {
+      // Surface the failure through the notices bus so the widget's NoticeBar
+      // shows it — the editor has no UI of its own for errors.
+      emitNotice({ kind: 'error', label: 'Image upload failed' })
+    }
   }
 
   const onDrawingSave = async ({ json, png }) => {
     const ed = editorRef.current
     const id = drawing.id || crypto.randomUUID()
-    await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/octet-stream' }), 'application/octet-stream')
-    await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
+    try {
+      await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/octet-stream' }), 'application/octet-stream')
+      await notesApi.uploadResource(id + '.excalidraw.png', png, 'image/png')
+    } catch {
+      // Drawing save failed: notify via the bus. Keep the modal open (setDrawing
+      // is NOT cleared here) so the user can retry from inside the dialog.
+      emitNotice({
+        kind: 'error',
+        label: 'Drawing save failed',
+        action: { label: 'Retry', fn: () => onDrawingSave({ json, png }) },
+      })
+      return
+    }
     const src = RES_PREFIX + id + '.excalidraw.png'
     if (drawing.src) {
       // edit: replace the opened node's preview (cache-bust), preserving its width.

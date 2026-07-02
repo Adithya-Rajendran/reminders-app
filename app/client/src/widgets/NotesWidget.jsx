@@ -4,8 +4,9 @@ import {
   buildTree, folderKids, noteKids, countNotes, canDropInto,
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
   widgetStore,
-  SkeletonRows, EmptyState, ErrorState, UndoBar,
+  SkeletonRows, EmptyState, ErrorState, ReconnectBanner, NoticeBar,
   IconNote, IconPlus, IconCloud, IconFolder, IconChevR, IconChevL, IconChevDown, IconSort, IconPin, IconDots, IconTrash, IconSun,
+  onNotice,
 } from '../widget-sdk'
 import { NoteEditor, PromptModal, NoteContextMenu, TrashView } from '../widget-sdk/notes'
 
@@ -70,6 +71,7 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
 export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceId }) {
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
   const [state, setState] = useState('loading') // loading | ready | error | unconfigured
+  const [stale, setStale] = useState(false)     // background refresh failed but we still have data
   const [notes, setNotes] = useState([])
   const [folders, setFolders] = useState([])
   const [sel, setSel] = useState('')      // active folder (where new items go)
@@ -92,18 +94,24 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const [tplOpen, setTplOpen] = useState(false)
   const tplRef = usePopover(tplOpen, setTplOpen)
 
-  // Soft-delete (trash) confirmation + Undo, mirroring CalendarWidget's 6s
-  // delete→undo: trashing a note is reversible (notesApi.restore), so instead of
-  // a confirm we move it and offer a transient Undo bar.
-  const [undo, setUndo] = useState(null)
-  const undoTimer = useRef(null)
-  const dismissUndo = useCallback(() => { clearTimeout(undoTimer.current); setUndo(null) }, [])
-  const showUndo = useCallback((label, fn) => {
-    clearTimeout(undoTimer.current)
-    setUndo({ label, fn })
-    undoTimer.current = setTimeout(() => setUndo(null), 6000)
+  // Unified notice slot (replaces the old undo-only `undo` state).
+  // Holds ONE notice at a time: undo (accent), error (danger), or info.
+  //   notice = { kind: 'undo'|'error'|'info', label, action?: { label, fn } }
+  // Undo behavior is identical — the UndoBar was a NoticeBar with kind='undo'.
+  const [notice, setNotice] = useState(null)
+  const noticeTimer = useRef(null)
+  const dismissNotice = useCallback(() => { clearTimeout(noticeTimer.current); setNotice(null) }, [])
+  const showNotice = useCallback((n, autoDismissMs = 6000) => {
+    clearTimeout(noticeTimer.current)
+    setNotice(n)
+    if (autoDismissMs > 0) noticeTimer.current = setTimeout(() => setNotice(null), autoDismissMs)
   }, [])
-  useEffect(() => () => clearTimeout(undoTimer.current), [])
+  useEffect(() => () => clearTimeout(noticeTimer.current), [])
+
+  // NoteEditor / NoteRichEditor emit notices through the notices bus so they
+  // can surface errors (image upload failed, drawing save failed) in the
+  // widget's notice slot without a prop-drilling chain.
+  useEffect(() => onNotice((n) => showNotice(n)), [showNotice])
 
   // Size class from the shared widget-size system (one observer lives in the
   // frame). Narrow collapses to a single master-detail column; a very wide widget
@@ -114,15 +122,34 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const wide = atLeastW(sz, 'xl')
   const showAux = atLeastH(sz, 'sm')
 
+  // stateRef lets the load callback read the current state without being listed
+  // as a dep (which would recreate load() on every state change and cause loops).
+  const stateRef = useRef('loading')
+  stateRef.current = state
+
   const load = useCallback(async () => {
+    // On initial / forced load: show skeleton; on background refresh: keep the
+    // existing tree visible and set the stale flag only when it fails (never
+    // wipe to ErrorState while there is data to show).
     setState((s) => (s === 'ready' ? s : 'loading'))
     try {
       const r = await notesApi.list()
       if (!r.configured) { setState('unconfigured'); return }
       setNotes(Array.isArray(r.notes) ? r.notes : [])
-      try { const fr = await notesApi.folders(); setFolders((fr.folders || []).filter(Boolean)) } catch { /* keep */ }
+      // Folders sub-fetch is best-effort — failure folds into the stale flag,
+      // not a separate error state, because the tree still shows note paths.
+      try { const fr = await notesApi.folders(); setFolders((fr.folders || []).filter(Boolean)) } catch { setStale(true) }
+      setStale(false)
       setState('ready')
-    } catch { setState('error') }
+    } catch {
+      if (stateRef.current === 'ready') {
+        // Background refresh failed — keep the existing tree, show the banner.
+        setStale(true)
+      } else {
+        // Initial load failed — show the full ErrorState.
+        setState('error')
+      }
+    }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -146,10 +173,36 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
     setRecent((prev) => { const next = pushRecent(prev, { path: openPath, title }); store.saveJson(RECENT_KEY, next); return next })
   }, [openPath, notes])
 
+  // ---- uniform mutation wrapper ----
+  // Every mutating action goes through act(label, fn). On failure it shows an
+  // error notice with a consistent format; on undo-eligible actions the caller
+  // passes a confirmFn. This collapses ~11 separate catch-and-ignore paths into
+  // a single auditable pattern so new error cases can't silently regress.
+  const act = useCallback((label, fn, { retryFn, onSuccess } = {}) => async (...args) => {
+    try {
+      const result = await fn(...args)
+      onSuccess?.(result)
+      return result
+    } catch {
+      showNotice({
+        kind: 'error',
+        label: `${label} failed`,
+        action: retryFn ? { label: 'Retry', fn: retryFn } : undefined,
+      })
+    }
+  }, [showNotice])
+
   // ---- per-note actions (context menu) ----
   const openCtx = (note, x, y) => setCtxMenu({ note, x, y })
-  const doDuplicate = async (n) => { try { const r = await notesApi.duplicate(n.path); await load(); setOpenPath(r.path) } catch { /* ignore */ } }
-  const doPin = async (n) => { try { await notesApi.setPinned(n.path, !n.pinned); await load() } catch { /* ignore */ } }
+
+  const doDuplicate = act('Duplicate', async (n) => {
+    const r = await notesApi.duplicate(n.path); await load(); setOpenPath(r.path)
+  })
+
+  const doPin = act('Pin', async (n) => {
+    await notesApi.setPinned(n.path, !n.pinned); await load()
+  })
+
   // Move a note to Trash, then offer Undo (restore) — the editor's trash button
   // funnels here too (onDeleted) so both paths share the confirmation bar.
   const doDelete = async (n) => {
@@ -157,14 +210,38 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       await notesApi.trash(n.path)
       if (openPath === n.path) setOpenPath(null)
       await load()
-      showUndo('Moved to Trash', async () => {
-        try { await notesApi.restore(n.path); await load() } catch { /* best-effort restore */ }
+      // Undo restore failure surfaces as an error notice with an "Open Trash"
+      // action (so the user can still manually restore from the trash view).
+      showNotice({
+        kind: 'undo',
+        label: 'Moved to Trash',
+        action: {
+          label: 'Undo',
+          fn: async () => {
+            try { await notesApi.restore(n.path); await load() } catch {
+              showNotice({
+                kind: 'error',
+                label: 'Couldn\'t restore note',
+                action: { label: 'Open Trash', fn: () => setTrashOpen(true) },
+              })
+            }
+          },
+        },
       })
-    } catch { /* ignore */ }
+    } catch {
+      showNotice({ kind: 'error', label: 'Move to Trash failed' })
+    }
   }
+
   const submitRename = async (newTitle) => {
     const p = renamePrompt; setRenamePrompt(null)
-    try { const r = await notesApi.rename(p.path, newTitle); if (openPath === p.path && r?.path) setOpenPath(r.path); await load() } catch { /* ignore */ }
+    try {
+      const r = await notesApi.rename(p.path, newTitle)
+      if (openPath === p.path && r?.path) setOpenPath(r.path)
+      await load()
+    } catch {
+      showNotice({ kind: 'error', label: 'Rename failed' })
+    }
   }
 
   const toggleExpand = (path) => setExpanded((prev) => {
@@ -174,9 +251,10 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   })
   const expandAncestors = (path) => setExpanded((prev) => new Set([...prev, ...ancestorsOf(path)]))
 
-  const newNote = async () => {
-    try { const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
-  }
+  const newNote = act('Create note', async () => {
+    const n = await notesApi.create(sel, 'Untitled'); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path)
+  })
+
   // Daily note (Logseq/Obsidian pattern): a frictionless capture surface titled by
   // today's date. Opens the existing one if present (matched by title, any folder),
   // else creates it in the active folder. Low-friction capture is the best-evidenced
@@ -186,8 +264,11 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
     const title = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const existing = notes.find((n) => n.title === title)
     if (existing) { setOpenPath(existing.path); return }
-    try { const n = await notesApi.create(sel, title); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch { /* ignore */ }
+    try { const n = await notesApi.create(sel, title); if (sel) expandAncestors(sel); await load(); setOpenPath(n.path) } catch {
+      showNotice({ kind: 'error', label: 'Couldn\'t create today\'s note' })
+    }
   }
+
   // New note from a template (a note in the Templates folder): duplicate it, then
   // move the copy into the active folder and open it.
   const newFromTemplate = async (tpl) => {
@@ -197,7 +278,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       let path = dup.path
       if (sel) { const mv = await notesApi.move(dup.path, sel); path = mv.path; expandAncestors(sel) }
       await load(); setOpenPath(path)
-    } catch { /* ignore */ }
+    } catch {
+      showNotice({ kind: 'error', label: 'Couldn\'t create note from template' })
+    }
   }
 
   // ---- drag & drop: move a note (or folder) into a folder, or out to the root ----
@@ -216,7 +299,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       }
       if (target) expandAncestors(target)
       await load()
-    } catch { /* ignore */ }
+    } catch {
+      showNotice({ kind: 'error', label: 'Move failed' })
+    }
   }
   const dnd = {
     over: overTarget,
@@ -233,7 +318,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const createFolder = async (name) => {
     setFolderPrompt(false)
     const path = sel ? sel + '/' + name : name
-    try { await notesApi.createFolder(path); expandAncestors(path); setSel(path); await load() } catch { /* ignore */ }
+    try { await notesApi.createFolder(path); expandAncestors(path); setSel(path); await load() } catch {
+      showNotice({ kind: 'error', label: 'Couldn\'t create folder' })
+    }
   }
 
   const allTags = useMemo(() => [...new Set(notes.flatMap((n) => n.tags || []))].sort(), [notes])
@@ -287,6 +374,8 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
 
   return (
     <div className={`notes-widget notes-split${narrow ? ' narrow' : ''}${wide ? ' notes-wide' : ''}`} style={{ position: 'relative' }}>
+      {/* Background refresh failed: keep tree visible, show a quiet banner. */}
+      {stale && <ReconnectBanner onRetry={load} />}
       {showSidebar && (
         <aside className="notes-sidebar">
           <div className="note-toolbar">
@@ -300,7 +389,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                 </div>
               )}
             </div>
-            <button className="iconbtn sm" aria-label="Today’s note" title="Open today’s note" onClick={openToday}><IconSun size={15} /></button>
+            <button className="iconbtn sm" aria-label="Today's note" title="Open today's note" onClick={openToday}><IconSun size={15} /></button>
             <button className="iconbtn sm" aria-label="New folder" title={sel ? `New folder in ${sel}` : 'New folder'} onClick={() => setFolderPrompt(true)}><IconFolder size={15} /></button>
             <button className="iconbtn sm" aria-label="New note" title={sel ? `New note in ${sel}` : 'New note'} onClick={newNote}><IconPlus size={16} /></button>
             {templates.length > 0 && (
@@ -334,6 +423,15 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
               : searching
                 ? (
                   <>
+                    {/* A live tag filter silently narrows search results — say so,
+                        with a one-click way out, or "no matches" reads as "the
+                        note doesn't exist". */}
+                    {tag && ql && (
+                      <div className="note-search-scope">
+                        Searching within <strong>#{tag}</strong>
+                        <button type="button" className="undo-btn" onClick={() => setTag(null)}>Search all notes</button>
+                      </div>
+                    )}
                     {sortNotes(matches, sort).map((n) => (
                       <div
                         key={n.path} className={`tree-row tree-note${openPath === n.path ? ' active' : ''}`} style={{ paddingLeft: 8 }}
@@ -395,20 +493,48 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
             <button className="notes-back" onClick={() => setOpenPath(null)}><IconChevL size={15} /> Files</button>
           )}
           {trashOpen
-            ? <TrashView onClose={() => setTrashOpen(false)} onChanged={load} />
+            ? (
+              <TrashView
+                onClose={() => setTrashOpen(false)} onChanged={load}
+                // Restoring shouldn't strand the user in a now-emptier trash:
+                // confirm it happened and offer a one-click way to the note.
+                onRestored={(r) => showNotice({
+                  kind: 'info',
+                  label: `Restored “${r?.title || 'note'}”`,
+                  action: r?.path ? { label: 'Open', fn: () => { setTrashOpen(false); setOpenPath(r.path) } } : undefined,
+                })}
+              />
+            )
             : openPath
               ? (
                 <NoteEditor
                   inline path={openPath} notes={notes}
                   onClose={() => setOpenPath(null)}
                   onChanged={(np) => { if (np) setOpenPath(np); load() }}
-                  // The editor's trash button funnels through the widget's Undo
+                  // The editor's trash button funnels through the widget's notice
                   // bar (same as a context-menu delete) — it passes the trashed
                   // path so Undo can restore it.
                   onDeleted={(p) => {
                     const path = p || openPath
                     setOpenPath(null); load()
-                    if (path) showUndo('Moved to Trash', async () => { try { await notesApi.restore(path); await load() } catch { /* best-effort restore */ } })
+                    if (path) {
+                      showNotice({
+                        kind: 'undo',
+                        label: 'Moved to Trash',
+                        action: {
+                          label: 'Undo',
+                          fn: async () => {
+                            try { await notesApi.restore(path); await load() } catch {
+                              showNotice({
+                                kind: 'error',
+                                label: 'Couldn\'t restore note',
+                                action: { label: 'Open Trash', fn: () => setTrashOpen(true) },
+                              })
+                            }
+                          },
+                        },
+                      })
+                    }
                   }}
                 />
               )
@@ -424,7 +550,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       )}
       {folderPrompt && (
         <PromptModal
-          title="New folder" label={sel ? `Inside “${sel}”` : 'In Notes (root)'} placeholder="Folder name"
+          title="New folder" label={sel ? `Inside "${sel}"` : 'In Notes (root)'} placeholder="Folder name"
           onSubmit={createFolder} onCancel={() => setFolderPrompt(false)}
         />
       )}
@@ -443,9 +569,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
           onDelete={() => doDelete(ctxMenu.note)}
         />
       )}
-      {undo && (
+      {notice && (
         <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, zIndex: 5 }}>
-          <UndoBar undo={undo} dismiss={dismissUndo} />
+          <NoticeBar notice={notice} dismiss={dismissNotice} />
         </div>
       )}
     </div>

@@ -255,7 +255,12 @@ export async function renameNote(userId, path, newTitle) {
   for (let n = 2; target !== rel && await dav.exists(c.account, target); n++) target = join(dir, `${base} ${n}.md`)
   if (target !== rel) await dav.move(c.account, rel, target)
   invalidate(userId)
-  return { path: target, title: titleOf(target) }
+  // Return the fresh etag via PROPFIND (MOVE gives the resource a new etag on
+  // the server; the client must apply it so the next body-save's If-Match header
+  // isn't stale — a stale If-Match causes a 412 → 409 on the next PUT).
+  let etag = null
+  try { const entries = await dav.propfind(c.account, target, 0); etag = entries?.[0]?.etag || null } catch { /* best-effort */ }
+  return { path: target, title: titleOf(target), etag }
 }
 
 // Move a note into a different folder (creating it). Keeps the filename/id.
@@ -273,7 +278,11 @@ export async function moveNote(userId, path, folder) {
   for (let n = 2; target !== rel && await dav.exists(c.account, target); n++) target = join(dir, `${name.replace(/\.md$/i, '')} ${n}.md`)
   if (target !== rel) await dav.move(c.account, rel, target)
   invalidate(userId)
-  return { path: target, title: titleOf(target), folder: sanitizeFolder(folder) }
+  // Return the fresh etag via PROPFIND — a MOVE gives the resource a new etag;
+  // the client applies it so the next autosave's If-Match header stays current.
+  let etag = null
+  try { const entries = await dav.propfind(c.account, target, 0); etag = entries?.[0]?.etag || null } catch { /* best-effort */ }
+  return { path: target, title: titleOf(target), folder: sanitizeFolder(folder), etag }
 }
 
 // Pin / unpin a note (frontmatter `pinned: true`). Preserves `updated` so a

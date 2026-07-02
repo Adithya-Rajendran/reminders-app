@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -53,6 +53,26 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
   const [skip, setSkip] = useState(0)
   const nowTask = ranked.length ? ranked[skip % ranked.length] : null
 
+  // Completion beat: when the CURRENT task is checked off, the card used to just
+  // swap to the next task with zero acknowledgment — the completion read as a
+  // glitch. Show a transient (~2.5s) "Done ✓ — next: …" chip and announce the
+  // same string for screen readers. The next title is computed from the ranked
+  // list minus the completed task — the exact task the card will show next.
+  const [beat, setBeat] = useState(null)
+  const beatTimer = useRef(null)
+  useEffect(() => () => clearTimeout(beatTimer.current), [])
+  const completeNow = () => {
+    if (!nowTask) return
+    const rest = ranked.filter((t) => t.id !== nowTask.id)
+    const next = rest.length ? rest[skip % rest.length] : null
+    const msg = next ? `Done ✓ — next: ${next.title}` : 'Done ✓ — all clear'
+    clearTimeout(beatTimer.current)
+    setBeat(msg)
+    beatTimer.current = setTimeout(() => setBeat(null), 2500)
+    announce(msg) // the visual chip is a plain div; SR announcement goes through the app live region
+    onToggle(nowTask)
+  }
+
   // How many plan tasks are still open (excluding the current one)?
   const planSet = useMemo(() => new Set(todayPlanIds), [todayPlanIds])
   const planRemaining = useMemo(
@@ -72,17 +92,47 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
     return () => clearInterval(id)
   }, [running])
   const setDur = (min) => { const m = Math.max(5, Math.min(120, min)); setDurationMin(m); store.saveJson(DUR_KEY, m); if (!running) setRemaining(m * 60) }
-  const startTimer = () => { if (remaining <= 0) setRemaining(durationMin * 60); setSessionStart(Date.now()); setRunning(true) }
-  const resetTimer = () => { setRunning(false); setRemaining(durationMin * 60) }
+  const startTimer = () => { if (remaining <= 0) setRemaining(durationMin * 60); setSessionStart(Date.now()); setEndedSummary(null); setRunning(true) }
+  const resetTimer = () => { setRunning(false); setRemaining(durationMin * 60); setEndedSummary(null) }
 
   // Reminders that fired during the session, split so a genuinely urgent one can
   // break through while routine ones stay quietly parked (pull over push).
   const sessionEvents = running ? (events || []).filter((e) => (e?.receivedAt || 0) > sessionStart) : []
   const { breakthrough, routine } = partitionByTier(sessionEvents)
 
+  // When the timer hits 0 the live "N parked" strips above vanish (they only
+  // render while running) — which broke the "review them when you finish"
+  // promise. Snapshot what fired the moment the session ends and render it in
+  // the end state; cleared on the next start/reset.
+  const [endedSummary, setEndedSummary] = useState(null)
+  const sessionEnded = remaining === 0 && !running && sessionStart > 0
+  useEffect(() => {
+    if (!sessionEnded) return
+    const fired = (events || []).filter((e) => (e?.receivedAt || 0) > sessionStart)
+    setEndedSummary(partitionByTier(fired))
+  }, [sessionEnded])
+
   const [park, setPark] = useState(() => store.loadJson(PARK_KEY, ''))
-  const savePark = (text) => { setPark(text); store.saveJson(PARK_KEY, text) }
   const [parkOpen, setParkOpen] = useState(false)
+  // Parking a thought gave zero confirmation, so it read as text vanishing into a
+  // void. Persistence is synchronous (device-local storage, never-throw), so show
+  // a quiet debounced "saved" receipt — honest about the destination — once
+  // typing pauses; announced once per panel-open so SRs aren't spammed per pause.
+  const [parkSaved, setParkSaved] = useState(false)
+  const parkTimers = useRef({})
+  const parkAnnouncedRef = useRef(false)
+  useEffect(() => { parkAnnouncedRef.current = false }, [parkOpen])
+  useEffect(() => () => { clearTimeout(parkTimers.current.show); clearTimeout(parkTimers.current.hide) }, [])
+  const savePark = (text) => {
+    setPark(text); store.saveJson(PARK_KEY, text)
+    setParkSaved(false)
+    clearTimeout(parkTimers.current.show); clearTimeout(parkTimers.current.hide)
+    parkTimers.current.show = setTimeout(() => {
+      setParkSaved(true)
+      if (!parkAnnouncedRef.current) { parkAnnouncedRef.current = true; announce('Thought parked — saved on this device') }
+      parkTimers.current.hide = setTimeout(() => setParkSaved(false), 2000)
+    }, 800)
+  }
 
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={3} /></div>
   if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
@@ -100,7 +150,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
               <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
             )}
           </div>
-          <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={() => onToggle(nowTask)} />
+          <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={completeNow} />
           <div className="focus-now-body">
             <div className="focus-title">{nowTask.title}</div>
             <div className="focus-meta">
@@ -115,6 +165,10 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
       ) : (
         <EmptyState icon={IconTarget} title="Nothing to focus on" sub="No open tasks right now — enjoy the clear runway." />
       )}
+
+      {/* Transient completion acknowledgment (plain div — announce() covers SRs).
+          Its entry animation is disabled under prefers-reduced-motion in the CSS. */}
+      {beat && <div className="focus-beat">{beat}</div>}
 
       <div className={`focus-timer${running ? ' running' : ''}${done ? ' done' : ''}`}>
         <div className="focus-clock" aria-live="off">{done ? 'Done ✓' : fmtClock(remaining)}</div>
@@ -143,12 +197,33 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
         <div className="focus-parked" title="Routine reminders fired while you focus — review them when you finish"><IconBell size={13} /> {routine.length} reminder{routine.length > 1 ? 's' : ''} parked</div>
       )}
 
+      {/* End of session: pay off the "parked" promise with the actual snapshot. */}
+      {done && endedSummary && (endedSummary.breakthrough.length + endedSummary.routine.length) > 0 && (() => {
+        const all = [...endedSummary.breakthrough, ...endedSummary.routine]
+        const shown = all.slice(0, 4)
+        return (
+          <div className="focus-endpark">
+            <div className="focus-endpark-head">
+              <IconBell size={13} /> Parked while you focused
+              {endedSummary.breakthrough.length > 0 && <span className="focus-endpark-urgent"> · {endedSummary.breakthrough.length} urgent</span>}
+            </div>
+            <ul className="focus-endpark-list">
+              {shown.map((e, i) => <li key={i}>{e?.data?.event?.data?.task?.title || 'Reminder'}</li>)}
+            </ul>
+            {all.length > shown.length && <div className="focus-endpark-more">+{all.length - shown.length} more in the Reminders widget</div>}
+          </div>
+        )
+      })()}
+
       <div className="focus-brain">
-        <button type="button" className="focus-brain-head" aria-expanded={parkOpen} onClick={() => setParkOpen((o) => !o)}>
-          <IconChevR size={12} className={`rem-chev${parkOpen ? ' open' : ''}`} /> Park a thought{!parkOpen && park.trim() ? ' ·' : ''}
-        </button>
+        <div className="focus-brain-row">
+          <button type="button" className="focus-brain-head" aria-label={`Park a thought${!parkOpen && park.trim() ? ' (has saved text)' : ''}`} aria-expanded={parkOpen} onClick={() => setParkOpen((o) => !o)}>
+            <IconChevR size={12} className={`rem-chev${parkOpen ? ' open' : ''}`} /> Park a thought{!parkOpen && park.trim() ? ' ·' : ''}
+          </button>
+          {parkOpen && parkSaved && <span className="focus-park-saved">Saved · on this device</span>}
+        </div>
         {parkOpen && (
-          <textarea className="input focus-park" value={park} onChange={(e) => savePark(e.target.value)} placeholder="Dump loose ends here so they don’t pull at your attention…" />
+          <textarea className="input focus-park" aria-label="Park a thought" value={park} onChange={(e) => savePark(e.target.value)} placeholder="Dump loose ends here so they don’t pull at your attention…" />
         )}
       </div>
 

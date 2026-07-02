@@ -3,6 +3,7 @@ import { dueChip, pdotClass, PRIORITIES, timeLabel, absDate, cueTriggerOf } from
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../../taskviews.js'
 import { computeHabitStats, recentDays } from '../../habitstats.js'
 import { usePopover } from '../../usePopover.js'
+import { useMenuKeyNav } from './useMenuKeyNav.js'
 import { useWidgetSize } from '../../useWidgetSize.js'
 import { atMostW } from '../../widgetsize.js'
 import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../../icons.jsx'
@@ -58,14 +59,19 @@ const ClockMini = () => (
 // editing/typing elsewhere in a list no longer re-renders every sibling row. It
 // also re-renders when the enclosing widget crosses a size tier (context bypasses
 // memo), which is what lets it shed secondary controls in a very narrow column.
-function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, onSetDread, showHabit, childTasks, onAddSubtask }) {
+function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, onSetDread, showHabit, childTasks, onAddSubtask, dense: denseProp }) {
   const [burst, setBurst] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [subDraft, setSubDraft] = useState('')
   // In a very narrow column there's no room for the full control strip, so keep
   // the title + the due/schedule chip and drop the rest (priority, cue, labels,
   // quick-win, subtasks) — the row stays tappable and legible instead of wrapping.
-  const dense = atMostW(useWidgetSize(), 'xs')
+  // A widget can also FORCE density via the `dense` prop when it embeds rows in a
+  // cramped sub-layout (e.g. the triage matrix quadrants) regardless of its own
+  // width tier — the two are OR'd, never fighting each other. (The hook is called
+  // unconditionally — hiding it behind the || would break the Rules of Hooks.)
+  const sz = useWidgetSize()
+  const dense = denseProp || atMostW(sz, 'xs')
   const chip = dueChip(task.due_date)
   const repeats = (task.repeat_after || 0) > 0
   const cue = (task.cue || '').trim()
@@ -152,12 +158,19 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
 
 export default memo(TaskRow)
 
+// ArrowDown on a closed menu trigger opens it — useMenuKeyNav then moves focus
+// onto the first item, so the menu is arrow-key reachable without a click.
+const openOnArrowDown = (open, setOpen) => (e) => {
+  if (e.key === 'ArrowDown' && !open) { e.preventDefault(); setOpen(true) }
+}
+
 function PriorityControl({ value, onSet }) {
   const [open, setOpen] = useState(false)
   const ref = usePopover(open, setOpen)
+  useMenuKeyNav(open, ref) // roving focus over the priority menuitems
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" aria-haspopup="menu" aria-expanded={open} onKeyDown={openOnArrowDown(open, setOpen)} onClick={() => setOpen((o) => !o)}>
         <span className={`pdot ${pdotClass(value)}`} />
       </button>
       {open && (
@@ -235,10 +248,11 @@ function CueControl({ task, onSetCue, onSetTrigger }) {
 export function EstimateControl({ task, onSet }) {
   const [open, setOpen] = useState(false)
   const ref = usePopover(open, setOpen)
+  useMenuKeyNav(open, ref) // roving focus over the estimate menuitems
   const est = Math.max(0, Math.trunc(Number(task.time_estimate) || 0))
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" aria-haspopup="menu" aria-expanded={open} onKeyDown={openOnArrowDown(open, setOpen)} onClick={() => setOpen((o) => !o)}>
         {est ? '~' + fmtEst(est) : 'est'}
       </button>
       {open && (

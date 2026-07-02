@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 import { useModalRef } from './useModalRef.js'
 import ReminderGroupsSection from './settings/ReminderGroupsSection.jsx'
@@ -30,6 +30,11 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
   const [activeId, setActiveId] = useState(null) // account whose lists are shown in discover
   const [lists, setLists] = useState([])
   const [counts, setCounts] = useState({}) // listName -> task count (best-effort)
+
+  // Captured at connect() time: true when the user is adding their very first
+  // account (accounts.length === 0 before the POST). Used to auto-close after
+  // the discover step so the user lands on their now-working board.
+  const isFirstAccount = useRef(false)
 
   const preset = provider ? PROVIDER_PRESETS[provider] : null
   const formValid = !!preset && preset.fields.every((f) => (form[f.key] || '').trim().length > 0)
@@ -100,6 +105,9 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
     if (!provider) return
     setConnecting(true)
     setError(null)
+    // Capture whether this is the very first account BEFORE the POST so the
+    // discover-step close button can use it even after accounts reloads.
+    isFirstAccount.current = accounts.length === 0
     try {
       const body = {
         name: deriveName(provider, form),
@@ -139,6 +147,13 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
 
   const finishDiscover = async () => {
     await load()
+    // First-account flow: close the modal so the user lands on their now-working
+    // board instead of staying on an account list they don't need to act on yet.
+    if (isFirstAccount.current) {
+      isFirstAccount.current = false
+      onClose()
+      return
+    }
     setMode('list')
     setProvider(null)
     setForm({})
@@ -149,7 +164,10 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
 
   const backToList = () => { setMode('list'); setProvider(null); setForm({}); setError(null) }
 
-  const headSub = mode === 'list' ? 'Calendar & tasks (CalDAV) + notes (Nextcloud) — one account.'
+  const headSub = mode === 'list'
+    ? (accounts.length === 0
+      ? 'Connect your first account — your tasks and calendar stay on your own server.'
+      : 'Calendar & tasks (CalDAV) + notes (Nextcloud) — one account.')
     : mode === 'pick' ? 'Choose a provider to connect.'
       : mode === 'form' ? `Connect your ${preset ? preset.name : ''} account.`
         : 'Choose which lists to sync.'

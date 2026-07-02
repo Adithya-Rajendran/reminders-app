@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  useTaskList, widgetStore, useWidgetSize, usePopover, atLeastW, atLeastH,
+  useTaskList, widgetStore, useWidgetSize, usePopover, useMenuKeyNav, atLeastW, atLeastH,
   selectFrogScored, groupEisenhower, byImportanceThenDue, needsTriage,
   careerXp, levelForXp, levelProgress, taskXp, dailyStreak, countCompletions,
   DAILY_GOAL_DEFAULT, TRIAGE_XP, TRIAGE_DAILY_CAP,
-  TaskRow, EstimateControl, DreadControl,
+  XP_BASE, importanceFactor, effortFactor, dreadFactor,
+  TaskRow, EstimateControl, DreadControl, announce,
   dueChip, timeLabel, pdotClass,
   SkeletonRows, EmptyState, ErrorState, UndoBar,
   IconTrophy, IconBolt, IconFlame, IconFrog, IconGrid, IconList, IconGear,
@@ -22,6 +23,11 @@ const QUADS = [
   { k: 'Q4', label: 'Later', sub: 'neither' },
 ]
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+// Gear-menu keyboard nav options — module-level so the object identity is stable
+// (useMenuKeyNav keys its effect on it; a per-render object would re-run the
+// effect and yank focus back to `initial` mid-navigation).
+const RADIO_NAV = { selector: '[role="menuitemradio"]', radio: true, initial: (el) => el.querySelector('[aria-checked="true"]') }
 
 // Honor the OS "reduce motion" setting: we don't just zero animation durations
 // (styles.css already does), we skip SPAWNING confetti / fly-up nodes entirely.
@@ -58,6 +64,11 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
   const [celebrate, setCelebrate] = useState(() => store.loadJson('celebrate', 'full'))
   const [gearOpen, setGearOpen] = useState(false)
   const gearRef = usePopover(gearOpen, setGearOpen) // close on outside-click / Esc, like every other menu
+  useMenuKeyNav(gearOpen, gearRef, RADIO_NAV) // arrows rove the modes, starting on the active one
+  // XP explainer panel (opened from the level badge). Plain informational dialog —
+  // usePopover handles dismissal + focus restore; no menu items to rove.
+  const [xpOpen, setXpOpen] = useState(false)
+  const xpRef = usePopover(xpOpen, setXpOpen)
   // Effective celebration tier: OS reduced-motion (or the 'minimal' setting) wins.
   const fx = reduced || celebrate === 'minimal' ? 'none' : celebrate // 'full' | 'restrained' | 'none'
 
@@ -164,11 +175,15 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
     prevDerivedRef.current = derived
     if (derived <= prev) return // optimistic removals / reverts only lower it — ignore
     if (derived > hwm) { setHwm(derived); store.saveJson('xpHwm', derived) }
-    if (fx === 'none') return
-    pushFlyup(derived - prev, 'task')
     const oldTotal = Math.max(hwm, prev) + bonus
     const newTotal = Math.max(hwm, derived) + bonus
-    if (levelForXp(newTotal) > levelForXp(oldTotal)) fireLevelUp(levelForXp(newTotal))
+    const crossed = levelForXp(newTotal) > levelForXp(oldTotal)
+    // The announcement isn't "celebration motion" — the level genuinely changed,
+    // so screen readers hear it in every fx mode; only the visuals are gated.
+    if (crossed) announce(`Level ${levelForXp(newTotal)} reached`)
+    if (fx === 'none') return
+    pushFlyup(derived - prev, 'task')
+    if (crossed) fireLevelUp(levelForXp(newTotal))
   }, [derived, state]) // hwm/bonus/fx read fresh each run; exhaustive-deps is off project-wide
 
   // Award a small, daily-capped bonus the first time a task becomes fully triaged
@@ -201,6 +216,26 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
 
   const quads = useMemo(() => groupEisenhower(tasks, new Date()), [tasks])
 
+  // Frog completion beat: without it the boss card silently vanishes and the next
+  // frog instantly takes its place — the day's biggest win reads as a glitch. Hold
+  // the eaten frog's card for ~900ms in a "done" state before the next one renders.
+  // The announcement always fires; the visual hold is skipped under fx==='none'
+  // (reduced motion / minimal), where the instant swap is the point.
+  const [frogBeat, setFrogBeat] = useState(null) // { title, xp }
+  const frogBeatTimer = useRef(null)
+  useEffect(() => () => clearTimeout(frogBeatTimer.current), [])
+  const completeFrog = () => {
+    if (!frog) return
+    const xp = taskXp(frog)
+    announce(`Frog eaten — ${frog.title} done, plus ${xp} XP`)
+    if (fx !== 'none') {
+      clearTimeout(frogBeatTimer.current)
+      setFrogBeat({ title: frog.title, xp })
+      frogBeatTimer.current = setTimeout(() => setFrogBeat(null), 900)
+    }
+    onToggle(frog)
+  }
+
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
   if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
 
@@ -210,9 +245,44 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
     <div className="triage">
       {/* HUD: level + XP bar, today ring, streak, celebration setting */}
       <div className="tri-hud">
-        <div className="tri-level" title={`Level ${prog.level} · ${prog.toNext} XP to next`}>
-          <IconTrophy size={16} /> <b>Lv {prog.level}</b>
-        </div>
+        {/* The level badge doubles as the "how does XP work" explainer — the HUD
+            was numbers with no story, which reads as an opaque (gameable) score.
+            Everything below is computed LIVE from the leveling.js exports, so the
+            explanation can never drift from the actual formula. */}
+        <span className="inline-ctl tri-level-wrap" ref={xpRef}>
+          <button
+            type="button" className={`tri-level${levelUp != null ? ' lvlup' : ''}`}
+            title={`Level ${prog.level} · ${prog.toNext} XP to next — how does XP work?`}
+            aria-haspopup="dialog" aria-expanded={xpOpen}
+            onClick={() => setXpOpen((o) => !o)}
+          >
+            <IconTrophy size={16} /> <b>Lv {prog.level}</b>
+          </button>
+          {xpOpen && (
+            <div className="mini-menu tri-xp-pop" role="dialog" aria-label="How XP works">
+              <div className="xp-row xp-head">Level {prog.level} — {prog.into} / {prog.span} XP · {prog.toNext} to the next level</div>
+              <div className="xp-row">
+                Completing a task earns <b>{XP_BASE} XP</b>, multiplied by importance
+                (priority, up to ×{importanceFactor(5)}), effort (time estimate,
+                ×{effortFactor(1)}–{effortFactor(999)}) and dread (up to ×{dreadFactor(5)}) —
+                the hard, important, avoided work is worth the most.
+              </div>
+              {frog && (
+                <div className="xp-row">Today’s frog, “{frog.title}”, is worth <b>+{taskXp(frog)} XP</b>.</div>
+              )}
+              <div className="xp-row">
+                Triaging a task (setting an estimate and a schedule) earns
+                +{TRIAGE_XP} XP, capped at {TRIAGE_DAILY_CAP} XP a day.
+              </div>
+              <div className="xp-row">
+                The ring is today’s goal — {doneToday} of {goal} tasks done. The flame
+                counts days in a row with at least one completion; today is grace, so
+                an empty day only breaks the streak at midnight.
+              </div>
+              <div className="xp-row xp-trust">XP is computed from your completed tasks — it can’t be lost.</div>
+            </div>
+          )}
+        </span>
         <div className="tri-xp">
           <div className="tri-xpbar"><div className="tri-xpfill" style={{ width: `${prog.pct}%` }} /></div>
           {atLeastW(sz, 'md') && <span className="tri-xptext">{prog.into} / {prog.span} XP</span>}
@@ -249,16 +319,22 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
               <div className="eq-head"><span className="eq-label">{q.label}</span><span className="eq-count">{quads[q.k].length}</span></div>
               {wide && <div className="eq-sub">{q.sub}</div>}
               <div className="eq-list">
-                {quads[q.k].slice(0, wide ? 12 : 8).map((t) => {
-                  const c = dueChip(t.due_date)
-                  return (
-                    <div className="eq-item" key={t.id} title={t.title}>
-                      <span className={`pdot ${pdotClass(t.priority || 0)}`} />
-                      <span className="eq-item-t">{t.title}</span>
-                      {c && <span className={`chip ${c.cls}`}>{c.label}</span>}
-                    </div>
-                  )
-                })}
+                {/* Real (dense) TaskRows, not read-only echoes: the matrix is where
+                    you DECIDE, so complete/reschedule/re-prioritise must work right
+                    here instead of dead-ending into "find it in another widget".
+                    Same slice cap as before; the remainder is now counted. */}
+                {quads[q.k].slice(0, wide ? 12 : 8).map((t) => (
+                  <TaskRow
+                    key={t.id} task={t} dense
+                    onToggle={onToggle}
+                    onSchedule={onSchedule}
+                    onSetPriority={onSetPriority}
+                    onPatch={onPatch}
+                  />
+                ))}
+                {quads[q.k].length > (wide ? 12 : 8) && (
+                  <div className="eq-more">+{quads[q.k].length - (wide ? 12 : 8)} more</div>
+                )}
                 {quads[q.k].length === 0 && <div className="eq-empty">—</div>}
               </div>
             </div>
@@ -267,10 +343,17 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
       ) : (
         <>
           {/* The frog "boss" — biggest XP of the day */}
-          {frog ? (
+          {frogBeat ? (
+            <div className="tri-boss tri-boss-eaten" aria-hidden="true">
+              <div className="tri-boss-eyebrow"><IconFrog size={14} /> Frog eaten · +{frogBeat.xp} XP</div>
+              <div className="tri-boss-body">
+                <div className="tri-boss-title tri-eaten-title">{frogBeat.title}</div>
+              </div>
+            </div>
+          ) : frog ? (
             <div className="tri-boss">
               <div className="tri-boss-eyebrow"><IconFrog size={14} /> Today’s frog · boss</div>
-              <button className="tri-boss-check" aria-label={`Complete: ${frog.title}`} onClick={() => onToggle(frog)} />
+              <button className="tri-boss-check" aria-label={`Complete: ${frog.title}`} onClick={completeFrog} />
               <div className="tri-boss-body">
                 <div className="tri-boss-title">{frog.title}</div>
                 {showMeta && <div className="tri-boss-why">Your most important task — eat the frog before easier, busier work.</div>}

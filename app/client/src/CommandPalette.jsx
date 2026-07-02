@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ModalFrame from './ModalFrame.jsx'
 import { useModalRef } from './useModalRef.js'
-import { notesApi } from './api.js'
 import { emitOpenNote } from './notesbus.js'
+import { notesApi } from './api.js'
 import { fuzzyRank } from './fuzzy.js'
+import { orderCommands } from './palettecmds.js'
+import { createAndOpenNote } from './noteactions.js'
 import { IconSearch, IconNote, IconPlus, IconFolder, IconCornerDownLeft, IconSpinner } from './icons.jsx'
 
 // Render a label with its fuzzy-matched characters emphasised. Groups runs so
@@ -62,12 +64,14 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   // Built-in note command + any app-level commands the host passes in (settings,
   // theme, dashboards, …) — so Ctrl/Cmd+K is a single keyboard-driven action spine.
   const COMMANDS = useMemo(() => [
-    { id: 'new-note', label: 'New note', hint: 'Create a note in Notes', icon: IconPlus, run: async () => { try { const n = await notesApi.create('', 'Untitled'); emitOpenNote(n.path) } catch { /* ignore */ } } },
+    { id: 'new-note', label: 'New note', hint: 'Create a note in Notes — shortcut: n', icon: IconPlus, priority: 1, run: createAndOpenNote },
     ...commands,
   ], [commands])
 
+  // Commands are additionally ordered by their `priority` (workflow actions
+  // first on an empty query; a tie-nudge when ranking) — see palettecmds.js.
   const results = useMemo(
-    () => (cmdMode ? fuzzyRank(term, COMMANDS, (c) => c.label) : fuzzyRank(term, notes || [], (n) => n.title)),
+    () => (cmdMode ? orderCommands(fuzzyRank(term, COMMANDS, (c) => c.label), term) : fuzzyRank(term, notes || [], (n) => n.title)),
     [cmdMode, term, notes, COMMANDS],
   )
 
@@ -79,9 +83,16 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     const r = results[i]; if (!r) return
     if (cmdMode) { r.item.run?.(); onClose() } else { emitOpenNote(r.item.path); onClose() }
   }
+  const PAGE = 8
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => (results.length ? (s + 1) % results.length : 0)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => (results.length ? (s - 1 + results.length) % results.length : 0)) }
+    else if (e.key === 'PageDown') { e.preventDefault(); setSel((s) => Math.min(results.length - 1, s + PAGE)) }
+    else if (e.key === 'PageUp') { e.preventDefault(); setSel((s) => Math.max(0, s - PAGE)) }
+    // Home/End jump the RESULT list only while the input is empty — with text
+    // in the box they keep their native move-the-caret meaning.
+    else if (e.key === 'Home' && !term) { e.preventDefault(); setSel(0) }
+    else if (e.key === 'End' && !term) { e.preventDefault(); setSel(Math.max(0, results.length - 1)) }
     else if (e.key === 'Enter') { e.preventDefault(); activate() }
   }
 

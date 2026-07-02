@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, computeReview, parseYmd, selectStalled, dueBucket, isRealDate, widgetStore, useWidgetSize, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, IconChart, IconCheck } from '../widget-sdk'
+import { useTaskList, computeReview, parseYmd, selectStalled, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
 import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
@@ -21,7 +21,7 @@ const STEPS = [
 // timestamp and reflections are client-only UI state in localStorage.
 export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load, onToggle, onSchedule, onSetPriority, onSetCue, onPatch } = useTaskList(tasksCap, selector)
+  const { tasks, state, load, onToggle, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const sz = useWidgetSize()
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
 
@@ -29,6 +29,9 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
   const [reflections, setReflections] = useState(() => store.loadJson(REFLECT_KEY, []))
   const [step, setStep] = useState(-1) // -1 = not in the guided flow
   const [draft, setDraft] = useState('')
+  // Reflections history popover, opened from the last-reflection row.
+  const [histOpen, setHistOpen] = useState(false)
+  const histRef = usePopover(histOpen, setHistOpen)
   const review = useMemo(() => computeReview(tasks, new Date(), lastReviewed), [tasks, lastReviewed])
 
   const overdue = useMemo(() => tasks.filter((t) => !t.done && isRealDate(t.due_date) && dueBucket(t.due_date).k === 'overdue'), [tasks])
@@ -74,7 +77,14 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
           {step === 0 && (overdue.length ? <div className="task-stream">{overdue.map(rowFor)}</div> : <div className="rv-flow-empty">Nothing overdue — clear. ✓</div>)}
           {step === 1 && (stalled.length ? <div className="task-stream">{stalled.map(rowFor)}</div> : <div className="rv-flow-empty">No stalled tasks — every open item has a next step. ✓</div>)}
           {step === 2 && (
-            <textarea className="rv-reflect input" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="What went well? What got in the way? What’s the one thing to focus on next week?" />
+            <>
+              {/* Continuity beat: reflection lands better against last week's note
+                  (and proves the notes go somewhere instead of into a void). */}
+              {reflections[0] && (
+                <div className="rv-prev-reflect"><b>Last week you wrote:</b> {reflections[0].text}</div>
+              )}
+              <textarea className="rv-reflect input" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="What went well? What got in the way? What’s the one thing to focus on next week?" />
+            </>
           )}
         </div>
         <div className="rv-flow-nav">
@@ -83,6 +93,8 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
             ? <button className="btn primary sm" onClick={() => setStep(step + 1)}>Next</button>
             : <button className="btn primary sm" onClick={finishReview}><IconCheck size={14} /> Finish review</button>}
         </div>
+        {/* Completing/rescheduling rows above is undoable like everywhere else. */}
+        {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
       </div>
     )
   }
@@ -130,6 +142,10 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
         </div>
       )}
 
+      {/* One-line legend: the bars are a single series (completions per day), but
+          unlabeled they invited guesses like "completed vs created". */}
+      {showSpark && showDetails && <div className="rv-spark-cap">tasks completed per day · last 7 days</div>}
+
       {showDetails && (
         <div className="rv-meta">
           <span className="chip">{review.last30Total} in 30 days</span>
@@ -137,7 +153,7 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
         </div>
       )}
 
-      {showPrompt && (review.promptDue ? (
+      {showPrompt ? (review.promptDue ? (
         <div className="rv-prompt">
           <div className="rv-prompt-body">
             <div className="rv-prompt-title">Weekly review &amp; re-plan</div>
@@ -150,13 +166,42 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
           <span className="rv-reviewed"><IconCheck size={14} /> Reviewed this week</span>
           <button className="btn ghost sm" onClick={() => { setDraft(''); setStep(0) }}>Review again</button>
         </div>
-      ))}
-
-      {showDetails && lastReflection && (
-        <div className="rv-last-reflect" title={lastReflection.text}>
-          <span className="rv-last-label">Last reflection</span> {lastReflection.text}
+      )) : (
+        // Below the md height tier the full prompt card doesn't fit — but the
+        // DEFAULT widget size is below md, so without this compact row the guided
+        // review would be unreachable for anyone who never resizes the widget.
+        <div className="rv-entry-compact">
+          <button className="btn ghost sm" onClick={() => { setDraft(''); setStep(0) }}>
+            <IconChart size={13} /> {review.promptDue ? 'Weekly review' : 'Review again'}
+          </button>
         </div>
       )}
+
+      {showDetails && lastReflection && (
+        // The row is a button now: past reflections used to be written and never
+        // seen again — this opens the full history, newest first.
+        <span className="inline-ctl rv-hist-wrap" ref={histRef}>
+          <button
+            type="button" className="rv-last-reflect rv-hist-btn" title={lastReflection.text}
+            aria-haspopup="dialog" aria-expanded={histOpen}
+            onClick={() => setHistOpen((o) => !o)}
+          >
+            <span className="rv-last-label">Last reflection</span> {lastReflection.text}
+          </button>
+          {histOpen && (
+            <div className="mini-menu rv-hist-menu" role="dialog" aria-label="Past reflections">
+              {reflections.map((r) => (
+                <div className="rv-hist-item" key={r.iso}>
+                  <div className="rv-hist-date">{new Date(r.iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                  <div className="rv-hist-text">{r.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </span>
+      )}
+
+      {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>
   )
 }

@@ -13,7 +13,9 @@ import { insertTask } from './taskstore.js'
 import { emitTasksChanged } from './tasksbus.js'
 import { preloadWidgets, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { loadJson } from './storage.js'
-import { UndoBar } from './widget-sdk'
+import { UndoBar, LiveAnnouncer } from './widget-sdk'
+import { onBoard, getBoard, flashWidget } from './boardbus.js'
+import { createAndOpenNote } from './noteactions.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
@@ -316,9 +318,20 @@ export default function App() {
     onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'notes' }) },
     onCommands: () => { if (status === 'ready') setPalette({ mode: 'commands' }) },
     onQuickCapture: () => { if (status === 'ready') setCapture(true) },
+    onNewNote: () => { if (status === 'ready') createAndOpenNote() },
     onHelp: () => { if (status === 'ready') setHelp(true) },
     onCycleDash: (dir) => { if (status === 'ready') cycleDash(dir) },
   })
+
+  // What's on the current board (published by Dashboard) — feeds the palette's
+  // "Go to <widget>" commands.
+  const [boardWidgets, setBoardWidgets] = useState(() => getBoard())
+  useEffect(() => onBoard(setBoardWidgets), [])
+
+  // Bumped when Settings closes: accounts/projects/groups may have changed, so
+  // Dashboard refreshes its meta (fixes the "connected an account but the
+  // onboarding card is still there" dead-end without remounting the board).
+  const [metaTick, setMetaTick] = useState(0)
 
   // Warm the widget chunks for the last-seen board while the layout fetch is
   // still in flight — otherwise every chunk request waterfalls behind
@@ -391,19 +404,26 @@ export default function App() {
 
   // App-level commands surfaced in the Ctrl/Cmd+K palette (alongside its built-in
   // note command), so the palette is a keyboard-driven spine for the whole app.
+  // `priority` orders the empty-query list (workflow actions first, rare and
+  // destructive ones last) — see palettecmds.js.
   const paletteCommands = [
-    { id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, run: () => setCapture(true) },
-    { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, run: () => openSettings() },
+    { id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, priority: 3, run: () => setCapture(true) },
+    // One "Go to …" command per widget on the current board: scrolls it into
+    // view and flashes it (the palette becomes real navigation on tall boards).
+    ...boardWidgets.map((w) => (
+      { id: 'goto-' + w.i, label: `Go to ${w.title}`, hint: 'Widget on this board', priority: 2, run: () => setTimeout(() => flashWidget(w.i), 0) }
+    )),
     // One "Switch to …" command per other dashboard, so tab switching is
     // keyboard-reachable from the palette (and fuzzy-findable by name).
     ...dashboards.filter((d) => d.id !== activeDash).map((d) => (
-      { id: 'dash-' + d.id, label: `Switch to ${d.name}`, hint: 'Dashboard — Ctrl+[ / ]', run: () => setActiveDash(d.id) }
+      { id: 'dash-' + d.id, label: `Switch to ${d.name}`, hint: 'Dashboard — Ctrl+[ / ]', priority: 2, run: () => setActiveDash(d.id) }
     )),
-    { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', run: () => setHelp(true) },
+    { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, priority: 1, run: () => openSettings() },
+    { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', priority: 1, run: () => setHelp(true) },
     { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, run: toggleTheme },
     { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
     { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', run: addDashboard },
-    { id: 'logout', label: 'Log out', icon: IconLogout, run: () => window.location.assign('/auth/logout') },
+    { id: 'logout', label: 'Log out', icon: IconLogout, priority: -1, run: () => window.location.assign('/auth/logout') },
   ]
 
   return (
@@ -440,14 +460,17 @@ export default function App() {
             dashboardId={activeDash}
             title={(dashboards.find((d) => d.id === activeDash) || {}).name}
             onOpenSettings={openSettings}
+            metaTick={metaTick}
           />
         </div>
       )}
 
       {settings && <SettingsModal initialCreateGroup={settings.createGroup} onClose={() => {
         // Settings can change accounts, projects, and groups — drop every cached
-        // read so the board refetches fresh (same freshness as before the cache).
+        // read so the board refetches fresh, and tell Dashboard to re-check its
+        // meta (accounts/projects) so the onboarding gate lifts without a reload.
         appCache.clear()
+        setMetaTick((t) => t + 1)
         setSettings(null)
       }} />}
 
@@ -467,6 +490,9 @@ export default function App() {
       {status === 'ready' && help && <KeyboardHelpModal onClose={() => setHelp(false)} />}
 
       {toast && <div className="app-toast"><UndoBar undo={toast} dismiss={() => { clearTimeout(toastTimer.current); setToast(null) }} /></div>}
+
+      {/* One permanent polite live region for the whole app (see announcer.jsx). */}
+      <LiveAnnouncer />
     </>
   )
 }

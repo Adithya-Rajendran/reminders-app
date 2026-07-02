@@ -8,7 +8,8 @@ import { notesApi } from './api.js'
 import { createSaveQueue } from './savequeue.js'
 import { extractOutline } from './outline.js'
 import { loadJson, saveJson } from './storage.js'
-import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder, IconList, IconPin } from './icons.jsx'
+import { IconX, IconTrash, IconSpinner, IconCheck, IconFolder, IconList, IconPin, IconRefresh } from './icons.jsx'
+import { announce } from './widget-sdk/ui/announcer.jsx'
 
 // Tiptap is heavy (loaded only when a note is open) — code-split it out.
 const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
@@ -29,20 +30,31 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   const [folders, setFolders] = useState([])
   const [newTag, setNewTag] = useState('')
   const [state, setState] = useState('loading') // loading | ready | error
-  const [saving, setSaving] = useState('idle')   // idle | saving | saved | error
+  const [saving, setSaving] = useState('idle')   // idle | unsaved | saving | saved | error
+  const [lastSaveError, setLastSaveError] = useState(null) // the last Error from a failed save
+  // loadTick: incrementing this re-runs the load effect (used by the note-load
+  // Retry button without changing initialPath — a re-mount-level reload).
+  const [loadTick, setLoadTick] = useState(0)
   const [folderPrompt, setFolderPrompt] = useState(false)
   const [showOutline, setShowOutline] = useState(() => loadJson('notes-outline-open', false))
   const bodyElRef = useRef(null)
+  const titleElRef = useRef(null)
+  // Set when the loaded note looks brand-new (Untitled + empty body): the next
+  // ready-render focuses and selects the title so typing replaces "Untitled"
+  // instead of appending to it.
+  const wantTitleFocus = useRef(false)
   const saveTimer = useRef(null)
   const bodyRef = useRef('')
   const pathRef = useRef(initialPath)
   const etagRef = useRef(null)
   const tagsRef = useRef([])
   const stateRef = useRef('loading')
+  const savingRef = useRef('idle')
   pathRef.current = path
   etagRef.current = etag
   tagsRef.current = tags
   stateRef.current = state
+  savingRef.current = saving
 
   // Serialized autosave (savequeue.js): never overlap two PUTs; a save requested
   // mid-flight coalesces into one trailing save with the latest body + tags.
@@ -54,39 +66,116 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
         const r = await notesApi.save(p, bodyRef.current, etagRef.current, tagsRef.current)
         if (pathRef.current === p) setEtag(r.etag) // the pane may have switched notes mid-PUT
       },
-      onState: setSaving,
+      // onState now receives (state, error?) — we store the error for conflict UX.
+      onState: (s, err) => {
+        // Update the ref synchronously, not just via render: close() checks it
+        // right after an awaited flush, and the render that would refresh the
+        // ref hasn't happened yet at that point — without this, a failed
+        // flush-on-close slips past the guard and the edits are lost silently.
+        savingRef.current = s
+        setSaving(s)
+        if (s === 'error') {
+          setLastSaveError(err || null)
+          // Through the app-level live region — a conditionally-rendered
+          // role="alert" span is rarely read (same rationale as ReconnectBanner).
+          announce(err?.status === 409 ? 'This note changed somewhere else — resolve the conflict' : 'Save failed')
+        } else if (s === 'saved') setLastSaveError(null)
+      },
     })
   }
 
   useEffect(() => {
     // Skip the reload when the parent just re-points us at our own (renamed/moved)
     // path — we're already showing it, so a refetch would only flash.
-    if (initialPath === pathRef.current && stateRef.current === 'ready') return undefined
+    if (loadTick === 0 && initialPath === pathRef.current && stateRef.current === 'ready') return undefined
     let alive = true
+    setState('loading')
     // Switching to another note: save pending edits to the old path now — the
     // reset() below would silently drop them.
     clearTimeout(saveTimer.current)
     if (stateRef.current === 'ready' && queue.current.isDirty()) queue.current.flush()
     queue.current.reset()
+    setLastSaveError(null)
     notesApi.get(initialPath)
       // setPath keeps pathRef in sync with what's loaded — without it, autosaves
       // after a switch PUT the new body at the OLD note's path (and 412).
-      .then((n) => { if (!alive) return; setPath(initialPath); setTitle(n.title); setBody(n.body); bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || []); setMeta(n.meta || null); setFolder(n.folder || ''); setState('ready') })
+      .then((n) => {
+        if (!alive) return
+        setPath(initialPath); setTitle(n.title); setBody(n.body)
+        bodyRef.current = n.body; setEtag(n.etag); setTags(n.meta?.tags || [])
+        setMeta(n.meta || null); setFolder(n.folder || ''); setState('ready')
+        wantTitleFocus.current = /^untitled( \d+)?$/i.test(n.title || '') && !(n.body || '').trim()
+      })
       .catch(() => { if (alive) setState('error') })
     notesApi.folders().then((r) => { if (alive) setFolders(r.folders || []) }).catch(() => {})
     return () => { alive = false }
-  }, [initialPath])
+  }, [initialPath, loadTick]) // loadTick lets the Retry button re-run this without changing path
+
+  // After the ready-render commits, honor a pending new-note title focus.
+  useEffect(() => {
+    if (state !== 'ready' || !wantTitleFocus.current) return
+    wantTitleFocus.current = false
+    titleElRef.current?.focus()
+    titleElRef.current?.select()
+  }, [state])
+
+  // Register a beforeunload guard while there is unsaved or in-flight data.
+  // Only registered on the full-screen modal (not inline pane) so the guard
+  // doesn't block navigating away from the dashboard while a widget autosave runs.
+  // 'error' is also dangerous: covers both 409 conflict (dirty=false but body
+  // edits are pending resolution) and network error (dirty=true, retry pending).
+  useEffect(() => {
+    if (inline) return undefined
+    const isDangerous = () => saving === 'unsaved' || saving === 'saving' || saving === 'error'
+    const handler = (e) => { if (isDangerous()) { e.preventDefault(); e.returnValue = '' } }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [inline, saving])
 
   const onBody = (text) => {
-    setBody(text); bodyRef.current = text; queue.current.markDirty(); setSaving('saving')
+    setBody(text); bodyRef.current = text; queue.current.markDirty(); setSaving('unsaved')
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(queue.current.flush, 700)
   }
+
+  // close() guards: if the last flush failed (error state), keep the editor open
+  // and show the error — silently discarding unsaved data is the worst outcome.
+  // This covers both the 409 conflict case (dirty=false but edits need resolution)
+  // and network-error cases (dirty=true, retry is offered). A blocked close must
+  // still offer a way OUT (server could be down for good): the first attempt
+  // arms an explicit "Discard & close" confirm instead of silently doing nothing.
+  // State drives the button label; the ref is what close() reads — close is
+  // captured by a stable Escape-key handler, so it must not close over state.
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const confirmDiscardRef = useRef(false)
+  const armDiscard = (v) => { confirmDiscardRef.current = v; setConfirmDiscard(v) }
+  useEffect(() => { if (saving !== 'error' && confirmDiscardRef.current) armDiscard(false) }, [saving])
   const close = async () => {
     clearTimeout(saveTimer.current)
-    try { if (stateRef.current === 'ready' && queue.current.isDirty()) await queue.current.flush() } catch { /* best effort */ }
+    // Already in an error state → stay open so the user can see and resolve it;
+    // a second, explicit click on "Discard & close" abandons the edits.
+    if (savingRef.current === 'error') {
+      if (confirmDiscardRef.current) { queue.current.reset(); onClose?.() }
+      else armDiscard(true)
+      return
+    }
+    if (stateRef.current === 'ready' && queue.current.isDirty()) {
+      try {
+        await queue.current.flush()
+      } catch {
+        // flush itself doesn't throw (errors go to onState); this catch is for
+        // any unexpected rejection path — surface in state, do NOT close.
+        savingRef.current = 'error'
+        setSaving('error')
+        return
+      }
+      // If onState set us to 'error', the flush failed — stay open. (onState
+      // updates savingRef synchronously, so this read is race-free.)
+      if (savingRef.current === 'error') return
+    }
     onClose?.()
   }
+
   useEffect(() => {
     if (inline) return undefined // inside a widget pane Esc shouldn't close the note
     const onKey = (e) => { if (e.key === 'Escape') close() }
@@ -98,7 +187,13 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     const t = title.trim()
     const cur = path.split('/').pop().replace(/\.md$/i, '')
     if (!t || t === cur) { setTitle(cur); return }
-    try { const r = await notesApi.rename(path, t); setPath(r.path); setTitle(r.title); onChanged?.(r.path) } catch { setTitle(cur) }
+    try {
+      const r = await notesApi.rename(path, t)
+      // Apply the returned etag so the next body save uses the fresh one; a
+      // MOVE (WebDAV) gets a new etag on the server and stale etags cause 409.
+      if (r.etag) setEtag(r.etag)
+      setPath(r.path); setTitle(r.title); onChanged?.(r.path)
+    } catch { setTitle(cur) }
   }
   const del = async () => {
     clearTimeout(saveTimer.current)
@@ -114,8 +209,52 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   const moveTo = async (f) => {
     const target = (f || '').trim()
     if (target === (folder || '')) return
-    try { const r = await notesApi.move(pathRef.current, target); setPath(r.path); setFolder(r.folder || ''); onChanged?.(r.path) } catch { /* ignore */ }
+    try {
+      const r = await notesApi.move(pathRef.current, target)
+      // Apply returned etag: a MOVE gives the file a new etag on the server;
+      // without updating it here, the next autosave sends a stale If-Match → 409.
+      if (r.etag) setEtag(r.etag)
+      setPath(r.path); setFolder(r.folder || ''); onChanged?.(r.path)
+    } catch { /* ignore */ }
   }
+
+  // ---- 409 conflict resolution ----
+  const isConflict = saving === 'error' && lastSaveError?.status === 409
+
+  // [Reload]: fetch the server's current version, replace body + etag. The user
+  // loses their local edits, but the note is consistent again.
+  const conflictReload = async () => {
+    try {
+      const n = await notesApi.get(pathRef.current)
+      // Update refs immediately (used synchronously in the next save) and state
+      // (React re-render). bodyRef must be in sync with the new body so a
+      // rapid edit immediately after reload doesn't re-queue the old body.
+      bodyRef.current = n.body; etagRef.current = n.etag
+      setBody(n.body); setEtag(n.etag)
+      queue.current.reset(); setSaving('idle'); setLastSaveError(null)
+    } catch { /* stay in conflict state if the reload itself fails */ }
+  }
+
+  // [Keep mine]: fetch only the current etag (with a lightweight HEAD-equivalent
+  // GET), update etagRef, then immediately flush our pending body.
+  const conflictKeepMine = async () => {
+    try {
+      const n = await notesApi.get(pathRef.current)
+      // Update both the ref (used synchronously inside the queue's save()) and
+      // the state (so future renders show the correct etag).
+      etagRef.current = n.etag
+      setEtag(n.etag)
+      queue.current.markDirty()
+      await queue.current.flush()
+    } catch { /* stay in conflict state — e.g. network down */ }
+  }
+
+  // 'Saved' chip: auto-fade back to idle after 2.5 s so the bar isn't cluttered.
+  useEffect(() => {
+    if (saving !== 'saved') return undefined
+    const t = setTimeout(() => setSaving('idle'), 2500)
+    return () => clearTimeout(t)
+  }, [saving])
 
   const folderOpts = [...new Set([folder, ...folders].filter(Boolean))].sort()
   const pinned = !!meta?.pinned
@@ -135,17 +274,36 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     <>
       <div className="note-edit-head">
         <input
+          ref={titleElRef}
           className="note-title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={commitTitle}
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} placeholder="Untitled" aria-label="Note title"
         />
-        <span className="note-save-state">
-          {saving === 'saving' ? <><IconSpinner size={13} /> Saving…</> : saving === 'saved' ? <><IconCheck size={13} /> Saved</> : saving === 'error' ? 'Save failed' : ''}
+        <span className={`note-save-state${saving === 'error' ? ' err' : ''}`}>
+          {saving === 'unsaved' ? 'Unsaved…'
+            : saving === 'saving' ? <><IconSpinner size={13} /> Saving…</>
+            : saving === 'saved' ? <><IconCheck size={13} /> Saved</>
+            : saving === 'error' && !isConflict
+              ? <><span>Save failed</span><button className="undo-btn" style={{ marginLeft: 6 }} onClick={queue.current.flush}>Retry</button></>
+            : null}
         </span>
         <button className={`iconbtn sm${pinned ? ' on' : ''}`} title={pinned ? 'Unpin' : 'Pin to top'} aria-label="Pin note" onClick={togglePin}><IconPin size={16} /></button>
         <button className={`iconbtn sm${showOutline ? ' on' : ''}`} title="Outline" aria-label="Toggle outline" onClick={() => toggleOutline(!showOutline)}><IconList size={16} /></button>
         <button className="iconbtn sm danger-hover" title="Move to Trash" aria-label="Move note to trash" onClick={del}><IconTrash size={16} /></button>
-        <button className="iconbtn sm" title="Close" aria-label="Close note" onClick={close}><IconX size={16} /></button>
+        {confirmDiscard && saving === 'error'
+          ? <button className="btn danger sm" onClick={close}>Discard &amp; close</button>
+          : <button className="iconbtn sm" title="Close" aria-label="Close note" onClick={close}><IconX size={16} /></button>}
       </div>
+
+      {/* 409 conflict banner: shown instead of the generic error chip. */}
+      {isConflict && (
+        {/* Announced via the live region in onState — no conditional role="alert". */}
+        <div className="note-conflict-bar">
+          <span>This note changed somewhere else.</span>
+          <button className="undo-btn" onClick={conflictReload}>Reload</button>
+          <button className="undo-btn" onClick={conflictKeepMine}>Keep mine</button>
+        </div>
+      )}
+
       {state === 'ready' && (
         <div className="note-edit-meta">
           <label className="note-folder-pick" title="Move to folder">
@@ -175,7 +333,14 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
       <div className="note-edit-body-wrap">
         <div className="note-edit-body" ref={bodyElRef}>
           {state === 'loading' ? <div className="note-loading"><IconSpinner size={20} /></div>
-            : state === 'error' ? <div className="note-loading">Couldn’t load this note.</div>
+            : state === 'error' ? (
+              <div className="note-loading">
+                <span>Couldn't load this note.</span>
+                <button className="btn ghost sm" style={{ marginTop: 8 }} onClick={() => setLoadTick((t) => t + 1)}>
+                  <IconRefresh size={14} /> Retry
+                </button>
+              </div>
+            )
               : (
                 <Suspense fallback={<div className="note-loading"><IconSpinner size={20} /></div>}>
                   <NoteRichEditor value={body} onChange={onBody} notes={notes} folder={folder} />

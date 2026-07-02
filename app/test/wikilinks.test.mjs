@@ -1,6 +1,6 @@
 // Tests for wikilink helpers (client/src/wikilinks.js). Pure module. Run with:
 //   docker run --rm -v "$PWD":/app -w /app node:22 node test/wikilinks.test.mjs
-import { WIKILINK_RE, parseWikilink, serializeWikilink, wikilinkLabel, resolveWikilink } from '../client/src/wikilinks.js'
+import { WIKILINK_RE, parseWikilink, serializeWikilink, wikilinkLabel, resolveWikilink, insideWikilink } from '../client/src/wikilinks.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -32,6 +32,18 @@ ok(resolveWikilink('ideas', notes).path === 'Notes/Ideas.md', 'resolve: case-ins
 ok(resolveWikilink('Nope', notes) === null, 'resolve: no match -> null')
 ok(resolveWikilink('Roadmap', notes, 'Work').path === 'Notes/Work/Roadmap.md', 'resolve: tie-break prefers same folder')
 ok(resolveWikilink('Roadmap', notes, 'Other').path === 'Notes/Work/Roadmap.md', 'resolve: tie-break then most-recent')
+
+// ---- insideWikilink (the caret-inside-a-complete-link suggestion guard) ----
+// Doc text: "see [[Roadmap]] here" — the link spans offsets 4..15 (from..to,
+// half-open like the deco ranges the editor builds).
+const ranges = [{ from: 4, to: 15 }]
+ok(insideWikilink(ranges, 4) === true, 'inside: trigger at the link own [[ is blocked (click parked caret in the link)')
+ok(insideWikilink(ranges, 9) === true, 'inside: trigger mid-link is blocked')
+ok(insideWikilink(ranges, 14) === true, 'inside: trigger just before the closing ]] is blocked')
+ok(insideWikilink(ranges, 15) === false, 'inside: position right after the link is allowed (new link may start there)')
+ok(insideWikilink(ranges, 3) === false, 'inside: position before the link is allowed')
+ok(insideWikilink([], 9) === false, 'inside: no links -> allowed')
+ok(insideWikilink(undefined, 9) === false, 'inside: undefined ranges -> allowed (deco state not ready)')
 
 console.log(`\nwikilinks.test: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

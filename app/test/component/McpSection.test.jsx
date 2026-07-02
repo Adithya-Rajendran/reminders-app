@@ -283,4 +283,131 @@ describe('McpSection', () => {
     // CLI snippet text (only the command block starts with "claude mcp add").
     expect(screen.getByText(/claude mcp add/i)).toBeInTheDocument()
   })
+
+  // ---------------------------------------------------------------
+  // Delta-PUT tests (Workstream 4 — fix #2)
+  // ---------------------------------------------------------------
+
+  it('PUT body for a widget toggle is a single-key delta, not the full map', async () => {
+    // Start with both reminders and calendar off.
+    const fetchMock = makeFetch({ getSettings: DEFAULT_SETTINGS })
+    globalThis.fetch = fetchMock
+    render(<McpSection />)
+
+    await screen.findByText('Reminders')
+    const remindersToggle = screen.getByRole('switch', { name: /enable mcp access for reminders widget/i })
+    await userEvent.click(remindersToggle)
+
+    await waitFor(() => {
+      const puts = fetchMock.mock.calls.filter(
+        ([url, opts]) => url === '/api/mcp/settings' && (opts?.method || 'GET').toUpperCase() === 'PUT',
+      )
+      expect(puts.length).toBeGreaterThan(0)
+      const body = JSON.parse(puts[puts.length - 1][1].body)
+      // Must be a delta: only the toggled key present, no 'enabled' key, no
+      // 'calendar' key.
+      expect(Object.keys(body)).toEqual(['widgets'])
+      expect(Object.keys(body.widgets)).toEqual(['reminders'])
+      expect(body.widgets.reminders).toBe(true)
+    })
+  })
+
+  it('out-of-order (stale seq) response does not overwrite newer local state', async () => {
+    // Simulate two rapid PUTs resolving in reverse order.
+    // PUT #1 (reminders on): resolves SECOND with stale data ({ reminders: true, calendar: false }).
+    // PUT #2 (calendar on): resolves FIRST with authoritative data ({ reminders: true, calendar: true }).
+    // After both settle, calendar should still be true (newer PUT wins).
+
+    let resolvePut1, resolvePut2
+    const put1Promise = new Promise((res) => { resolvePut1 = res })
+    const put2Promise = new Promise((res) => { resolvePut2 = res })
+
+    let putCallCount = 0
+    globalThis.fetch = vi.fn(async (url, opts = {}) => {
+      const method = (opts.method || 'GET').toUpperCase()
+      if (url === '/api/mcp/settings' && method === 'GET') {
+        return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => DEFAULT_SETTINGS }
+      }
+      if (url === '/api/mcp/settings' && method === 'PUT') {
+        putCallCount++
+        if (putCallCount === 1) {
+          // First PUT (reminders toggle): hold until we tell it to resolve.
+          await put1Promise
+          return {
+            ok: true, status: 200, headers: { get: () => 'application/json' },
+            // Stale response: doesn't know calendar was enabled.
+            json: async () => ({ ...DEFAULT_SETTINGS, widgets: { reminders: true, calendar: false } }),
+          }
+        } else {
+          // Second PUT (calendar toggle): resolves first (wins).
+          await put2Promise
+          return {
+            ok: true, status: 200, headers: { get: () => 'application/json' },
+            json: async () => ({ ...DEFAULT_SETTINGS, widgets: { reminders: true, calendar: true } }),
+          }
+        }
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`)
+    })
+
+    render(<McpSection />)
+    await screen.findByText('Reminders')
+
+    const remindersToggle = screen.getByRole('switch', { name: /enable mcp access for reminders widget/i })
+    const calendarToggle = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
+
+    // Fire both toggles before either PUT resolves.
+    await userEvent.click(remindersToggle)
+    await userEvent.click(calendarToggle)
+
+    // Resolve PUT #2 (calendar) first — this is the "newer" one.
+    resolvePut2()
+    // Give it a tick to settle.
+    await waitFor(() => expect(putCallCount).toBeGreaterThanOrEqual(2))
+    // Now resolve PUT #1 (reminders) — this is "stale" and should be ignored.
+    resolvePut1()
+
+    // After both resolve, calendar should remain enabled (newer PUT wins; stale
+    // PUT #1 response is discarded because its seq < latestSeq).
+    await waitFor(() => {
+      const calSwitch = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
+      expect(calSwitch).toBeChecked()
+    })
+  })
+
+  it('error revert flips only the toggled key back, not the whole map', async () => {
+    // Start: reminders true, calendar false.
+    const startSettings = { ...DEFAULT_SETTINGS, widgets: { reminders: true, calendar: false } }
+    let putCallCount = 0
+    globalThis.fetch = vi.fn(async (url, opts = {}) => {
+      const method = (opts.method || 'GET').toUpperCase()
+      if (url === '/api/mcp/settings' && method === 'GET') {
+        return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => startSettings }
+      }
+      if (url === '/api/mcp/settings' && method === 'PUT') {
+        putCallCount++
+        throw new Error('network error')
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`)
+    })
+
+    render(<McpSection />)
+    await screen.findByText('Reminders')
+
+    // Reminders is currently ON. Toggle it OFF — this will fail and should revert
+    // only reminders back to true, leaving calendar at false.
+    const remindersToggle = screen.getByRole('switch', { name: /enable mcp access for reminders widget/i })
+    expect(remindersToggle).toBeChecked()
+
+    await userEvent.click(remindersToggle)
+
+    // Wait for the error to surface.
+    await screen.findByRole('alert')
+
+    // After revert: reminders should be back to true; calendar should still be
+    // false (i.e. the whole map was NOT replaced with stale state).
+    const calendarToggle = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
+    expect(remindersToggle).toBeChecked()
+    expect(calendarToggle).not.toBeChecked()
+  })
 })

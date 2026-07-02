@@ -125,6 +125,10 @@ export default function McpSection() {
   const [tokenBusy, setTokenBusy] = useState(false)
 
   const isMounted = useRef(true)
+  // Monotonically-increasing sequence counter for widget toggle PUTs.
+  // Each PUT stamps its own seq; responses whose seq < latestSeq are stale
+  // (out-of-order) and are discarded rather than overwriting newer local state.
+  const latestSeq = useRef(0)
   useEffect(() => {
     isMounted.current = true
     return () => { isMounted.current = false }
@@ -163,24 +167,29 @@ export default function McpSection() {
   }
 
   // Toggle an individual widget.
+  // Sends only a single-key delta { widgets: { [type]: bool } } — server merges
+  // it into current state, so a stale client map can’t clobber other keys.
   const setWidgetEnabled = async (type, on) => {
     if (!settings) return
     const prevWidgets = settings.widgets || {}
-    const nextWidgets = { ...prevWidgets, [type]: on }
-    // Optimistic update.
-    setSettings((s) => ({ ...s, widgets: nextWidgets }))
+    // Optimistic update: flip just this key.
+    setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: on } }))
     setToggleBusy(true)
     setToggleErr(null)
+    // Stamp this request with a monotonically-increasing seq so that if two
+    // rapid PUTs resolve out of order we can discard the stale one.
+    const mySeq = ++latestSeq.current
     try {
       const next = await api('/api/mcp/settings', {
         method: 'PUT',
-        body: JSON.stringify({ widgets: nextWidgets }),
+        // Delta only — server merges; never sends the whole map.
+        body: JSON.stringify({ widgets: { [type]: on } }),
       })
-      if (isMounted.current) setSettings(next)
+      if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
-        // Revert the optimistic change.
-        setSettings((s) => ({ ...s, widgets: prevWidgets }))
+        // Revert only the toggled key, not the whole map.
+        setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: prevWidgets[type] } }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
       }
     } finally {
@@ -189,6 +198,8 @@ export default function McpSection() {
   }
 
   // Enable all MCP-capable widgets at once.
+  // Sends the full all-true map; safe with merge semantics and not a delta
+  // (intent is to enable everything, so sending the complete set is correct).
   const enableAll = async () => {
     if (!settings) return
     const prevWidgets = settings.widgets || {}
@@ -197,12 +208,13 @@ export default function McpSection() {
     setSettings((s) => ({ ...s, widgets: nextWidgets }))
     setToggleBusy(true)
     setToggleErr(null)
+    const mySeq = ++latestSeq.current
     try {
       const next = await api('/api/mcp/settings', {
         method: 'PUT',
         body: JSON.stringify({ widgets: nextWidgets }),
       })
-      if (isMounted.current) setSettings(next)
+      if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
         setSettings((s) => ({ ...s, widgets: prevWidgets }))

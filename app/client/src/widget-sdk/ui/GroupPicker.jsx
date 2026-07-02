@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconPlus, IconChevDown } from '../../icons.jsx'
+import { IconPlus, IconChevDown, IconX } from '../../icons.jsx'
+import { useMenuKeyNav } from './useMenuKeyNav.js'
 
 // The panel content: a search box, the recent groups (or search matches), and a
 // "New group…" row that routes to Settings (group creation lives there now).
@@ -19,6 +20,10 @@ export function GroupList({ groups = [], recent = [], value, onPick, onNew, neut
       <input
         className="input gp-search" autoFocus value={q}
         onChange={(e) => setQ(e.target.value)}
+        // Enter is the fast path for "type a few letters, pick the top hit" — it
+        // picks the first visible row. Arrow/Home/End roving into the option list
+        // is handled by useMenuKeyNav up in GroupPop (which wraps this panel).
+        onKeyDown={(e) => { if (e.key === 'Enter' && rows.length) { e.preventDefault(); onPick(rows[0]) } }}
         placeholder="Search groups…" aria-label="Search groups"
       />
       <div className="gp-list" role="listbox">
@@ -46,9 +51,18 @@ export function GroupList({ groups = [], recent = [], value, onPick, onNew, neut
 
 // Portal popover anchored to a trigger (below, flipped above if no room), so it is
 // never clipped by a small/scrolling widget. Dismisses on outside-click / Esc.
+//
+// Keyboard: focus starts in the search box (typing filters), ArrowDown moves into
+// the option list. Module-level options so the object identity is stable — the
+// hook's effect keys on it, and a per-render object would re-focus `initial`.
+const LIST_NAV = { selector: '.gp-item', initial: (el) => el.querySelector('.gp-search') }
+
 function GroupPop({ anchorRef, onClose, children }) {
   const popRef = useRef(null)
   const [pos, setPos] = useState(null)
+  // `!!pos`, not `true`: the pop renders null until placed, so keying the hook on
+  // placement makes its effect run only once the panel actually exists in the DOM.
+  useMenuKeyNav(!!pos, popRef, LIST_NAV)
   const place = useCallback(() => {
     const r = anchorRef.current?.getBoundingClientRect()
     if (!r) return
@@ -92,26 +106,39 @@ function GroupPop({ anchorRef, onClose, children }) {
 
 // A searchable group dropdown: the last-3 used groups by default, a search box to
 // find any group, and "New group…" → Settings (no inline group creation).
+//
+// An ACTIVE pick must be visible and reversible from the trigger itself — the
+// bare group name used to read as a static label, with no route back to
+// "no group" short of knowing to re-open the menu. So: a "Group:" prefix +
+// active styling on the trigger, re-picking the active row toggles it off,
+// and a one-click ✕ clears it (a sibling, not nested — nested buttons are
+// invalid HTML and unreachable for AT).
 export default function GroupPicker({ value, groups = [], recent = [], onChange, onNew, neutral, placeholder = 'Group' }) {
   const btnRef = useRef(null)
   const [open, setOpen] = useState(false)
-  const pick = (v) => { onChange(v); setOpen(false) }
+  const cleared = neutral ? neutral.value : ''
+  const pick = (v) => { onChange(v === value ? cleared : v); setOpen(false) }
   const handleNew = (name) => { setOpen(false); onNew?.(name) }
   return (
-    <>
+    <span className="gp-wrap">
       <button
-        type="button" ref={btnRef} className="rem-group gp-trigger"
+        type="button" ref={btnRef} className={`rem-group gp-trigger${value ? ' active' : ''}`}
         aria-haspopup="listbox" aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className={value ? 'gp-val' : 'gp-ph'}>{value || placeholder}</span>
+        <span className={value ? 'gp-val' : 'gp-ph'}>{value ? `Group: ${value}` : placeholder}</span>
         <IconChevDown size={13} style={{ opacity: 0.7, flex: '0 0 auto' }} />
       </button>
+      {value ? (
+        <button type="button" className="iconbtn sm gp-clear" aria-label="Clear group" title="Clear group" onClick={() => onChange(cleared)}>
+          <IconX size={12} />
+        </button>
+      ) : null}
       {open && (
         <GroupPop anchorRef={btnRef} onClose={() => setOpen(false)}>
           <GroupList groups={groups} recent={recent} value={value} onPick={pick} onNew={handleNew} neutral={neutral} />
         </GroupPop>
       )}
-    </>
+    </span>
   )
 }

@@ -14,6 +14,7 @@
 .rv-bar { width: 70%; max-width: 22px; border-radius: 5px 5px 2px 2px; background: var(--accent-grad); min-height: 4px; transition: height .2s ease; }
 .rv-bar.empty { background: var(--line-strong); }
 .rv-bar-lbl { font-size: 10.5px; color: var(--faint); font-weight: 600; }
+.rv-spark-cap { font-size: 10.5px; color: var(--faint); margin-top: -8px; }
 .rv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
 .rv-prompt-body { flex: 1; min-width: 0; }
@@ -21,8 +22,27 @@
 .rv-prompt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .rv-reviewed { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green); }
 .rv-done-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rv-last-reflect { font-size: 11.5px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Now a BUTTON (opens the reflections history) — button chrome reset here so the
+   clamped two-line look is unchanged; a hover wash signals it's clickable. */
+.rv-last-reflect { font-size: 11.5px; font-family: inherit; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: transparent; border: 0; padding: 3px 5px; margin: -3px -5px; border-radius: 8px; cursor: pointer; text-align: left; }
+.rv-last-reflect:hover { background: var(--panel2); }
 .rv-last-label { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 10px; color: var(--faint); margin-right: 4px; }
+.rv-hist-wrap { display: block; position: relative; }
+/* History opens UPWARD (the row sits at the widget's bottom edge) and scrolls. */
+.rv-hist-menu { top: auto; bottom: calc(100% + 6px); left: 0; right: 0; max-height: 220px; overflow-y: auto; cursor: default; }
+.rv-hist-item { padding: 6px 8px; }
+.rv-hist-item + .rv-hist-item { border-top: 1px solid var(--line); }
+.rv-hist-date { font-size: 10.5px; font-weight: 700; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; }
+.rv-hist-text { font-size: 12px; color: var(--muted); line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word; }
+
+/* Compact review entry for heights below the md tier (the default size!), where
+   the full prompt card is hidden but the flow must stay reachable. */
+.rv-entry-compact { display: flex; }
+.rv-entry-compact .btn { display: inline-flex; align-items: center; gap: 5px; }
+
+/* "Last week you wrote: …" continuity callout above the reflection textarea. */
+.rv-prev-reflect { font-size: 12px; color: var(--muted); line-height: 1.45; padding: 8px 10px; margin-bottom: 8px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rv-prev-reflect b { color: var(--text); }
 
 /* guided review flow */
 .rv-flowwrap { gap: 8px; }

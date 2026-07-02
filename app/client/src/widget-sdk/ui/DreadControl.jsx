@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePopover } from '../../usePopover.js'
+import { useMenuKeyNav } from './useMenuKeyNav.js'
 
 // Graded "dread" (avoidance) control — a compact chip that opens a 1–5 dot picker,
 // styled like the other inline task controls (priority / estimate). Dread weights
@@ -10,9 +11,17 @@ import { usePopover } from '../../usePopover.js'
 // one implementation.
 const LEVELS = [1, 2, 3, 4, 5]
 
+// Radio-style roving focus: Left/Right alias Up/Down and focus opens on the
+// CHECKED dot (falling back to the first when dread is unset). Module-level so
+// the options object is referentially stable — useMenuKeyNav keys its effect on
+// it, and a fresh object each render would re-run the effect and yank focus
+// back to `initial` mid-navigation.
+const RADIO_NAV = { selector: '[role="radio"]', radio: true, initial: (el) => el.querySelector('[role="radio"][aria-checked="true"]') }
+
 export default function DreadControl({ value = 0, onSet }) {
   const [open, setOpen] = useState(false)
   const ref = usePopover(open, setOpen)
+  useMenuKeyNav(open, ref, RADIO_NAV)
   const v = Math.max(0, Math.min(5, Math.trunc(Number(value) || 0)))
   return (
     <span className="inline-ctl" ref={ref}>

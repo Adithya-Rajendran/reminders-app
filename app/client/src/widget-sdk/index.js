@@ -10,7 +10,10 @@
 // here so the widget itself stays decoupled.
 
 // ---- shared widget UI ----
-export { SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview } from './ui/parts.jsx'
+export { SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, NoticeBar, QuickAddPreview } from './ui/parts.jsx'
+export { announce, LiveAnnouncer } from './ui/announcer.jsx'
+export { useMenuKeyNav } from './ui/useMenuKeyNav.js'
+export { emitNotice, onNotice } from '../notices.js'
 export { default as TaskRow, EstimateControl, fmtEst } from './ui/TaskRow.jsx'
 export { default as DateTimePicker } from './ui/DateTimePicker.jsx'
 export { default as DreadControl } from './ui/DreadControl.jsx'

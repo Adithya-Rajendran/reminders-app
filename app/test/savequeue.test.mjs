@@ -60,6 +60,56 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
   ok(states.join() === 'saving,error,saving,saved', 'retry reports saving -> saved')
 }
 
+// ---- error carries the Error object through to onState ----
+{
+  const errors = []
+  const boom = new Error('network blip')
+  const q = createSaveQueue({
+    save: async () => { throw boom },
+    onState: (s, err) => { if (s === 'error') errors.push(err) },
+  })
+  q.markDirty()
+  await q.flush()
+  ok(errors.length === 1 && errors[0] === boom, 'error object is passed as second arg to onState')
+}
+
+// ---- 409 conflict: queue is NOT re-marked dirty; no auto-retry ----
+{
+  const states = []
+  let attempts = 0
+  const conflict = new Error('conflict')
+  conflict.status = 409
+  const q = createSaveQueue({
+    save: async () => { attempts++; throw conflict },
+    onState: (s, err) => states.push({ s, status: err?.status }),
+  })
+  q.markDirty()
+  await q.flush()
+  ok(!q.isDirty(), '409 does NOT re-mark dirty (no auto-retry)')
+  ok(states.length === 2 && states[1].s === 'error' && states[1].status === 409, '409 error surfaces to onState with status')
+  // A second flush should be a no-op because dirty is false.
+  await q.flush()
+  ok(attempts === 1, '409 is never auto-retried — only one save attempt')
+}
+
+// ---- non-409 errors DO re-mark dirty ----
+{
+  let attempts = 0
+  const netErr = new Error('gateway timeout')
+  netErr.status = 502
+  const q = createSaveQueue({
+    save: async () => { attempts++; if (attempts < 3) throw netErr },
+    onState: () => {},
+  })
+  q.markDirty()
+  await q.flush()
+  ok(q.isDirty(), '502 re-marks dirty for later retry')
+  await q.flush()
+  ok(q.isDirty(), 'still dirty after second 502')
+  await q.flush()
+  ok(!q.isDirty() && attempts === 3, 'succeeds on third attempt, no longer dirty')
+}
+
 // ---- reset forgets unsaved state ----
 {
   let saves = 0

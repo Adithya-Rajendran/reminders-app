@@ -4,8 +4,8 @@ import { useGlobalHotkeys } from '../../client/src/useGlobalHotkeys.js'
 
 // Tiny probe component: mounts the hook and exposes nothing in the DOM.
 // All assertions are on the vi.fn() handlers, driven by KeyboardEvents on document.
-function Probe({ onQuickCapture, onHelp, onCommands, onCycleDash, onQuickSwitch }) {
-  useGlobalHotkeys({ onQuickCapture, onHelp, onCommands, onCycleDash, onQuickSwitch })
+function Probe({ onQuickCapture, onNewNote, onHelp, onCommands, onCycleDash, onQuickSwitch }) {
+  useGlobalHotkeys({ onQuickCapture, onNewNote, onHelp, onCommands, onCycleDash, onQuickSwitch })
   return null
 }
 
@@ -32,6 +32,24 @@ describe('useGlobalHotkeys', () => {
     document.getElementById('trap').focus()
     fire('c')
     expect(onQuickCapture).not.toHaveBeenCalled()
+  })
+
+  it("'n' fires onNewNote, with the same typing guard as 'c'", () => {
+    const onNewNote = vi.fn()
+    render(
+      <>
+        <Probe onNewNote={onNewNote} />
+        <input id="trap-n" />
+      </>,
+    )
+    fire('n')
+    expect(onNewNote).toHaveBeenCalledOnce()
+    document.getElementById('trap-n').focus()
+    fire('n')
+    expect(onNewNote).toHaveBeenCalledOnce() // not fired while typing
+    document.getElementById('trap-n').blur()
+    fire('n', { ctrlKey: true })
+    expect(onNewNote).toHaveBeenCalledOnce() // modifier combos are not the hotkey
   })
 
   it("'?' fires onHelp", () => {
