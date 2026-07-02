@@ -2,8 +2,9 @@
 // (fresh-board placement), appendToLayouts (add-widget placement). Run with:
 //   node test/dashlayout.test.mjs
 import {
-  COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
+  COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE, DERIVED_TIERS,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, fitWidthToContract, nextSlot,
+  stripDerivedTiers, boardSignature,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -167,6 +168,38 @@ ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interio
   // no aspect -> identity (still floors a degenerate size to >= 1)
   ok(eq(clampAspect(7, 4, null), 7, 4), 'no aspect -> identity')
   ok(eq(clampAspect(0, 0, null), 1, 1), 'degenerate size floors to 1')
+}
+
+// --- stripDerivedTiers (never persist the rebuilt-on-load ultrawide tiers) ---
+{
+  const src = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }], xl: [{ i: 'a', x: 0, y: 0, w: 15, h: 9 }], xxs: [{ i: 'a', x: 0, y: 0, w: 5, h: 9 }] }
+  const s = stripDerivedTiers(src)
+  ok(Object.keys(s).sort().join() === 'lg,xxs', 'derived tiers are dropped; authoritative ones survive')
+  ok(s.lg === src.lg, 'surviving tiers are reused, not copied')
+  ok(!!src.xl, 'non-mutating')
+  ok(DERIVED_TIERS.every((bp) => COLS[bp] > COLS.lg), 'every derived tier is wider than the base (sanity: the list tracks COLS)')
+  ok(Object.keys(stripDerivedTiers(null)).length === 0, 'null input -> empty object (no throw)')
+}
+
+// --- boardSignature (the persist no-op guard) ---
+{
+  const widgets = [{ i: 'b', type: 'calendar' }, { i: 'a', type: 'upcoming', group: 'home' }]
+  const lay = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 10, y: 0, w: 10, h: 9 }] }
+  const sig = boardSignature(widgets, lay)
+  // Stability: everything react-grid-layout adds or reorders without a real change.
+  ok(boardSignature([...widgets].reverse(), lay) === sig, 'widget order does not change the signature')
+  ok(boardSignature(widgets, { lg: [...lay.lg].reverse() }) === sig, 'item order does not change the signature')
+  const stamped = { lg: lay.lg.map((it) => ({ ...it, minW: 4, minH: 4, maxW: 20, isResizable: true, moved: false, static: false })) }
+  ok(boardSignature(widgets, stamped) === sig, 'stamped constraint/RGL props do not change the signature')
+  const withDerived = { ...lay, xl: [{ i: 'a', x: 0, y: 0, w: 15, h: 9 }, { i: 'b', x: 15, y: 0, w: 15, h: 9 }] }
+  ok(boardSignature(widgets, withDerived) === sig, 'derived tiers do not change the signature')
+  // Sensitivity: every real board change must register.
+  ok(boardSignature(widgets, { lg: lay.lg.map((it) => (it.i === 'a' ? { ...it, x: 5 } : it)) }) !== sig, 'a moved widget changes the signature')
+  ok(boardSignature(widgets, { lg: lay.lg.map((it) => (it.i === 'a' ? { ...it, w: 12 } : it)) }) !== sig, 'a resized widget changes the signature')
+  ok(boardSignature(widgets.slice(1), lay) !== sig, 'a removed widget changes the signature')
+  ok(boardSignature(widgets.map((w) => (w.i === 'b' ? { ...w, type: 'notes' } : w)), lay) !== sig, 'a changed widget type changes the signature')
+  ok(boardSignature(widgets.map((w) => (w.i === 'a' ? { ...w, group: 'work' } : w)), lay) !== sig, 'a changed widget group changes the signature')
+  ok(boardSignature(widgets, { ...lay, md: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 9 }] }) !== sig, 'an added authoritative tier changes the signature')
 }
 
 console.log(`dashlayout: ${pass} passed, ${fail} failed`)
