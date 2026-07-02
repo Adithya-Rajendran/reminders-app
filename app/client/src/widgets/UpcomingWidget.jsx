@@ -94,13 +94,13 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
   return (
     <div className="tasklist">
       {inboxId && !compact && (
-        <form className=”add-row qa rem-add” onSubmit={addTask}>
+        <form className="add-row qa rem-add" onSubmit={addTask}>
           <IconClock size={16} />
-          <input className=”rem-text” value={draft} onChange={(e) => setDraft(e.target.value)} placeholder=”Add a scheduled task… (e.g. “file taxes friday !3”)” aria-label=”Add a scheduled task” />
-          <button type=”submit” className=”iconbtn sm” aria-label=”Add task” title=”Add task”><IconPlus size={16} /></button>
+          <input className="rem-text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a scheduled task… (e.g. “file taxes friday !3”)" aria-label="Add a scheduled task" />
+          <button type="submit" className="iconbtn sm" aria-label="Add task" title="Add task"><IconPlus size={16} /></button>
         </form>
       )}
-      {err && <div role=”alert” className=”rem-err”>{err}</div>}
+      {err && <div role="alert" className="rem-err">{err}</div>}
       {inboxId && !compact && <QuickAddPreview text={draft} />}
       {inboxId && !compact && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
       {state === 'ready' && !compact && (tasks.length > 0 || quickOnly) && (

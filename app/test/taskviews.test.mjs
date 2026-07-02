@@ -203,7 +203,6 @@ ok(UPCOMING_ORDER.join() === 'overdue,today,tomorrow,week,later', 'UPCOMING_ORDE
 
 // ---- selectTriagedThisWeek ----
 {
-  const DAY_MS = 864e5
   const atDay = (n) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.toISOString() }
   const triageTasks = [
     // tomorrow + estimate -> included
