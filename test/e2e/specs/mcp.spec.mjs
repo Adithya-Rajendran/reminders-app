@@ -20,9 +20,12 @@ test.describe('MCP API', () => {
   let token
 
   test.beforeEach(async ({ request }) => {
-    // Enable MCP with reminders + daily tools; provision a fresh token.
+    // Enable MCP with reminders + daily tools; provision a fresh token. The
+    // server MERGES widget toggles (deltas, not wholesale replace), so notes is
+    // pinned false explicitly — merge semantics would otherwise let a previous
+    // test's state leak into this one.
     await request.put('/api/mcp/settings', {
-      data: { enabled: true, widgets: { reminders: true, daily: true } },
+      data: { enabled: true, widgets: { reminders: true, daily: true, notes: false } },
     })
     const r = await request.post('/api/mcp/token')
     expect(r.ok(), `POST /api/mcp/token -> ${r.status()}`).toBeTruthy()
@@ -58,13 +61,16 @@ test.describe('MCP API', () => {
     expect(names).toContain('daily_get_plan')
     expect(names).not.toContain('notes_list')
 
-    // Turn daily OFF — tools/list must drop daily_get_plan.
-    await request.put('/api/mcp/settings', { data: { widgets: { reminders: true } } })
+    // Turn daily OFF with a single-key delta (the server merges — the old
+    // wholesale-replace behavior would have needed the full map here).
+    await request.put('/api/mcp/settings', { data: { widgets: { daily: false } } })
     const list2Res = await rpc(request, token, 'tools/list', undefined)
     expect(list2Res.ok()).toBeTruthy()
     const { result: list2Result } = await list2Res.json()
     const names2 = list2Result.tools.map((t) => t.name)
     expect(names2).not.toContain('daily_get_plan')
+    // ...and the merge must have preserved the untouched reminders key.
+    expect(names2).toContain('reminders_capture')
 
     // Calling a disabled tool must return a JSON-RPC error (not an HTTP error).
     // The server uses McpError(MethodNotFound) for unknown/disabled tools.
