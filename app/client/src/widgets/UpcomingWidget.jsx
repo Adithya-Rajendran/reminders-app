@@ -15,11 +15,15 @@ function todayDefault() {
 // browsing it passively triggers recall ("oh, I need to…"), the "opportunistic
 // rehearsal" calendars are valued for. Within each day, importance leads so a
 // trivial-but-sooner task can't bury an important one (the mere-urgency effect).
-export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }) {
+export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId, config = {} }) {
   const inboxId = projects?.[0]?.id
   const selector = useCallback((all) => selectUpcoming(all), [])
   const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
-  const [quickOnly, setQuickOnly] = useState(false)
+  // config is the MERGED per-instance config (manifest defaults <- saved w.config,
+  // validated by the host) — always the declared keys, always the right type, so
+  // it can seed state and cap slices without its own guards. quickWinsFirst seeds
+  // the 2-min filter; compactLimit caps the compact-mode preview.
+  const [quickOnly, setQuickOnly] = useState(config.quickWinsFirst || false)
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState('')
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
@@ -48,8 +52,8 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
 
   const flatItems = useMemo(() => {
     const sorted = [...shown].sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-    return capped ? sorted.slice(0, 5) : sorted
-  }, [shown, capped])
+    return capped ? sorted.slice(0, config.compactLimit || 5) : sorted
+  }, [shown, capped, config.compactLimit])
   const moreCount = shown.length - flatItems.length
 
   const toggleGroup = (key) => setCollapsed((prev) => {

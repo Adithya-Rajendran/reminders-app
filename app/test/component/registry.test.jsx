@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WIDGETS, WIDGET_TYPES, LOADERS, preloadWidgets } from '../../client/src/widgets/registry.jsx'
+import { WIDGETS, WIDGET_TYPES, LOADERS, RENDERER_TYPES, LOADER_TYPES, preloadWidgets } from '../../client/src/widgets/registry.jsx'
 import { WIDGET_MANIFEST } from '../../client/src/widgets/manifest.js'
 
 // CI gate for the manifest↔registry contract. The registry throws at import time
@@ -26,6 +26,15 @@ describe('widget registry ↔ manifest parity', () => {
     // missing from LOADERS would silently skip its preload (waterfall returns).
     for (const m of WIDGET_MANIFEST) expect(typeof LOADERS[m.type], `${m.type} loader`).toBe('function')
     expect(() => preloadWidgets(['not-a-widget', null, undefined])).not.toThrow()
+  })
+
+  it('has no orphaned renderer or loader (every one maps to a manifest type)', () => {
+    // The reverse of the load-time throw: RENDERERS/LOADERS are module-private, so an
+    // entry whose type has no manifest descriptor never surfaces in a widget and would
+    // pass CI silently — dead code that drifts out of sync. Gate it both ways.
+    const manifestTypes = new Set(WIDGET_MANIFEST.map((m) => m.type))
+    for (const t of RENDERER_TYPES) expect(manifestTypes.has(t), `renderer "${t}" has no manifest descriptor`).toBe(true)
+    for (const t of LOADER_TYPES) expect(manifestTypes.has(t), `loader "${t}" has no manifest descriptor`).toBe(true)
   })
 
   it('supports widget-contributed Settings panels', () => {

@@ -1,0 +1,66 @@
+/* ---------- Notes widget ---------- */
+/* Editor/shared classes (.note-x, .trash-x, .prompt-x, .cmdk-x, the .notes-cfg /
+   .notes-chip settings selectors, and .tree-chev which Backlinks also uses) stay
+   in the global styles.css — only the classes rendered solely by NotesWidget live
+   here. */
+.notes-widget { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* folder-tree sidebar layout */
+.notes-widget.tree { flex-direction: row; gap: 0; }
+.notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.notes-widget.tree .notes-main { padding-left: 10px; }
+.notes-main .iconbtn.on { color: var(--accent); background: var(--accent-soft); }
+.notes-tree { width: 175px; flex: none; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); padding-right: 4px; }
+.notes-widget.tree.compact { flex-direction: column; }
+.notes-widget.tree.compact .notes-main { padding-left: 0; }
+.notes-widget.tree.compact .notes-tree { width: auto; border-right: none; border-bottom: 1px solid var(--line); max-height: 45%; margin-bottom: 6px; padding-right: 0; }
+.tree-head { display: flex; align-items: center; gap: 4px; padding: 2px 6px 6px; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.tree-head-actions { margin-left: auto; display: flex; }
+.tree-row { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); white-space: nowrap; transition: background .12s ease, box-shadow .12s ease; }
+.tree-row:hover { background: var(--accent-soft); }
+.tree-row.sel { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree-row .ic { flex: none; opacity: .85; }
+.tree-chev-pad { width: 12px; flex: none; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.tree-empty { color: var(--muted); font-size: 11px; padding: 6px; }
+/* Obsidian-style explorer: single-pane file tree (folders + notes) */
+.notes-explorer { flex-direction: column; }
+.notes-explorer .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.tree-count { margin-left: auto; font-size: 10px; color: var(--muted); opacity: .8; padding-left: 6px; }
+.tree-row.tree-note { color: var(--text); }
+.tree-row.tree-note .ic { opacity: .6; }
+.tree-row.tree-note:hover { background: var(--accent-soft); }
+.tree-note .tree-name { flex: 1; min-width: 0; }
+.tree-section { margin-bottom: 2px; }
+.tree-pin-mark { color: var(--warn); flex: none; opacity: .9; }
+.tree-row-menu { flex: none; background: none; border: none; color: var(--faint); cursor: pointer; padding: 1px; margin: -2px 0; border-radius: 5px; display: inline-flex; opacity: 0; transition: opacity .12s; }
+.tree-row:hover .tree-row-menu, .tree-row:focus-within .tree-row-menu { opacity: 1; }
+.tree-row-menu:hover { color: var(--text); background: var(--accent-soft); }
+.notes-trash-btn { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px; width: 100%; text-align: left; background: none; border: none; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.notes-trash-btn:hover, .notes-trash-btn.on { color: var(--text); }
+.notes-trash-btn .ic { color: var(--faint); }
+.tree-note-folder { margin-left: auto; font-size: 10px; color: var(--muted); padding-left: 6px; white-space: nowrap; }
+.tree-row.note-hit { align-items: flex-start; height: auto; padding-top: 5px; padding-bottom: 5px; }
+.tree-row.note-hit > .ic { margin-top: 2px; }
+
+/* Split workspace: tree sidebar + note open in the main pane (Obsidian/VSCode). */
+.notes-split { flex-direction: row; gap: 0; align-items: stretch; }
+.notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
+.notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.notes-split .notes-main { padding-left: 12px; }
+/* On a very wide widget, give the tree more room so deep paths don't truncate. */
+.notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
+.notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
+.notes-main-empty .state-ic { margin-bottom: 4px; }
+.notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
+.notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; padding: 2px 4px 8px; }
+.notes-back:hover { color: var(--text); }
+.tree-row.tree-note.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+/* drag & drop: highlight the folder (or root) a note/folder will drop into */
+.tree-row[draggable="true"] { cursor: grab; }
+.tree-row[draggable="true"]:active { cursor: grabbing; }
+.tree-row.drag-over { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.notes-tree.drag-over-root { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 8px; }
+/* Narrow widget: collapse to a single master-detail column. */
+.notes-split.narrow { flex-direction: column; }
+.notes-split.narrow .notes-sidebar { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.notes-split.narrow .notes-main { padding-left: 0; }

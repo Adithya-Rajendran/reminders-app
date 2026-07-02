@@ -24,8 +24,9 @@ import { publishBoard, onGoToWidget } from './boardbus.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
-  IconX, IconInbox, IconRefresh,
+  IconX, IconInbox, IconRefresh, IconGear, IconCheck,
 } from './icons.jsx'
+import { resolveWidgetConfig } from './widgets/manifest.js'
 
 const Grid = WidthProvider(Responsive)
 
@@ -259,6 +260,24 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
     pendingScrollId.current = w.i // scroll + flash it once it renders (effect below)
   }
 
+  // Persist a widget instance's per-instance config (manifest `config` schema).
+  // The saved object is normalized against the widget's schema first — unknown
+  // keys dropped, values validated — so a stale/edited layout can never persist a
+  // config the widget can't consume. Storing only the validated subset also keeps
+  // w.config small and forward-safe.
+  const configureWidget = (id, nextConfig) => {
+    const type = widgets.find((w) => w.i === id)?.type
+    const schema = WIDGET_TYPES.get(type)?.config
+    const clean = resolveWidgetConfig(schema, nextConfig)
+    const nextWidgets = widgets.map((w) => (w.i === id ? { ...w, config: clean } : w))
+    setWidgets(nextWidgets)
+    // boardSignature (the no-op-save guard) intentionally hashes only identity /
+    // type / group / placement, not w.config — so force this write through by
+    // clearing the last-saved signature, or a config-only change would be skipped.
+    lastSavedSig.current = null
+    persist(nextWidgets, layouts)
+  }
+
   const removeWidget = (id) => {
     const nextWidgets = widgets.filter((w) => w.i !== id)
     const nextLayouts = {}
@@ -480,10 +499,22 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
               const ctx = selectCtx(appCtx, connections)
               // Gate on declared capability requirements the host can determine.
               const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
+              // A per-instance config schema (manifest `config`) surfaces a gear on
+              // the widget head; resolveWidgetConfig fills the form with the merged,
+              // validated current values (defaults <- saved).
+              const configSchema = spec?.config
               return (
                 // data-wid lets addWidget's effect find this node to scroll/flash it.
                 <div key={w.i} data-wid={w.i}>
-                  <WidgetFrame type={w.type} title={titleFor(w)} group={w.group} onRemove={() => removeWidget(w.i)}>
+                  <WidgetFrame
+                    type={w.type}
+                    title={titleFor(w)}
+                    group={w.group}
+                    onRemove={() => removeWidget(w.i)}
+                    configSchema={configSchema}
+                    configValues={configSchema ? resolveWidgetConfig(configSchema, w.config) : null}
+                    onConfigure={configSchema ? (next) => configureWidget(w.i, next) : undefined}
+                  >
                     <WidgetMount spec={spec} w={w} ctx={ctx}>
                       {unmet.length ? <WidgetRequirement title={titleFor(w)} reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
                     </WidgetMount>
@@ -644,7 +675,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
 }
 
 /* ---------- Widget frame ---------- */
-function WidgetFrame({ type, title, group, onRemove, children }) {
+function WidgetFrame({ type, title, group, onRemove, children, configSchema, configValues, onConfigure }) {
   const Ic = WIDGET_TYPES.get(type)?.icon || IconList
   // One ResizeObserver per widget, on the body (the real scroll container). The
   // resulting size class is broadcast through context so any widget can adapt its
@@ -666,6 +697,11 @@ function WidgetFrame({ type, title, group, onRemove, children }) {
           {group && <span className="lock-badge" title={`Locked to ${group}`}>Locked</span>}
         </span>
         <span className="widget-head-actions">
+          {/* Gear only for widget types that DECLARE a config schema (manifest
+              `config`) — opens a generic form built from that schema. */}
+          {configSchema && onConfigure && (
+            <WidgetConfigButton title={title} schema={configSchema} values={configValues} onSave={onConfigure} />
+          )}
           <button
             className="iconbtn sm danger-hover widget-remove"
             aria-label={`Remove ${title} widget`}
@@ -686,6 +722,82 @@ function WidgetFrame({ type, title, group, onRemove, children }) {
         </WidgetSizeContext.Provider>
       </div>
     </div>
+  )
+}
+
+/* ---------- Per-instance config (manifest `config` schema) ---------- */
+// The gear on a widget's head + the popover that holds its generic config form.
+// Only mounted for widget types that declare a `config` schema (see WidgetFrame).
+function WidgetConfigButton({ title, schema, values, onSave }) {
+  const [open, setOpen] = useState(false)
+  const ref = usePopover(open, setOpen)
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }} ref={ref}>
+      <button
+        className="iconbtn sm"
+        aria-label={`Configure ${title} widget`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="Configure widget"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <IconGear size={15} />
+      </button>
+      {open && (
+        <div className="menu widget-cfg-pop" role="dialog" aria-label={`${title} settings`} style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', padding: 12, minWidth: 240, animation: 'menuIn 150ms ease' }}>
+          <WidgetConfigForm schema={schema} values={values} onSave={(next) => { onSave(next); setOpen(false) }} />
+        </div>
+      )}
+    </span>
+  )
+}
+
+// A generic form rendered from a widget's config SCHEMA (array of typed field
+// descriptors). Pure UI over data: it knows the four field types, not any widget.
+// Local draft state so edits are staged and committed on Save (not persisted per
+// keystroke); the parent normalizes+validates the draft again before saving.
+// Exported for the component test — the schema→form mapping is the testable part.
+export function WidgetConfigForm({ schema, values, onSave }) {
+  const [draft, setDraft] = useState(() => ({ ...values }))
+  const set = (key, val) => setDraft((d) => ({ ...d, [key]: val }))
+  const submit = (e) => { e.preventDefault(); onSave(draft) }
+  return (
+    <form onSubmit={submit} className="widget-cfg-form">
+      {(schema || []).map((f) => {
+        const id = `cfg-${f.key}`
+        return (
+          <div key={f.key} className="field" style={{ marginBottom: 10 }}>
+            {f.type === 'boolean' ? (
+              <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input id={id} type="checkbox" checked={!!draft[f.key]} onChange={(e) => set(f.key, e.target.checked)} />
+                <span>{f.label}</span>
+              </label>
+            ) : (
+              <>
+                <label htmlFor={id} style={{ display: 'block', marginBottom: 4 }}>{f.label}</label>
+                {f.type === 'number' ? (
+                  <input
+                    id={id} className="input" type="number"
+                    value={draft[f.key]}
+                    min={f.min} max={f.max}
+                    onChange={(e) => set(f.key, e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                ) : f.type === 'select' ? (
+                  <select id={id} className="input" value={draft[f.key]} onChange={(e) => set(f.key, e.target.value)}>
+                    {(f.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <input id={id} className="input" type="text" value={draft[f.key]} onChange={(e) => set(f.key, e.target.value)} />
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
+      <button type="submit" className="btn primary sm" style={{ width: '100%' }}>
+        <IconCheck size={14} /> Save
+      </button>
+    </form>
   )
 }
 

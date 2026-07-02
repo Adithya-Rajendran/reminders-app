@@ -1,3 +1,4 @@
+import './NotesWidget.css'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useWidgetSize, atMostW, atLeastW, atLeastH, usePopover,

@@ -1,0 +1,102 @@
+/* ---------- Calendar widget ---------- */
+.cal { display: flex; flex-direction: column; height: 100%; }
+.cal-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 10px;
+  flex-wrap: wrap;
+}
+.cal-nav { display: flex; align-items: center; gap: 4px; }
+.cal-period { font-size: 14px; font-weight: 700; min-width: 0; }
+
+.cal-body { flex: 1; overflow: auto; padding: 0 8px 8px; min-height: 0; }
+
+/* ============================================================
+   FullCalendar v6 — themed via FC CSS vars + scoped overrides.
+   Colors re-pointed to the shared design tokens (theme-aware).
+   ============================================================ */
+.cal-wrap { height: 100%; }
+.cal-wrap .fc {
+  --fc-page-bg-color: transparent;
+  --fc-border-color: var(--line);
+  --fc-neutral-bg-color: var(--panel2);
+  --fc-today-bg-color: var(--accent-soft);
+  --fc-now-indicator-color: var(--danger);
+  --fc-list-event-hover-bg-color: var(--panel2);
+  --fc-event-bg-color: var(--accent);
+  --fc-event-border-color: var(--accent);
+  --fc-event-text-color: #fff;
+  height: 100%; color: var(--text); font: inherit;
+}
+.cal-wrap .fc a { color: inherit; text-decoration: none; }
+.cal-wrap .fc-theme-standard td,
+.cal-wrap .fc-theme-standard th,
+.cal-wrap .fc-theme-standard .fc-scrollgrid { border-color: var(--line); }
+
+/* Toolbar */
+.cal-wrap .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+.cal-wrap .fc .fc-toolbar-title { font-size: 15px; font-weight: 650; color: var(--text); }
+
+/* Toolbar buttons */
+.cal-wrap .fc .fc-button {
+  background: var(--panel2); border: 1px solid var(--line-strong); color: var(--text);
+  font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 9px;
+  box-shadow: none; text-transform: capitalize; transition: filter .15s, background .15s;
+}
+.cal-wrap .fc .fc-button:hover { filter: brightness(1.15); }
+.cal-wrap .fc .fc-button:focus,
+.cal-wrap .fc .fc-button-primary:focus { box-shadow: none; outline: none; }
+.cal-wrap .fc .fc-button-primary:not(:disabled):focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
+.cal-wrap .fc .fc-button-primary:disabled { opacity: .5; }
+.cal-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
+.cal-wrap .fc .fc-button-primary:not(:disabled):active {
+  background: var(--accent-grad);
+  border-color: transparent; color: #fff;
+}
+.cal-wrap .fc .fc-button-group > .fc-button { border-radius: 0; }
+.cal-wrap .fc .fc-button-group > .fc-button:first-child { border-top-left-radius: 9px; border-bottom-left-radius: 9px; }
+.cal-wrap .fc .fc-button-group > .fc-button:last-child { border-top-right-radius: 9px; border-bottom-right-radius: 9px; }
+
+/* Headers, day numbers, axis labels */
+.cal-wrap .fc th { padding: 6px 0; }
+.cal-wrap .fc .fc-col-header-cell-cushion,
+.cal-wrap .fc .fc-daygrid-day-number,
+.cal-wrap .fc .fc-timegrid-axis-cushion,
+.cal-wrap .fc .fc-timegrid-slot-label-cushion,
+.cal-wrap .fc .fc-list-day-text,
+.cal-wrap .fc .fc-list-day-side-text { color: var(--muted); font-size: 12px; }
+.cal-wrap .fc .fc-day-today .fc-daygrid-day-number { color: var(--text); font-weight: 700; }
+.cal-wrap .fc .fc-daygrid-more-link { color: var(--accent); }
+
+/* Event chips */
+.cal-wrap .fc .fc-event {
+  border-radius: 6px; padding: 1px 5px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; overflow: hidden;
+}
+.cal-wrap .fc .fc-event .fc-event-main,
+.cal-wrap .fc .fc-event .fc-event-time,
+.cal-wrap .fc .fc-event .fc-event-title { color: inherit; }
+.cal-wrap .fc .cal-event { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, transparent); color: var(--accent); }
+.cal-wrap .fc .cal-task { cursor: default; }
+.cal-wrap .fc .cal-task-local { background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 50%, transparent); color: var(--green); }
+.cal-wrap .fc .cal-task-caldav { background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 50%, transparent); color: var(--warn); }
+
+/* List / agenda view */
+.cal-wrap .fc .fc-list { border-color: var(--line); }
+.cal-wrap .fc .fc-list-day-cushion { background: var(--panel2); }
+.cal-wrap .fc .fc-list-event:hover td { background: var(--panel2); }
+.cal-wrap .fc .fc-list-event-title, .cal-wrap .fc .fc-list-event-time { color: var(--text); }
+.cal-wrap .fc .fc-list-empty { background: transparent; color: var(--muted); }
+
+/* "more" popover */
+.cal-wrap .fc .fc-popover { background: var(--panel-solid); border: 1px solid var(--line-strong); box-shadow: var(--shadow); }
+.cal-wrap .fc .fc-popover-header { background: var(--panel2); color: var(--text); }
+
+.cal-modal { width: 480px; max-width: 100%; }
+
+/* Calendar: trimmed toolbar when the widget is narrow. */
+.cal-compact .fc-toolbar-title { font-size: 14px; }
+.cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
+.cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
+
+/* Calendar task chips: dragging is their one interaction — show it. */
+.cal-task { cursor: grab; }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue } from '../widget-sdk'
+import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue, NODE_W, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, edgeBetween, dropBase, dragTo, uidFromPoint } from '../widget-sdk'
 import './CuesWidget.css'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
@@ -7,11 +7,8 @@ import './CuesWidget.css'
 // click a line to remove it. Each card's position + outgoing links live on the
 // VTODO in X-REMINDERS-FLOW (task.flow) — a dedicated field read by no other
 // widget. Double-click a card to edit its "when X" cue.
-const NODE_W = 188
-const NODE_H = 64
-const CONTENT_W = 2400
-const CONTENT_H = 1400
-const edgePath = (sx, sy, tx, ty) => `M ${sx} ${sy} C ${sx + 55} ${sy}, ${tx - 55} ${ty}, ${tx} ${ty}`
+// The board geometry (node size, content plane, pointer→content transform, edge
+// anchors + path) lives in ../flowgeom.js so it's node-testable without a DOM.
 
 function FlowNode({ task, pos, dragging, linkArmed, onMoveStart, onLinkStart, onLinkKey, onToggle, onUnplace, onSetCue }) {
   const [editing, setEditing] = useState(false)
@@ -112,24 +109,21 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
   }, [persistFlow])
 
   // --- pointer drag (reuses the down → window-move → up pattern) ---
-  const toContent = (ev) => {
-    const c = canvasRef.current; const r = c.getBoundingClientRect()
-    return { x: ev.clientX - r.left + c.scrollLeft, y: ev.clientY - r.top + c.scrollTop }
+  // Reads live rect/scroll off the canvas and defers the math to flowgeom.toContent.
+  const ptToContent = (ev) => {
+    const c = canvasRef.current
+    return toContent(c.getBoundingClientRect(), c.scrollLeft, c.scrollTop, ev.clientX, ev.clientY)
   }
-  const targetAt = (ev) => {
-    let el = document.elementFromPoint(ev.clientX, ev.clientY)
-    while (el && el !== document.body) { if (el.dataset && el.dataset.uid) return el.dataset.uid; el = el.parentElement }
-    return null
-  }
+  const targetAt = (ev) => uidFromPoint(document.elementFromPoint(ev.clientX, ev.clientY))
   const onMoveStart = (task, e, fromQueue = false) => {
     if (e.button != null && e.button !== 0) return
     e.preventDefault()
-    const s = toContent(e)
-    const base = task.flow || { x: Math.max(0, s.x - NODE_W / 2), y: Math.max(0, s.y - 20) }
+    const s = ptToContent(e)
+    const base = task.flow || dropBase(s)
     const offX = fromQueue ? NODE_W / 2 : s.x - base.x
     const offY = fromQueue ? 20 : s.y - base.y
     setDrag({ mode: 'move', uid: task.uid, x: base.x, y: base.y, offX, offY })
-    const move = (ev) => { const p = toContent(ev); setDrag((d) => d && ({ ...d, x: Math.max(0, p.x - d.offX), y: Math.max(0, p.y - d.offY) })) }
+    const move = (ev) => { const p = ptToContent(ev); setDrag((d) => d && ({ ...d, ...dragTo(p, d.offX, d.offY) })) }
     const up = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
       setDrag((d) => { if (d) persistFlow(task, { x: d.x, y: d.y }); return null })
@@ -139,10 +133,9 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
   const onLinkStart = (task, e) => {
     if (e.button != null && e.button !== 0) return
     e.preventDefault(); e.stopPropagation()
-    const p = posOf(task)
-    const sx = p.x + NODE_W, sy = p.y + NODE_H / 2
+    const { x: sx, y: sy } = nodeOut(posOf(task))
     setDrag({ mode: 'link', fromUid: task.uid, sx, sy, x: sx, y: sy })
-    const move = (ev) => { const c = toContent(ev); setDrag((d) => d && ({ ...d, x: c.x, y: c.y })) }
+    const move = (ev) => { const c = ptToContent(ev); setDrag((d) => d && ({ ...d, x: c.x, y: c.y })) }
     const up = (ev) => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
       const tgt = targetAt(ev)
@@ -168,8 +161,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
     for (const tgt of (s.flow?.to || [])) {
       const t = placedByUid.get(tgt)
       if (!t) continue
-      const sp = posOf(s), tp = posOf(t)
-      edges.push({ key: s.uid + '->' + tgt, from: s, to: tgt, d: edgePath(sp.x + NODE_W, sp.y + NODE_H / 2, tp.x, tp.y + NODE_H / 2) })
+      edges.push({ key: s.uid + '->' + tgt, from: s, to: tgt, d: edgeBetween(posOf(s), posOf(t)) })
     }
   }
 

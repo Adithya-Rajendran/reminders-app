@@ -32,6 +32,20 @@ describe('UpcomingWidget', () => {
     expect(cap.calls.update).toContainEqual([1, { done: true }])
   })
 
+  it('honors per-instance config: quickWinsFirst seeds the 2-minute filter on', () => {
+    // A task WITHOUT the 2min label and one WITH it — with the filter pre-enabled,
+    // only the quick win should render (proves config.quickWinsFirst is wired, not
+    // just accepted). The filter chip should also start pressed.
+    const cap = fakeTasks([
+      { id: 1, title: 'Long report', due_date: future(1), done: false, priority: 0, labels: [] },
+      { id: 2, title: 'Reply to Sam', due_date: future(1), done: false, priority: 0, labels: [{ title: '2min' }] },
+    ])
+    render(<UpcomingWidget tasks={cap} config={{ quickWinsFirst: true, compactLimit: 5 }} />)
+    expect(screen.getByText('Reply to Sam')).toBeInTheDocument()
+    expect(screen.queryByText('Long report')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /2-min only/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows an error alert and restores the draft when create rejects', async () => {
     const cap = fakeTasks([])
     // Override create to reject with a JSON-encoded server error message

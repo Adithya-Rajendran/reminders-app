@@ -48,8 +48,15 @@
 //                ['caldav'] / ['nextcloud']. The dashboard shows a "connect it in
 //                Settings" placeholder for the ones it can determine; others a
 //                widget may self-handle (e.g. Notes' own "needs Nextcloud" state).
-//   config       optional per-instance default config (data only); a widget reads
-//                its merged config via widgetStore(instanceId). A widget type can
+//   config       optional per-instance config SCHEMA: an array of typed field
+//                descriptors { key, label, type, default, ... } (data only, so the
+//                node tests exercise it). type is 'number' | 'boolean' | 'select' |
+//                'text'; 'number' may carry { min, max }, 'select' an { options: [{
+//                value, label }] }. The dashboard renders this as a generic form
+//                behind a gear on the widget head, persists the chosen values as
+//                `w.config` on the saved layout item, and hands the widget the MERGED
+//                config (defaults <- saved, validated) as a `config` prop at render
+//                (see registry.jsx / resolveWidgetConfig below). A widget type can
 //                also contribute a Settings panel via `settingsPanel` (registry.jsx).
 //   mcp          optional { summary, tools: ['<type>_…'] } — the MCP toolset this
 //                widget exposes when the user enables it in Settings → MCP access.
@@ -68,6 +75,12 @@ export const WIDGET_MANIFEST = [
   { type: 'reminders', label: 'Reminders',     desc: 'Actionable task list — snooze, schedule, complete', plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 },
     mcp: { summary: 'Create, list, edit, complete and delete tasks & reminders (incl. natural-language capture)', tools: ['reminders_list', 'reminders_capture', 'reminders_create', 'reminders_update', 'reminders_complete', 'reminders_delete', 'reminders_groups_list'] } }, // task list — portrait to gentle landscape, never a thin strip
   { type: 'upcoming',  label: 'Upcoming',      desc: 'Dated tasks grouped by Today / Tomorrow / This week', plugs: ['tasks', 'projects'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 },
+    // Per-instance config: one board can carry an Upcoming tuned to quick wins and
+    // another to the full agenda. Both fields are honestly wired in UpcomingWidget.
+    config: [
+      { key: 'quickWinsFirst', label: 'Start with 2-minute wins only', type: 'boolean', default: false },
+      { key: 'compactLimit', label: 'Items to preview when space is tight', type: 'number', default: 5, min: 1, max: 20 },
+    ],
     mcp: { summary: 'Read the dated agenda, bucketed Overdue / Today / Tomorrow / This week / Later', tools: ['upcoming_agenda'] } }, // dated-task list — same shape band as reminders
   { type: 'calendar',  label: 'Calendar',      desc: 'Month / week / agenda — events + tasks, drag to reschedule', plugs: ['tasks', 'calendar'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 24, h: 22 }, aspect: { min: 0.9, max: 1.4 },
     mcp: { summary: 'List calendars, and read / create / edit / delete calendar events', tools: ['calendar_lists', 'calendar_events', 'calendar_create_event', 'calendar_update_event', 'calendar_delete_event'] } }, // a month grid reads best near-square / landscape
@@ -86,6 +99,52 @@ export const WIDGET_MANIFEST = [
 ]
 
 export const WIDGET_MANIFEST_BY_TYPE = new Map(WIDGET_MANIFEST.map((m) => [m.type, m]))
+
+// Coerce+validate one saved value against its field descriptor, returning the
+// field default when the saved value is missing or unusable. Kept total (never
+// throws) so a manifest change — a field retyped, a range tightened, an option
+// removed — degrades a stale saved value to the default instead of crashing the
+// widget that reads it.
+function coerceConfigValue(field, value) {
+  if (value === undefined || value === null) return field.default
+  switch (field.type) {
+    case 'boolean':
+      return typeof value === 'boolean' ? value : field.default
+    case 'number': {
+      const n = typeof value === 'number' ? value : Number(value)
+      if (!Number.isFinite(n)) return field.default
+      // Clamp into the declared range rather than rejecting — a saved value that
+      // was valid under an older, wider range stays usable, just bounded.
+      let out = n
+      if (typeof field.min === 'number') out = Math.max(field.min, out)
+      if (typeof field.max === 'number') out = Math.min(field.max, out)
+      return out
+    }
+    case 'select': {
+      const allowed = (field.options || []).map((o) => o.value)
+      return allowed.includes(value) ? value : field.default
+    }
+    case 'text':
+      return typeof value === 'string' ? value : field.default
+    default:
+      return field.default
+  }
+}
+
+// Merge a saved per-instance config (w.config) onto a widget type's config SCHEMA,
+// producing the plain values object handed to the widget. Every declared key is
+// present (defaults fill the gaps); every value is validated against its field;
+// keys not in the schema are dropped. A widget with no config schema gets {}.
+export function resolveWidgetConfig(schema, saved) {
+  const out = {}
+  if (!Array.isArray(schema)) return out
+  const src = saved && typeof saved === 'object' ? saved : {}
+  for (const field of schema) {
+    if (!field || typeof field.key !== 'string') continue
+    out[field.key] = coerceConfigValue(field, src[field.key])
+  }
+  return out
+}
 
 // The clean default board for fresh users and "Reset layout", left to right.
 export const DEFAULT_BOARD = ['reminders', 'upcoming', 'calendar']

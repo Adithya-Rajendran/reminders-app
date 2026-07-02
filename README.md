@@ -95,7 +95,7 @@ npm start        # run the BFF (serves app/public)
 
 CI (`.github/workflows/ci.yml`) runs lint, the SPA build, the server syntax check, unit + component tests, the same checks inside the Docker image's `test` stage **plus a boot smoke of the production image**, and a Playwright e2e suite against real CalDAV (Radicale) and WebDAV (wsgidav) backends — on every push/PR. `docker.yml` boot-tests and then pushes the image to GHCR on `main` and tags, and the optional `deploy.yml` can roll a cluster automatically afterwards (see [`k8s/README.md`](k8s/README.md)). **Everything runs on GitHub-hosted runners (free for public repos) — no self-hosted runner, VM, or cluster is required or used by CI.**
 
-**Extending the dashboard:** widgets are self-contained — one component file plus one entry in `app/client/src/widgets/registry.jsx`. See **[docs/adding-a-widget.md](docs/adding-a-widget.md)** for the walkthrough, and [`CLAUDE.md`](CLAUDE.md) for a map of the repo.
+**Extending the dashboard:** widgets are self-contained — one component file plus one entry in `app/client/src/widgets/registry.jsx`. See **[docs/adding-a-widget.md](docs/adding-a-widget.md)** for the walkthrough, [docs/api.md](docs/api.md) for the `/api/*` contract widgets couple to, and [`CLAUDE.md`](CLAUDE.md) for a map of the repo.
 
 ## Design
 
