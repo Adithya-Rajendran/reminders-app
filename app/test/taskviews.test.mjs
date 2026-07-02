@@ -188,13 +188,13 @@ ok(UPCOMING_ORDER.join() === 'overdue,today,tomorrow,week,later', 'UPCOMING_ORDE
   // empty planIds = identity
   const emptyResult = orderPlanFirst(tasks, [])
   ok(emptyResult.map((t) => t.id).join() === 'a,b,c,d', 'orderPlanFirst: empty planIds -> identity')
-  // done plan tasks are NOT forced first
+  // done plan tasks are NOT promoted — they keep their original position
   const withDone = [
-    { id: 'x', done: true, priority: 5 },   // plan id but done -> stays in rest
+    { id: 'x', done: true, priority: 5 },   // plan id but done -> not pulled forward
     { id: 'y', done: false, priority: 1 },
   ]
   const doneResult = orderPlanFirst(withDone, ['x'])
-  ok(doneResult[0].id === 'y' && doneResult[1].id === 'x', 'orderPlanFirst: done plan tasks are not promoted')
+  ok(doneResult.map((t) => t.id).join() === 'x,y', 'orderPlanFirst: a done plan task is not promoted (original order kept)')
   // ids not in plan are unaffected in relative order
   const outsideResult = orderPlanFirst(tasks, ['d'])
   ok(outsideResult[0].id === 'd', 'orderPlanFirst: plan id goes first')
