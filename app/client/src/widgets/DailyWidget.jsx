@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, appSharedStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
 import './DailyWidget.css'
 
-const PLAN_KEY = 'daily-plan' // { date, ids: [] }
 const NOTE_KEY = 'daily-note' // { date, text }
 const DAY_BUDGET_MIN = 360 // ~6 focused hours; the estimate roll-up flags overcommitment (planning fallacy)
 const SUGGEST_CAP = 10
@@ -15,8 +14,10 @@ const fmtMin = (m) => { m = Math.round(m || 0); if (m < 60) return m + 'm'; cons
 // watch an estimate roll-up so the day isn't overcommitted (planning fallacy).
 // Evening: recap what got done and roll the rest to tomorrow. The app reviews
 // weekly (Review widget) but never guided a single day — this fills that gap.
-// Per-day state is device-local (widgetStore); the tasks themselves stay in CalDAV.
-export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
+// The plan itself is server-stored (ctx.plan) so it syncs across browsers and is
+// readable by integrations; the shutdown note stays device-local (widgetStore);
+// the tasks themselves stay in CalDAV.
+export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceId }) {
   const inboxId = projects?.[0]?.id
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
@@ -26,15 +27,24 @@ export default function DailyWidget({ tasks: tasksCap, projects, instanceId }) {
   const [mode, setMode] = useState('plan') // 'plan' | 'shutdown'
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState('')
-  // PLAN_KEY is written to the shared store so FocusWidget (and any other widget)
-  // can read today's plan without knowing which DailyWidget instance wrote it.
-  const [planIds, setPlanIds] = useState(() => { const s = appSharedStore.loadJson(PLAN_KEY, null); return s && s.date === todayKey ? s.ids : [] })
+  const [planIds, setPlanIds] = useState([])
+  useEffect(() => {
+    let alive = true
+    plan.get(todayKey).then((r) => { if (alive) setPlanIds(Array.isArray(r?.ids) ? r.ids : []) }).catch(() => { /* keep [] — plan is additive UX */ })
+    return () => { alive = false }
+  }, [plan, todayKey])
   const savePlan = (ids) => {
+    // Optimistic: the plan is a tiny id list — apply locally, revert on failure.
+    const prev = planIds
     setPlanIds(ids)
-    appSharedStore.saveJson(PLAN_KEY, { date: todayKey, ids })
     // Notify other widgets (e.g. FocusWidget) that the plan changed, so they
     // can re-read without polling.
     window.dispatchEvent(new CustomEvent('reminders:plan-changed'))
+    plan.set(todayKey, ids).catch(() => {
+      setPlanIds(prev)
+      setErr('Could not save today’s plan — check your connection.')
+      window.dispatchEvent(new CustomEvent('reminders:plan-changed'))
+    })
   }
   const [note, setNote] = useState(() => { const n = store.loadJson(NOTE_KEY, null); return n && n.date === todayKey ? n.text : '' })
   const saveNote = (text) => { setNote(text); store.saveJson(NOTE_KEY, { date: todayKey, text }) }

@@ -71,8 +71,8 @@ const RENDERERS = {
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
   triage: { icon: IconTrophy, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} instanceId={w.i} /> },
-  daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} /> },
-  focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} instanceId={w.i} /> },
+  daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} plan={ctx.plan} instanceId={w.i} /> },
+  focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} plan={ctx.plan} instanceId={w.i} /> },
 }
 
 // Each manifest descriptor + its renderer = a full widget entry, in menu order.

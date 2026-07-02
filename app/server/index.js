@@ -13,6 +13,7 @@ import * as caldav from './caldav.js'
 import { rateLimitMiddleware } from './ratelimit.js'
 import * as notes from './notes.js'
 import * as groups from './reminder_groups.js'
+import * as dailyPlan from './daily_plan.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -133,6 +134,13 @@ app.put('/api/dashboards', requireAuth, async (req, res, next) => {
 app.delete('/api/dashboards/:id', requireAuth, async (req, res, next) => {
   if (req.params.id === config.DASH_INDEX) return res.status(400).json({ error: 'bad id' })
   try { await config.deleteDashboardLayout(req.session.user.sub, req.params.id); res.json({ ok: true }) } catch (e) { next(e) }
+})
+// ---- Daily plan (the few tasks picked for "today" — see server/daily_plan.js) ----
+app.get('/api/daily-plan', requireAuth, async (req, res, next) => {
+  try { res.json(await dailyPlan.getPlan(req.session.user.sub, req.query.date)) } catch (e) { next(e) }
+})
+app.put('/api/daily-plan', requireAuth, async (req, res, next) => {
+  try { res.json(await dailyPlan.setPlan(req.session.user.sub, req.body?.date, req.body?.ids)) } catch (e) { next(e) }
 })
 // CalDAV settings + tasks
 app.get('/api/caldav/accounts', requireAuth, caldav.listAccountsHandler)
