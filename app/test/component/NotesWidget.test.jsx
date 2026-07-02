@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import NotesWidget from '../../client/src/widgets/NotesWidget.jsx'
 import { fakeNotes } from './fakeCtx.js'
@@ -68,8 +68,8 @@ describe('NotesWidget', () => {
     // The widget only wipes to ErrorState on initial load failure. A subsequent
     // refresh failure must keep the existing tree and set stale=true (showing
     // ReconnectBanner) rather than replacing the tree with an error card. The
-    // second refresh is triggered for real (via the open-note bus, which calls
-    // load()) — without it this test passed even with the guard deleted.
+    // second refresh is triggered for real (a pin action re-load()s) — without
+    // it this test passed even with the guard deleted.
     const notesList = [{ path: 'Gamma.md', title: 'Gamma', folder: '', tags: [] }]
     const notes = fakeNotes({ configured: true, notes: notesList })
     let listCalls = 0
@@ -78,16 +78,15 @@ describe('NotesWidget', () => {
       if (listCalls === 1) return { configured: true, notes: notesList }
       throw new Error('offline') // subsequent calls fail
     }
-    let fireOpen
-    notes.onOpenNote = (fn) => { fireOpen = fn; return () => {} }
-    // Opening a note loads the editor; keep it trivially resolvable.
-    notes.get = () => Promise.resolve({ title: 'Gamma', body: 'x', etag: 'e1', meta: {}, folder: '' })
 
     render(<NotesWidget notes={notes} onOpenSettings={() => {}} instanceId="n-stale" />)
     // Tree populated on first load
     expect(await screen.findByText('Gamma')).toBeInTheDocument()
-    // Trigger a background refresh that fails.
-    await act(async () => { fireOpen('Gamma.md') })
+    // Trigger a background refresh that fails: pin succeeds, the follow-up
+    // load() rejects. (Pin, unlike opening a note, keeps the tree pane visible
+    // in the narrow jsdom layout.)
+    await userEvent.click(screen.getByRole('button', { name: /Note actions/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: /pin to top/i }))
     await waitFor(() => expect(listCalls).toBeGreaterThanOrEqual(2))
     // Tree survives (not replaced by ErrorState) and the stale banner shows.
     await waitFor(() => expect(screen.getByText(/last synced copy/i)).toBeInTheDocument())
