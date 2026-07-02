@@ -152,7 +152,7 @@ export default function NoteRichEditor({ value, onChange, notes = [], folder = '
   // Paste an image straight into the note → upload to _resources → embed.
   const uploadAndInsert = async (file) => {
     const ed = editorRef.current
-    if (!ed) return
+    if (!ed || ed.isDestroyed) return
     const name = crypto.randomUUID() + '.' + (EXT[file.type] || 'png')
     try {
       await notesApi.uploadResource(name, file, file.type)
@@ -166,6 +166,10 @@ export default function NoteRichEditor({ value, onChange, notes = [], folder = '
 
   const onDrawingSave = async ({ json, png }) => {
     const ed = editorRef.current
+    // The error notice's Retry can outlive the note (notice persists after the
+    // editor closes) — bail before uploading, or the resources land on the
+    // server and the insert below throws on a destroyed editor.
+    if (!ed || ed.isDestroyed) return
     const id = drawing.id || crypto.randomUUID()
     try {
       await notesApi.uploadResource(id + '.excalidraw', new Blob([json], { type: 'application/octet-stream' }), 'application/octet-stream')

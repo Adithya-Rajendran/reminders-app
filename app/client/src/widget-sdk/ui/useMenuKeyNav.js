@@ -23,6 +23,11 @@ export function useMenuKeyNav(open, ref, { selector = '[role="menuitem"]', initi
       const list = items()
       if (!list.length) return
       const i = list.indexOf(document.activeElement)
+      // Home/End typed in a text field OUTSIDE the item list (a search input
+      // with content, e.g. the group picker) must keep their native caret
+      // behavior; with the field empty they still jump the list.
+      const a = document.activeElement
+      if ((e.key === 'Home' || e.key === 'End') && i < 0 && a?.matches?.('input, textarea') && a.value) return
       if (claimsKey(e.key, { radio })) {
         e.preventDefault()
         list[nextIndex(normalizeKey(e.key), i, list.length)]?.focus()

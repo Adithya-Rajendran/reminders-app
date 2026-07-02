@@ -80,6 +80,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const [tag, setTag] = useState(null)
   const [contentHits, setContentHits] = useState([]) // full-text body matches (server FTS)
   const [openPath, setOpenPath] = useState(null)
+  // { path, etag }: set when a widget-side action rewrites the OPEN note
+  // server-side (pin from the tree menu) — the editor applies the fresh etag.
+  const [extEtag, setExtEtag] = useState(null)
   const [folderPrompt, setFolderPrompt] = useState(false)
   const [sort, setSort] = useState(() => store.loadJson('notes-sort', 'updated'))
   const [sortOpen, setSortOpen] = useState(false)
@@ -136,10 +139,13 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       const r = await notesApi.list()
       if (!r.configured) { setState('unconfigured'); return }
       setNotes(Array.isArray(r.notes) ? r.notes : [])
+      // Clear stale BEFORE the folders sub-fetch: clearing after it would
+      // clobber the catch's setStale(true) (same batched continuation), making
+      // a folders-only failure invisible.
+      setStale(false)
       // Folders sub-fetch is best-effort — failure folds into the stale flag,
       // not a separate error state, because the tree still shows note paths.
       try { const fr = await notesApi.folders(); setFolders((fr.folders || []).filter(Boolean)) } catch { setStale(true) }
-      setStale(false)
       setState('ready')
     } catch {
       if (stateRef.current === 'ready') {
@@ -200,7 +206,12 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   })
 
   const doPin = act('Pin', async (n) => {
-    await notesApi.setPinned(n.path, !n.pinned); await load()
+    const r = await notesApi.setPinned(n.path, !n.pinned)
+    // Pinning rewrites the file server-side (new etag). If it's the open note,
+    // hand the fresh etag to the editor — otherwise its next autosave sends a
+    // stale If-Match and throws a false conflict banner.
+    if (r?.etag && n.path === openPath) setExtEtag({ path: n.path, etag: r.etag })
+    await load()
   })
 
   // Move a note to Trash, then offer Undo (restore) — the editor's trash button
@@ -508,7 +519,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
             : openPath
               ? (
                 <NoteEditor
-                  inline path={openPath} notes={notes}
+                  inline path={openPath} notes={notes} extEtag={extEtag}
                   onClose={() => setOpenPath(null)}
                   onChanged={(np) => { if (np) setOpenPath(np); load() }}
                   // The editor's trash button funnels through the widget's notice

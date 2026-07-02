@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import McpSection from '../../client/src/settings/McpSection.jsx'
 
@@ -365,14 +365,19 @@ describe('McpSection', () => {
     // Give it a tick to settle.
     await waitFor(() => expect(putCallCount).toBeGreaterThanOrEqual(2))
     // Now resolve PUT #1 (reminders) — this is "stale" and should be ignored.
-    resolvePut1()
-
-    // After both resolve, calendar should remain enabled (newer PUT wins; stale
-    // PUT #1 response is discarded because its seq < latestSeq).
-    await waitFor(() => {
-      const calSwitch = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
-      expect(calSwitch).toBeChecked()
+    // Flush its whole microtask chain (mock fetch -> json parse -> setSettings)
+    // BEFORE asserting: asserting synchronously would pass even without the seq
+    // guard, because the stale response hadn't been applied yet.
+    await act(async () => {
+      resolvePut1()
+      await new Promise((r) => setTimeout(r, 0))
+      await new Promise((r) => setTimeout(r, 0))
     })
+
+    // After both fully settle, calendar must remain enabled (newer PUT wins;
+    // the stale PUT #1 response is discarded because its seq < latestSeq).
+    const calSwitch = screen.getByRole('switch', { name: /enable mcp access for calendar widget/i })
+    expect(calSwitch).toBeChecked()
   })
 
   it('error revert flips only the toggled key back, not the whole map', async () => {

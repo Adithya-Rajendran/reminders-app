@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { IconRefresh, IconInbox } from '../../icons.jsx'
 import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate, PRIORITIES } from '../../tasklib.js'
 import { announce } from './announcer.jsx'
@@ -61,7 +61,11 @@ export function ReconnectBanner({ onRetry }) {
 // LiveAnnouncer so it is actually read (see announcer.jsx).
 //   notice = { kind?: 'undo'|'error'|'info', label, action?: { label, fn } }
 export function NoticeBar({ notice, dismiss }) {
-  useEffect(() => { announce(notice.label) }, [notice.label])
+  // Keyed on the notice OBJECT, not the label: two consecutive notices with an
+  // identical label (e.g. two "Completed" undos in the 6s window) must both
+  // announce — the announcer's clear-then-set exists exactly for that. Hosts
+  // construct a fresh notice object per event, so identity is the event key.
+  useEffect(() => { announce(notice.label) }, [notice])
   const kind = notice.kind || 'undo'
   return (
     <div className={`undo-bar${kind === 'error' ? ' notice-error' : ''}`}>
@@ -74,9 +78,15 @@ export function NoticeBar({ notice, dismiss }) {
 }
 
 // Back-compat shell used across every widget: { undo: { label, fn? } }. Kept as
-// a one-line adapter so ten call sites don't churn.
+// an adapter so ten call sites don't churn. The notice is memoized on the undo
+// object — a fresh literal per render would re-announce on every parent
+// re-render now that NoticeBar keys its announce on notice identity.
 export function UndoBar({ undo, dismiss }) {
-  return <NoticeBar notice={{ kind: 'undo', label: undo.label, action: undo.fn ? { label: 'Undo', fn: undo.fn } : undefined }} dismiss={dismiss} />
+  const notice = useMemo(
+    () => ({ kind: 'undo', label: undo.label, action: undo.fn ? { label: 'Undo', fn: undo.fn } : undefined }),
+    [undo],
+  )
+  return <NoticeBar notice={notice} dismiss={dismiss} />
 }
 
 // Live, read-only preview of the tokens parseQuickAdd will pull from a quick-add

@@ -19,7 +19,7 @@ const NoteRichEditor = lazy(() => import('./NoteRichEditor.jsx'))
 // inside a pane when `inline` is set (the split-view notes widget). `onChanged` is
 // called after a rename/move so the surrounding tree can refresh; `onDeleted` after
 // a delete.
-export default function NoteEditor({ path: initialPath, onClose, onChanged, onDeleted, inline = false, notes = [] }) {
+export default function NoteEditor({ path: initialPath, onClose, onChanged, onDeleted, inline = false, notes = [], extEtag = null }) {
   const [path, setPath] = useState(initialPath)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -35,6 +35,7 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   // loadTick: incrementing this re-runs the load effect (used by the note-load
   // Retry button without changing initialPath — a re-mount-level reload).
   const [loadTick, setLoadTick] = useState(0)
+  const lastLoadTickRef = useRef(0)
   const [folderPrompt, setFolderPrompt] = useState(false)
   const [showOutline, setShowOutline] = useState(() => loadJson('notes-outline-open', false))
   const bodyElRef = useRef(null)
@@ -64,7 +65,10 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
       save: async () => {
         const p = pathRef.current
         const r = await notesApi.save(p, bodyRef.current, etagRef.current, tagsRef.current)
-        if (pathRef.current === p) setEtag(r.etag) // the pane may have switched notes mid-PUT
+        // Ref synchronously, not just state: a coalesced trailing save chains
+        // synchronously off this one and reads etagRef before React re-renders —
+        // with only setEtag it would send the stale If-Match and false-409.
+        if (pathRef.current === p) { etagRef.current = r.etag; setEtag(r.etag) } // the pane may have switched notes mid-PUT
       },
       // onState now receives (state, error?) — we store the error for conflict UX.
       onState: (s, err) => {
@@ -86,8 +90,11 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
 
   useEffect(() => {
     // Skip the reload when the parent just re-points us at our own (renamed/moved)
-    // path — we're already showing it, so a refetch would only flash.
-    if (loadTick === 0 && initialPath === pathRef.current && stateRef.current === 'ready') return undefined
+    // path — we're already showing it, so a refetch would only flash. Compare
+    // loadTick against the LAST-SEEN tick (not 0): comparing to the constant
+    // would permanently disable this skip once Retry has bumped the tick.
+    if (loadTick === lastLoadTickRef.current && initialPath === pathRef.current && stateRef.current === 'ready') return undefined
+    lastLoadTickRef.current = loadTick
     let alive = true
     setState('loading')
     // Switching to another note: save pending edits to the old path now — the
@@ -110,6 +117,16 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
     notesApi.folders().then((r) => { if (alive) setFolders(r.folders || []) }).catch(() => {})
     return () => { alive = false }
   }, [initialPath, loadTick]) // loadTick lets the Retry button re-run this without changing path
+
+  // The host rewrote this note server-side (e.g. pin from the tree context
+  // menu) and hands us the fresh etag — apply it or the next autosave sends a
+  // stale If-Match and false-409s.
+  useEffect(() => {
+    if (extEtag?.etag && extEtag.path === pathRef.current) {
+      etagRef.current = extEtag.etag
+      setEtag(extEtag.etag)
+    }
+  }, [extEtag])
 
   // After the ready-render commits, honor a pending new-note title focus.
   useEffect(() => {
@@ -165,6 +182,9 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
       // this await is what actually prevents closing over an unsettled save.
       try {
         await queue.current.flush()
+        // Keystrokes can land while the close-triggered save is mid-air; don't
+        // unmount past them — keep flushing until clean (or a save fails).
+        while (savingRef.current !== 'error' && queue.current.isDirty()) await queue.current.flush()
       } catch {
         // flush itself doesn't throw (errors go to onState); this catch is for
         // any unexpected rejection path — surface in state, do NOT close.

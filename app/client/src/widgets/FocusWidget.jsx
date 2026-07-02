@@ -69,8 +69,9 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
     clearTimeout(beatTimer.current)
     setBeat(msg)
     beatTimer.current = setTimeout(() => setBeat(null), 2500)
-    announce(msg) // the visual chip is a plain div; SR announcement goes through the app live region
-    onToggle(nowTask)
+    // No separate announce(): onToggle's undo bar announces its label, so route
+    // the richer message THROUGH it — otherwise every completion speaks twice.
+    onToggle(nowTask, { completedLabel: msg })
   }
 
   // How many plan tasks are still open (excluding the current one)?

@@ -63,7 +63,10 @@ export function useTaskList(tasks, selector) {
     update(task.id, { due_date, reminders }).then(emitChanged).catch(() => { refresh(); showSaveError() })
   }, [storePatch, update, emitChanged, refresh, showSaveError])
 
-  const onToggle = useCallback(async (task) => {
+  // completedLabel lets a widget substitute a richer message on the SAME undo
+  // bar ("Done ✓ — next: …") instead of layering a second announce() over the
+  // bar's own — one announcement per completion.
+  const onToggle = useCallback(async (task, { completedLabel } = {}) => {
     if (task.done) { storePatch(task.id, { done: false }); update(task.id, { done: false }).then(emitChanged).catch(() => { refresh(); showSaveError() }); return }
     const snapshot = getTasks()
     storeRemove(task.id) // optimistic remove with exit animation handled in CSS
@@ -78,7 +81,7 @@ export function useTaskList(tasks, selector) {
         showUndo(advanced ? 'Rescheduled ↻' : 'Recurring — set a due date to complete', null)
         refresh()
       } else {
-        showUndo('Completed', async () => { await update(task.id, { done: false }).catch(() => {}); emitChanged(); refresh() })
+        showUndo(completedLabel || 'Completed', async () => { await update(task.id, { done: false }).catch(() => {}); emitChanged(); refresh() })
       }
     } catch { replaceTasks(snapshot); showSaveError() }
   }, [storePatch, storeRemove, replaceTasks, update, emitChanged, isRealDate, refresh, getTasks, showUndo, showSaveError])

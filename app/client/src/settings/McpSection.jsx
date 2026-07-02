@@ -188,9 +188,16 @@ export default function McpSection() {
       if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
-        // Revert only the toggled key, not the whole map.
-        setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: prevWidgets[type] } }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
+        // The revert must respect the seq guard too: if a newer PUT owns the
+        // state, restoring this request's snapshot would clobber it — re-sync
+        // from the server instead.
+        if (mySeq === latestSeq.current) {
+          // Revert only the toggled key, not the whole map.
+          setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: prevWidgets[type] } }))
+        } else {
+          load()
+        }
       }
     }
   }
@@ -214,8 +221,14 @@ export default function McpSection() {
       if (isMounted.current && mySeq === latestSeq.current) setSettings(next)
     } catch {
       if (isMounted.current) {
-        setSettings((s) => ({ ...s, widgets: prevWidgets }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
+        // Same seq-guarded revert as setWidgetEnabled — the whole-map restore
+        // is only safe while this request is still the latest.
+        if (mySeq === latestSeq.current) {
+          setSettings((s) => ({ ...s, widgets: prevWidgets }))
+        } else {
+          load()
+        }
       }
     }
   }

@@ -95,8 +95,11 @@
 
 /* ---- celebration: fly-ups, confetti, level-up banner ---- */
 /* Keep the undo bar above the (pointer-events:none) celebration overlay so a
-   level-up banner / confetti never visually covers the Undo action. */
-.triage .undo-bar { position: relative; z-index: 7; }
+   level-up banner / confetti never visually covers the Undo action. No
+   `position` here: the base .undo-bar rule supplies position:sticky (pins the
+   bar to the visible bottom on long lists) — a `relative` override would
+   silently put it back below the fold, exactly the bug the sticky fix fixed. */
+.triage .undo-bar { z-index: 7; }
 .tri-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
 .tri-flyup { position: absolute; left: 50%; bottom: 58px; font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, .3); animation: triFly 1100ms ease-out forwards; }
 .tri-flyup.combo { color: var(--warn); font-size: 17px; }
