@@ -9,7 +9,7 @@ import { fakeTasks, fakePlan } from './fakeCtx.js'
 // reverts on a rejected plan.set call.
 
 describe('DailyWidget', () => {
-  it('shows the plan section heading and suggestions heading', () => {
+  it('shows the plan section heading and suggestions heading', async () => {
     render(
       <DailyWidget
         tasks={fakeTasks([])}
@@ -18,7 +18,10 @@ describe('DailyWidget', () => {
         instanceId="dw-smoke"
       />,
     )
-    expect(screen.getByText(/today's focus/i)).toBeInTheDocument()
+    // findBy* waits, which also lets the mount-time plan.get effect settle
+    // (silences the act() warning). NOTE the curly apostrophe — the widget
+    // renders 'Today’s focus', not a straight quote.
+    expect(await screen.findByText(/today’s focus/i)).toBeInTheDocument()
     expect(screen.getByText(/suggestions/i)).toBeInTheDocument()
   })
 
@@ -44,8 +47,12 @@ describe('DailyWidget', () => {
     // The task should appear as a suggestion.
     expect(await screen.findByText('Write report')).toBeInTheDocument()
 
-    // Click the suggestion button to add it to today's focus.
-    await userEvent.click(screen.getByTitle(/add to today/i))
+    // Click the SUGGESTION button (.daily-sg): the quick-add submit button
+    // carries the same "Add to today" title, so an unscoped title query is
+    // ambiguous.
+    const suggestion = screen.getByText('Write report').closest('.daily-sg')
+    expect(suggestion).not.toBeNull()
+    await userEvent.click(suggestion)
 
     // After the rejection, the error alert should appear.
     await waitFor(() =>
