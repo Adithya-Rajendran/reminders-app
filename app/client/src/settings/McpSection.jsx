@@ -114,8 +114,6 @@ export default function McpSection() {
   // Inline confirm state: 'regenerate' | 'revoke' | null
   const [confirmAction, setConfirmAction] = useState(null)
 
-  // Tracks whether any PUT is in flight for widget toggles.
-  const [toggleBusy, setToggleBusy] = useState(false)
   // Last toggle error message (separate from top-level `status` so it doesn't
   // overwrite the master-switch saved flash).
   const [toggleErr, setToggleErr] = useState(null)
@@ -172,9 +170,11 @@ export default function McpSection() {
   const setWidgetEnabled = async (type, on) => {
     if (!settings) return
     const prevWidgets = settings.widgets || {}
-    // Optimistic update: flip just this key.
+    // Optimistic update: flip just this key. No busy-lockout on the switches —
+    // per-key deltas + server merge + the seq guard make concurrent toggles
+    // safe, and locking every switch during a PUT made toggling a list of
+    // widgets needlessly serial.
     setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: on } }))
-    setToggleBusy(true)
     setToggleErr(null)
     // Stamp this request with a monotonically-increasing seq so that if two
     // rapid PUTs resolve out of order we can discard the stale one.
@@ -192,8 +192,6 @@ export default function McpSection() {
         setSettings((s) => ({ ...s, widgets: { ...s.widgets, [type]: prevWidgets[type] } }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
       }
-    } finally {
-      if (isMounted.current) setToggleBusy(false)
     }
   }
 
@@ -206,7 +204,6 @@ export default function McpSection() {
     const nextWidgets = { ...prevWidgets }
     for (const m of MCP_WIDGETS) nextWidgets[m.type] = true
     setSettings((s) => ({ ...s, widgets: nextWidgets }))
-    setToggleBusy(true)
     setToggleErr(null)
     const mySeq = ++latestSeq.current
     try {
@@ -220,8 +217,6 @@ export default function McpSection() {
         setSettings((s) => ({ ...s, widgets: prevWidgets }))
         setToggleErr('Couldn’t update widget access — check your server and try again.')
       }
-    } finally {
-      if (isMounted.current) setToggleBusy(false)
     }
   }
 
@@ -278,8 +273,9 @@ export default function McpSection() {
   const tokenForSnippet = freshToken ?? '<your token>'
   const cliSnippet = `claude mcp add --transport http reminders ${endpoint} --header "Authorization: Bearer ${tokenForSnippet}"`
 
-  // All widget toggles are disabled when MCP is off or something is saving.
-  const widgetDisabled = !enabled || toggleBusy
+  // Widget toggles are disabled only while MCP itself is off — in-flight PUTs
+  // don't lock them (deltas + merge + seq guard make concurrency safe).
+  const widgetDisabled = !enabled
 
   return (
     <div className="notes-cfg">
