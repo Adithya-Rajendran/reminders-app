@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, appSharedStore, orderPlanFirst, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -20,14 +20,39 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
 
   const open = useMemo(() => tasks.filter((t) => !t.done && !t.is_goal), [tasks])
+
+  // Read the daily plan written by DailyWidget via appSharedStore. A state counter
+  // is bumped on the 'reminders:plan-changed' window event so FocusWidget re-reads
+  // without polling. The plan shape is { date: 'YYYY-MM-DD', ids: string[] }.
+  const [planTick, setPlanTick] = useState(0)
+  useEffect(() => {
+    const handler = () => setPlanTick((n) => n + 1)
+    window.addEventListener('reminders:plan-changed', handler)
+    return () => window.removeEventListener('reminders:plan-changed', handler)
+  }, [])
+  const todayPlanIds = useMemo(() => {
+    const today = new Date()
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const saved = appSharedStore.loadJson('daily-plan', null)
+    return saved && saved.date === ymd ? (saved.ids || []) : []
+  }, [planTick]) // planTick is a synthetic dep: it forces a fresh read of external storage
+
   const ranked = useMemo(() => {
     const soon = open.filter((t) => isRealDate(t.due_date) && ['overdue', 'today'].includes(dueBucket(t.due_date).k)).sort(byImportanceThenDue)
     const soonSet = new Set(soon)
     const rest = open.filter((t) => !soonSet.has(t)).sort((a, b) => ((b.priority || 0) + (b.dread || 0)) - ((a.priority || 0) + (a.dread || 0)))
-    return [...soon, ...rest]
-  }, [open])
+    return orderPlanFirst([...soon, ...rest], todayPlanIds)
+  }, [open, todayPlanIds])
   const [skip, setSkip] = useState(0)
   const nowTask = ranked.length ? ranked[skip % ranked.length] : null
+
+  // How many plan tasks are still open (excluding the current one)?
+  const planSet = useMemo(() => new Set(todayPlanIds), [todayPlanIds])
+  const planRemaining = useMemo(
+    () => open.filter((t) => planSet.has(t.id) && t.id !== nowTask?.id).length,
+    [open, planSet, nowTask],
+  )
+  const nowIsFromPlan = !!nowTask && planSet.has(nowTask.id)
 
   // ---- focus timer ----
   const [durationMin, setDurationMin] = useState(() => store.loadJson(DUR_KEY, DEFAULT_MIN))
@@ -62,7 +87,12 @@ export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
     <div className="focus">
       {nowTask ? (
         <div className="focus-now">
-          <div className="focus-eyebrow"><IconTarget size={14} /> Focus on</div>
+          <div className="focus-eyebrow">
+            <IconTarget size={14} /> Focus on
+            {nowIsFromPlan && (
+              <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
+            )}
+          </div>
           <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={() => onToggle(nowTask)} />
           <div className="focus-now-body">
             <div className="focus-title">{nowTask.title}</div>

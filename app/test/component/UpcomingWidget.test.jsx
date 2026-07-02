@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import UpcomingWidget from '../../client/src/widgets/UpcomingWidget.jsx'
 import { fakeTasks } from './fakeCtx.js'
@@ -30,5 +30,21 @@ describe('UpcomingWidget', () => {
     render(<UpcomingWidget tasks={cap} />)
     await userEvent.click(screen.getByLabelText(/complete/i))
     expect(cap.calls.update).toContainEqual([1, { done: true }])
+  })
+
+  it('shows an error alert and restores the draft when create rejects', async () => {
+    const cap = fakeTasks([])
+    // Override create to reject with a JSON-encoded server error message
+    cap.create = () => Promise.reject(new Error(JSON.stringify({ error: 'Server busy' })))
+    render(<UpcomingWidget tasks={cap} projects={[{ id: 42 }]} />)
+
+    const input = screen.getByLabelText(/Add a scheduled task/i)
+    await userEvent.type(input, 'file taxes friday')
+    await userEvent.click(screen.getByLabelText(/Add task/i))
+
+    // The role="alert" error div should appear with the extracted message
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Server busy'))
+    // The draft text should be restored so the user doesn't lose their input
+    expect(input).toHaveValue('file taxes friday')
   })
 })

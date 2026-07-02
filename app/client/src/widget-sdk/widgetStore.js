@@ -24,3 +24,9 @@ export function widgetStore(instanceId) {
     saveStringSet(key, set) { saveStringSet(ns(key), set) },
   }
 }
+
+// Cross-widget shared store: any widget that needs to read state written by
+// another widget (e.g. FocusWidget reading the daily plan from DailyWidget)
+// must go through this instead of a per-instance store so the key namespace
+// is stable regardless of which instance of which widget last wrote it.
+export const appSharedStore = widgetStore('shared')

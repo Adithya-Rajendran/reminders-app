@@ -177,7 +177,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
 
   const onEventClick = (arg) => {
     const p = arg.event.extendedProps
-    if (p.kind !== 'event') return // tasks are not editable
+    if (p.kind !== 'event') return // tasks open nothing here — manage them in a task widget (they ARE draggable to reschedule)
     const allDay = arg.event.allDay
     setModal({
       mode: 'edit', key: arg.event.id,
@@ -263,6 +263,8 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         nowIndicator
         eventDisplay="block"
         eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
+        // Task chips look inert (click does nothing) — say what they CAN do.
+        eventDidMount={({ event, el }) => { if (event.extendedProps.kind === 'task') el.title = 'Drag to reschedule · manage in a task widget' }}
         eventSources={eventSources}
         select={onSelect}
         eventClick={onEventClick}

@@ -91,10 +91,11 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
   const deferDays = (frog && deferrals[frog.id]) || 0
 
   // ---- triage queue: undecided tasks (no estimate or no schedule), frog aside ----
-  const queue = useMemo(
-    () => open.filter((t) => t.id !== (frog && frog.id) && needsTriage(t)).slice().sort(byImportanceThenDue).slice(0, QUEUE_CAP),
+  const queueAll = useMemo(
+    () => open.filter((t) => t.id !== (frog && frog.id) && needsTriage(t)).slice().sort(byImportanceThenDue),
     [open, frog],
   )
+  const queue = useMemo(() => queueAll.slice(0, QUEUE_CAP), [queueAll])
 
   // ---- XP / level (PURE derived completions + monotonic device-local extras) ----
   // careerXp is a derived view over real completions (one-off done_at + habit-log
@@ -293,20 +294,25 @@ export default function TriageWidget({ tasks: tasksCap, instanceId }) {
           {/* Triage queue */}
           <div className="group-head tri-qhead"><span className="g-title">Triage queue</span><span className="g-count">{queue.length}</span></div>
           {queue.length === 0 ? (
-            <div className="tri-empty">Everything’s estimated and scheduled — you’re fully triaged. 🎯</div>
+            <EmptyState icon={IconFrog} title="Queue clear" sub="Head to Daily Plan to pick today’s focus, or start a Focus session." />
           ) : (
-            <div className="task-stream">
-              {queue.map((t) => (
-                <TaskRow
-                  key={t.id} task={t}
-                  onToggle={onToggle}
-                  onSchedule={onSchedule}
-                  onSetPriority={onSetPriority}
-                  onPatch={onPatch}
-                  onSetDread={(tt, d) => onPatch(tt, { dread: d })}
-                />
-              ))}
-            </div>
+            <>
+              <div className="task-stream">
+                {queue.map((t) => (
+                  <TaskRow
+                    key={t.id} task={t}
+                    onToggle={onToggle}
+                    onSchedule={onSchedule}
+                    onSetPriority={onSetPriority}
+                    onPatch={onPatch}
+                    onSetDread={(tt, d) => onPatch(tt, { dread: d })}
+                  />
+                ))}
+              </div>
+              {queueAll.length > QUEUE_CAP && (
+                <div className="tri-more">+{queueAll.length - QUEUE_CAP} more waiting</div>
+              )}
+            </>
           )}
         </>
       )}

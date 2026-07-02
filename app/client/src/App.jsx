@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, tk } from './api.js'
 import { appCache } from './fetchcache.js'
 import Dashboard from './Dashboard.jsx'
 import SettingsModal from './SettingsModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import QuickCaptureModal from './QuickCaptureModal.jsx'
+import KeyboardHelpModal from './KeyboardHelpModal.jsx'
 import { useGlobalHotkeys } from './useGlobalHotkeys.js'
 import { usePopover } from './usePopover.js'
 import { createTask } from './tasklib.js'
 import { insertTask } from './taskstore.js'
 import { emitTasksChanged } from './tasksbus.js'
+import { preloadWidgets, DEFAULT_BOARD } from './widgets/registry.jsx'
+import { loadJson } from './storage.js'
+import { UndoBar } from './widget-sdk'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
@@ -204,19 +208,31 @@ function DashboardTabs({ dashboards, active, onSelect, onAdd, onRename, onRemove
   const [confirmDel, setConfirmDel] = useState(null)
   const start = (d) => { setEditing(d.id); setVal(d.name) }
   const commit = () => { if (editing) onRename(editing, val); setEditing(null) }
+  // Standard ARIA tablist keyboard model: one Tab stop (the active tab), arrows
+  // move selection — so N dashboards don't cost N Tab presses to get past.
+  const onTabKey = (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const dir = e.key === 'ArrowRight' ? 1 : -1
+    const i = dashboards.findIndex((d) => d.id === active)
+    const next = dashboards[(i + dir + dashboards.length) % dashboards.length]
+    onSelect(next.id)
+    e.currentTarget.querySelector(`[data-dash="${next.id}"]`)?.focus()
+  }
   return (
-    <div className="dash-tabs" role="tablist" aria-label="Dashboards">
+    <div className="dash-tabs" role="tablist" aria-label="Dashboards" onKeyDown={onTabKey}>
       {dashboards.map((d) => (
         <span key={d.id} className={`dash-tab${d.id === active ? ' on' : ''}`}>
           {editing === d.id ? (
             <input
               autoFocus className="dash-tab-edit" value={val} aria-label="Dashboard name"
               onChange={(e) => setVal(e.target.value)} onBlur={commit}
-              onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(null) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(null); e.stopPropagation() }}
             />
           ) : (
             <button
               className="dash-tab-btn" role="tab" aria-selected={d.id === active}
+              tabIndex={d.id === active ? 0 : -1} data-dash={d.id}
               onClick={() => onSelect(d.id)} onDoubleClick={() => start(d)}
               title="Click to switch · double-click to rename"
             >{d.name}</button>
@@ -255,7 +271,17 @@ export default function App() {
   const [activeDash, setActiveDash] = useState('main')
   const [palette, setPalette] = useState(null) // null | { mode: 'notes' | 'commands' }
   const [capture, setCapture] = useState(false) // global quick-capture popup
+  const [help, setHelp] = useState(false)       // '?' shortcut cheat sheet
   const [inboxId, setInboxId] = useState(null)  // first project (the inbox), resolved once on ready
+  // Transient post-capture confirmation ("where did it go?") — same UndoBar shell
+  // the widgets use, app-level so it outlives the closed capture modal.
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+  const showToast = (label) => {
+    clearTimeout(toastTimer.current)
+    setToast({ label })
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }
 
   // Resolve the inbox project so quick-capture can create from anywhere, with no
   // task widget on the board (mirrors Dashboard's projects[0] inbox convention).
@@ -270,15 +296,37 @@ export default function App() {
   const captureCreate = async (fields) => {
     const t = await createTask(inboxId, fields)
     insertTask(t); emitTasksChanged()
+    showToast('Captured to Inbox — it will appear in Triage.')
     return t
   }
 
+  // Cycle dashboards with Ctrl/Cmd+[ and ] (wraps around).
+  const cycleDash = useCallback((dir) => {
+    setActiveDash((cur) => {
+      if (dashboards.length < 2) return cur
+      const i = dashboards.findIndex((d) => d.id === cur)
+      return dashboards[(i + dir + dashboards.length) % dashboards.length].id
+    })
+  }, [dashboards])
+
   // App-wide palette + quick-capture hotkeys (only meaningful once signed in).
+  // Capture is NOT gated on the inbox being resolved — a silently dead 'c' reads
+  // as broken; the modal itself explains the no-account case (inboxReady).
   useGlobalHotkeys({
     onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'notes' }) },
     onCommands: () => { if (status === 'ready') setPalette({ mode: 'commands' }) },
-    onQuickCapture: () => { if (status === 'ready' && inboxId) setCapture(true) },
+    onQuickCapture: () => { if (status === 'ready') setCapture(true) },
+    onHelp: () => { if (status === 'ready') setHelp(true) },
+    onCycleDash: (dir) => { if (status === 'ready') cycleDash(dir) },
   })
+
+  // Warm the widget chunks for the last-seen board while the layout fetch is
+  // still in flight — otherwise every chunk request waterfalls behind
+  // /api/layouts. Falls back to the default board for a first visit.
+  useEffect(() => {
+    if (status !== 'ready') return
+    preloadWidgets(loadJson('reminders-last-board-' + activeDash, DEFAULT_BOARD))
+  }, [status, activeDash])
 
   // Theme: persist + reflect on <html data-theme>.
   useEffect(() => {
@@ -344,8 +392,14 @@ export default function App() {
   // App-level commands surfaced in the Ctrl/Cmd+K palette (alongside its built-in
   // note command), so the palette is a keyboard-driven spine for the whole app.
   const paletteCommands = [
-    ...(inboxId ? [{ id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, run: () => setCapture(true) }] : []),
+    { id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, run: () => setCapture(true) },
     { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, run: () => openSettings() },
+    // One "Switch to …" command per other dashboard, so tab switching is
+    // keyboard-reachable from the palette (and fuzzy-findable by name).
+    ...dashboards.filter((d) => d.id !== activeDash).map((d) => (
+      { id: 'dash-' + d.id, label: `Switch to ${d.name}`, hint: 'Dashboard — Ctrl+[ / ]', run: () => setActiveDash(d.id) }
+    )),
+    { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', run: () => setHelp(true) },
     { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, run: toggleTheme },
     { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
     { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', run: addDashboard },
@@ -402,8 +456,17 @@ export default function App() {
       )}
 
       {status === 'ready' && capture && (
-        <QuickCaptureModal onSubmit={captureCreate} onClose={() => setCapture(false)} />
+        <QuickCaptureModal
+          onSubmit={captureCreate}
+          onClose={() => setCapture(false)}
+          inboxReady={inboxId != null}
+          onOpenSettings={openSettings}
+        />
       )}
+
+      {status === 'ready' && help && <KeyboardHelpModal onClose={() => setHelp(false)} />}
+
+      {toast && <div className="app-toast"><UndoBar undo={toast} dismiss={() => { clearTimeout(toastTimer.current); setToast(null) }} /></div>}
     </>
   )
 }

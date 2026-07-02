@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource, orderPlanFirst, selectTriagedThisWeek } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -169,6 +169,67 @@ ok(dueBucket(atDay(1)).k === 'tomorrow', 'dueBucket: ~+1 day -> tomorrow')
 ok(dueBucket(atDay(3)).k === 'week', 'dueBucket: +3 days -> this week')
 ok(dueBucket(atDay(10)).k === 'later', 'dueBucket: +10 days -> later')
 ok(UPCOMING_ORDER.join() === 'overdue,today,tomorrow,week,later', 'UPCOMING_ORDER is the display order')
+
+// ---- orderPlanFirst ----
+{
+  const tasks = [
+    { id: 'a', done: false, priority: 2 },
+    { id: 'b', done: false, priority: 3 },
+    { id: 'c', done: false, priority: 1 },
+    { id: 'd', done: false, priority: 4 },
+  ]
+  // Plan ids b and c: they should lead, in their original relative order
+  const result = orderPlanFirst(tasks, ['b', 'c'])
+  ok(result[0].id === 'b' && result[1].id === 'c', 'orderPlanFirst: plan ids lead in original order')
+  ok(result[2].id === 'a' && result[3].id === 'd', 'orderPlanFirst: non-plan ids follow in original order')
+  // null planIds = identity (no reordering)
+  const nullResult = orderPlanFirst(tasks, null)
+  ok(nullResult.map((t) => t.id).join() === 'a,b,c,d', 'orderPlanFirst: null planIds -> identity')
+  // empty planIds = identity
+  const emptyResult = orderPlanFirst(tasks, [])
+  ok(emptyResult.map((t) => t.id).join() === 'a,b,c,d', 'orderPlanFirst: empty planIds -> identity')
+  // done plan tasks are NOT forced first
+  const withDone = [
+    { id: 'x', done: true, priority: 5 },   // plan id but done -> stays in rest
+    { id: 'y', done: false, priority: 1 },
+  ]
+  const doneResult = orderPlanFirst(withDone, ['x'])
+  ok(doneResult[0].id === 'y' && doneResult[1].id === 'x', 'orderPlanFirst: done plan tasks are not promoted')
+  // ids not in plan are unaffected in relative order
+  const outsideResult = orderPlanFirst(tasks, ['d'])
+  ok(outsideResult[0].id === 'd', 'orderPlanFirst: plan id goes first')
+  ok(outsideResult.slice(1).map((t) => t.id).join() === 'a,b,c', 'orderPlanFirst: non-plan ids preserve their relative order')
+}
+
+// ---- selectTriagedThisWeek ----
+{
+  const DAY_MS = 864e5
+  const atDay = (n) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.toISOString() }
+  const triageTasks = [
+    // tomorrow + estimate -> included
+    { id: 't1', done: false, time_estimate: 30, due_date: atDay(1) },
+    // this week + estimate -> included
+    { id: 't2', done: false, time_estimate: 60, due_date: atDay(4) },
+    // today -> excluded (today/overdue are handled by DailyWidget's main logic)
+    { id: 't3', done: false, time_estimate: 30, due_date: atDay(0) },
+    // overdue -> excluded
+    { id: 't4', done: false, time_estimate: 30, due_date: atDay(-1) },
+    // later -> excluded
+    { id: 't5', done: false, time_estimate: 30, due_date: atDay(10) },
+    // tomorrow but no estimate -> excluded (not triaged)
+    { id: 't6', done: false, time_estimate: 0, due_date: atDay(1) },
+    // tomorrow + estimate but no real due_date -> excluded
+    { id: 't7', done: false, time_estimate: 30, due_date: '' },
+    // done -> excluded
+    { id: 't8', done: true, time_estimate: 30, due_date: atDay(1) },
+    // is_goal -> excluded
+    { id: 't9', done: false, is_goal: true, time_estimate: 30, due_date: atDay(1) },
+  ]
+  const result = selectTriagedThisWeek(triageTasks).map((t) => t.id).sort()
+  ok(result.join() === 't1,t2', 'selectTriagedThisWeek: tomorrow + this-week with estimate only; excludes today/overdue/later/no-estimate/no-date/done/goals')
+  ok(selectTriagedThisWeek([]).length === 0, 'selectTriagedThisWeek: empty list -> empty')
+  ok(selectTriagedThisWeek(null).length === 0, 'selectTriagedThisWeek: null -> empty')
+}
 
 console.log(`\ntaskviews.test: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -126,3 +126,29 @@ export function dueBucket(due) {
   return { k: 'later', label: 'Later' }
 }
 export const UPCOMING_ORDER = ['overdue', 'today', 'tomorrow', 'week', 'later']
+
+// Stable-partition: open tasks whose id appears in planIds come first (in their
+// original relative order), followed by the rest (also in original order). Done
+// tasks in planIds are NOT forced first — the plan chip shows what's still open.
+// Passing null/empty planIds is a no-op (identity). Pure; never mutates input.
+export function orderPlanFirst(ranked, planIds) {
+  if (!planIds || planIds.length === 0) return ranked
+  const planSet = new Set(planIds)
+  const inPlan = ranked.filter((t) => !t.done && planSet.has(t.id))
+  const rest = ranked.filter((t) => t.done || !planSet.has(t.id))
+  return [...inPlan, ...rest]
+}
+
+// Tasks that are "triaged this week": open (not done), has a real time estimate
+// (> 0), has a real due date, and due tomorrow or within this week — i.e. the
+// user has already decided WHEN and HOW LONG, but they're not yet on the daily
+// plan. Excludes today/overdue (already surfaced by DailyWidget's existing logic).
+export function selectTriagedThisWeek(tasks) {
+  return (tasks || []).filter((t) => {
+    if (t.done || t.is_goal) return false
+    if (!(t.time_estimate > 0)) return false
+    if (!isRealDate(t.due_date)) return false
+    const k = dueBucket(t.due_date).k
+    return k === 'tomorrow' || k === 'week'
+  })
+}

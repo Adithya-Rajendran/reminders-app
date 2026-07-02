@@ -52,4 +52,4 @@ export { useTaskList } from '../useTasks.js'
 // widgetStore(instanceId) is the per-instance surface widgets should use; the raw
 // helpers remain for non-instance-scoped state (e.g. a global app preference).
 export { loadJson, saveJson, loadStringSet, saveStringSet } from '../storage.js'
-export { widgetStore } from './widgetStore.js'
+export { widgetStore, appSharedStore } from './widgetStore.js'

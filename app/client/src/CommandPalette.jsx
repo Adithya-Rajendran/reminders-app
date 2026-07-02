@@ -137,6 +137,8 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
           <span className="cmdk-foot-keys"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
           <span className="cmdk-foot-keys"><kbd className="kbd-ic"><IconCornerDownLeft size={11} /></kbd> {cmdMode ? 'run' : 'open'}</span>
           <span className="cmdk-foot-keys"><kbd>esc</kbd> close</span>
+          {/* Advertise command mode from the surface people already have open. */}
+          {!cmdMode && <span className="cmdk-foot-keys"><kbd>&gt;</kbd> commands</span>}
           <span className="cmdk-foot-spacer" />
           <span className="cmdk-foot-mode">{cmdMode ? 'Commands' : 'Notes'}</span>
         </div>

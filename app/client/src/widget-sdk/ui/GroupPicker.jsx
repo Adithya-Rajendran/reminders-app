@@ -66,11 +66,22 @@ function GroupPop({ anchorRef, onClose, children }) {
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
   }, [place])
   useEffect(() => {
+    // Capture the element that had focus when this popover mounted (the trigger).
+    // On cleanup we restore focus there if it's orphaned — keyboard users aren't
+    // dumped to <body> after Esc or selecting an item. Same orphan-check idiom as
+    // usePopover.js: if the user clicked another control, leave focus there.
+    const prevFocus = document.activeElement
     const onDown = (e) => { if (popRef.current && !popRef.current.contains(e.target) && !anchorRef.current?.contains(e.target)) onClose() }
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      const active = document.activeElement
+      const orphaned = !active || active === document.body || (popRef.current && popRef.current.contains(active))
+      if (orphaned && prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus()
+    }
   }, [anchorRef, onClose])
   if (!pos) return null
   return createPortal(

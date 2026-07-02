@@ -157,7 +157,7 @@ function PriorityControl({ value, onSet }) {
   const ref = usePopover(open, setOpen)
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" onClick={() => setOpen((o) => !o)}>
+      <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className={`pdot ${pdotClass(value)}`} />
       </button>
       {open && (
@@ -238,7 +238,7 @@ export function EstimateControl({ task, onSet }) {
   const est = Math.max(0, Math.trunc(Number(task.time_estimate) || 0))
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" onClick={() => setOpen((o) => !o)}>
+      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         {est ? '~' + fmtEst(est) : 'est'}
       </button>
       {open && (

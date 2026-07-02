@@ -19,6 +19,7 @@ import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
 import { recentGroups, pushRecentGroup } from './groups.js'
+import { saveJson } from './storage.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
@@ -163,6 +164,9 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         // derived tiers is NOT a persistable change (they're stripped from every
         // save); only real cleanups below warrant a boot write.
         lastSavedSig.current = boardSignature(sw, lay)
+        // Remember this board's widget types so the NEXT visit can warm their
+        // chunks before this layouts fetch even resolves (see App's preload).
+        saveJson('reminders-last-board-' + dashboardId, sw.map((w) => w.type))
         if (sw.length !== original.length || needsGrid || remapped) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
@@ -174,6 +178,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
         setWidgets(def)
         setLayouts(lay)
         lastSavedSig.current = boardSignature(def, lay)
+        saveJson('reminders-last-board-' + dashboardId, def.map((w) => w.type))
       }
       setLoaded(true)
     })()
@@ -191,7 +196,9 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
       es.addEventListener('reminder', (e) => {
         let data = {}
         try { data = JSON.parse(e.data) } catch { /* ignore */ }
-        setEvents((prev) => [{ at: Date.now(), data }, ...prev].slice(0, 50))
+        // The envelope key consumers filter on is `receivedAt` (notiftier.js);
+        // keep `at` too for anything sorting on it.
+        setEvents((prev) => [{ at: Date.now(), receivedAt: Date.now(), data }, ...prev].slice(0, 50))
       })
       es.onerror = () => {
         if (stopped) return
@@ -367,13 +374,14 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
   }, [typeOf])
 
   if (!loaded) {
+    // Widget-shaped skeletons (not a text card): the board appears to assemble
+    // rather than flash from "Loading…" to a full grid.
     return (
-      <div className="grid-wrap">
-        <div
-          className="glass"
-          style={{ borderRadius: 'var(--r-card)', padding: '40px 24px', textAlign: 'center', maxWidth: 460, margin: '40px auto', color: 'var(--muted)' }}
-        >
-          Loading your dashboard…
+      <div className="grid-wrap" aria-label="Loading your dashboard" role="status">
+        <div className="dash-skel">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="widget glass dash-skel-card"><SkeletonRows n={4} /></div>
+          ))}
         </div>
       </div>
     )
@@ -406,8 +414,8 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
             <AddWidgetMenu projects={projects} onAdd={addWidget} onNewGroup={onNewGroup} />
             {/* A few concrete starters so a fresh board teaches its own shortcuts. */}
             <ul className="empty-tips state-sub" style={{ margin: '18px auto 0', maxWidth: 320, textAlign: 'left' }}>
-              <li>Press ⌘K for the command palette</li>
-              <li>Drag a widget&apos;s header to rearrange</li>
+              <li>Press <kbd>c</kbd> anywhere to capture a task</li>
+              <li>Ctrl/⌘ K searches notes — type <b>&gt;</b> for commands, <kbd>?</kbd> for all shortcuts</li>
               <li>Quick-add like “gym tomorrow 7am !2 *health”</li>
             </ul>
           </div>
@@ -463,12 +471,18 @@ function OnboardingCard({ onOpenSettings }) {
       >
         <div className="state-ic" style={{ margin: '0 auto 14px' }}><IconCloud size={24} /></div>
         <div className="state-title" style={{ fontSize: 17 }}>Link a CalDAV account</div>
-        <div className="state-sub" style={{ margin: '8px auto 20px', maxWidth: 360 }}>
+        <div className="state-sub" style={{ margin: '8px auto 12px', maxWidth: 360 }}>
           Your tasks &amp; reminders live in your own CalDAV server — Nextcloud, Apple iCloud, or any
           CalDAV provider. Connect an account to start adding tasks.
         </div>
+        {/* What each provider actually needs — saves a round-trip to the docs. */}
+        <ul className="state-sub" style={{ margin: '0 auto 20px', maxWidth: 360, textAlign: 'left' }}>
+          <li><b>Nextcloud</b> — your server URL + an app password (Settings → Security)</li>
+          <li><b>Apple iCloud</b> — an app-specific password from appleid.apple.com</li>
+          <li><b>Any CalDAV server</b> — its URL and your credentials</li>
+        </ul>
         <button className="btn primary" onClick={onOpenSettings}>
-          <IconCloud size={16} /> Connect CalDAV
+          <IconCloud size={16} /> Open Settings to connect
         </button>
       </div>
     </div>
@@ -548,8 +562,15 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
               {WIDGETS.map((m) => {
                 const I = m.icon
                 return (
-                  <button key={m.type} className="menu-item" role="menuitem" onClick={() => (m.pickGroup ? setSub(m.type) : add(m.type))} aria-haspopup={m.pickGroup ? 'menu' : undefined}>
-                    <I size={16} /> {m.label}{m.pickGroup && <IconChevR size={15} className="chev" />}
+                  <button key={m.type} className="menu-item menu-item-widget" role="menuitem" onClick={() => (m.pickGroup ? setSub(m.type) : add(m.type))} aria-haspopup={m.pickGroup ? 'menu' : undefined}>
+                    <I size={16} />
+                    <span className="menu-item-main">
+                      <span>{m.label}</span>
+                      {/* One-line purpose per widget — the label alone doesn't say
+                          what "Cues" or "Triage" will do to your board. */}
+                      {m.desc && <span className="menu-item-desc">{m.desc}</span>}
+                    </span>
+                    {m.pickGroup && <IconChevR size={15} className="chev" />}
                   </button>
                 )
               })}

@@ -21,6 +21,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
   const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const [quickOnly, setQuickOnly] = useState(false)
   const [draft, setDraft] = useState('')
+  const [err, setErr] = useState('')
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
   const [collapsed, setCollapsed] = useState(() => store.loadStringSet(COLLAPSE_KEY))
   const sz = useWidgetSize()
@@ -62,7 +63,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
     e.preventDefault()
     const raw = draft.trim()
     if (!raw || !inboxId) return
-    setDraft('')
+    setErr(''); setDraft('')
     const parsed = parseQuickAdd(raw)
     try {
       await tasksCap.create(inboxId, {
@@ -74,7 +75,12 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
         ...(parsed.cue_trigger ? { cue_trigger: parsed.cue_trigger } : {}),
       })
       tasksCap.emitChanged(); load()
-    } catch { setDraft(raw) }
+    } catch (e2) {
+      setDraft(raw)
+      let msg = 'Could not add task.'
+      try { msg = JSON.parse(e2.message).error || msg } catch { /* keep default */ }
+      setErr(msg)
+    }
   }
 
   const rows = (items) => (
@@ -88,12 +94,13 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId }
   return (
     <div className="tasklist">
       {inboxId && !compact && (
-        <form className="add-row qa rem-add" onSubmit={addTask}>
+        <form className=”add-row qa rem-add” onSubmit={addTask}>
           <IconClock size={16} />
-          <input className="rem-text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a scheduled task… (e.g. “file taxes friday !3”)" aria-label="Add a scheduled task" />
-          <button type="submit" className="iconbtn sm" aria-label="Add task" title="Add task"><IconPlus size={16} /></button>
+          <input className=”rem-text” value={draft} onChange={(e) => setDraft(e.target.value)} placeholder=”Add a scheduled task… (e.g. “file taxes friday !3”)” aria-label=”Add a scheduled task” />
+          <button type=”submit” className=”iconbtn sm” aria-label=”Add task” title=”Add task”><IconPlus size={16} /></button>
         </form>
       )}
+      {err && <div role=”alert” className=”rem-err”>{err}</div>}
       {inboxId && !compact && <QuickAddPreview text={draft} />}
       {inboxId && !compact && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
       {state === 'ready' && !compact && (tasks.length > 0 || quickOnly) && (

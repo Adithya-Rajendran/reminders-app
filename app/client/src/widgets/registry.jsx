@@ -7,15 +7,36 @@ import { WIDGET_MANIFEST, DEFAULT_BOARD } from './manifest.js'
 // appears on a board. Heavy dependencies (FullCalendar, the notes editor) stay
 // out of the initial bundle, and the bundle stays flat as widgets accumulate.
 // The widget frame in Dashboard.jsx provides the <Suspense> boundary.
-const UpcomingWidget = lazy(() => import('./UpcomingWidget.jsx'))
-const RemindersWidget = lazy(() => import('./RemindersWidget.jsx'))
-const CalendarWidget = lazy(() => import('./CalendarWidget.jsx'))
-const NotesWidget = lazy(() => import('./NotesWidget.jsx'))
-const ReviewWidget = lazy(() => import('./ReviewWidget.jsx'))
-const CuesWidget = lazy(() => import('./CuesWidget.jsx'))
-const TriageWidget = lazy(() => import('./TriageWidget.jsx'))
-const DailyWidget = lazy(() => import('./DailyWidget.jsx'))
-const FocusWidget = lazy(() => import('./FocusWidget.jsx'))
+//
+// The import thunks live in LOADERS (one per type) so preloadWidgets can warm a
+// chunk BEFORE the saved layout arrives — lazy() reuses the same thunk, so a
+// warmed import promise is picked up instead of fetched again. Without this,
+// every chunk request waits behind the /api/layouts round-trip (a cold-paint
+// waterfall measured at ~200ms+RTT on the deployed app).
+export const LOADERS = {
+  upcoming: () => import('./UpcomingWidget.jsx'),
+  reminders: () => import('./RemindersWidget.jsx'),
+  calendar: () => import('./CalendarWidget.jsx'),
+  notes: () => import('./NotesWidget.jsx'),
+  review: () => import('./ReviewWidget.jsx'),
+  cues: () => import('./CuesWidget.jsx'),
+  triage: () => import('./TriageWidget.jsx'),
+  daily: () => import('./DailyWidget.jsx'),
+  focus: () => import('./FocusWidget.jsx'),
+}
+// Warm the chunks for a board's widget types (best-effort; unknown types no-op).
+export function preloadWidgets(types) {
+  for (const t of new Set(types || [])) { try { LOADERS[t]?.() } catch { /* best-effort */ } }
+}
+const UpcomingWidget = lazy(LOADERS.upcoming)
+const RemindersWidget = lazy(LOADERS.reminders)
+const CalendarWidget = lazy(LOADERS.calendar)
+const NotesWidget = lazy(LOADERS.notes)
+const ReviewWidget = lazy(LOADERS.review)
+const CuesWidget = lazy(LOADERS.cues)
+const TriageWidget = lazy(LOADERS.triage)
+const DailyWidget = lazy(LOADERS.daily)
+const FocusWidget = lazy(LOADERS.focus)
 
 // The render/view half of each widget, keyed by the same `type` as its pure
 // descriptor in manifest.js. Splitting the JSX (icon + render here) from the pure

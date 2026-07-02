@@ -1727,6 +1727,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-tag-in:focus-visible,
 .note-title-input:focus-visible,
 .cmdk-input:focus-visible,
+.capture-input:focus-visible,
 .dash-tab-edit:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1795,3 +1796,46 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .capture-input::placeholder { color: var(--muted); }
 .capture-hint { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
 .capture-hint kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
+
+/* === UX core-loop pack === */
+
+/* App-level toast (post-capture confirmation) — the UndoBar shell, fixed
+   bottom-center so it outlives whichever modal/widget triggered it. */
+.app-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 90; width: min(420px, calc(100vw - 32px)); }
+
+/* Board loading: widget-shaped skeleton cards instead of a text card. */
+.dash-skel { display: flex; gap: 16px; padding: 4px; }
+.dash-skel-card { flex: 1; min-height: 220px; padding: 16px; border-radius: var(--r-card); }
+@media (max-width: 900px) { .dash-skel { flex-direction: column; } }
+
+/* Add-widget menu: label + one-line purpose. */
+.menu-item-widget { align-items: flex-start; }
+.menu-item-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.menu-item-desc { font-size: 11px; color: var(--muted); line-height: 1.35; white-space: normal; }
+
+/* '?' keyboard cheat sheet. */
+.kbd-help { display: flex; gap: 28px; flex-wrap: wrap; }
+.kbd-help-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.kbd-help-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.kbd-help-row { display: flex; align-items: baseline; gap: 10px; font-size: 13px; }
+.kbd-help-keys { display: inline-flex; gap: 3px; flex: 0 0 108px; }
+.kbd-help-keys kbd { display: inline-flex; align-items: center; padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 11px; color: var(--muted); }
+.kbd-help-what { color: var(--text); }
+
+/* Quick-add: syntax nudge while typing, before any token parses. */
+.qa-preview-hint { color: var(--faint); font-size: 11.5px; }
+
+/* Calendar task chips: dragging is their one interaction — show it. */
+.cal-task { cursor: grab; }
+
+/* Triage: overflow indicator when more tasks need triage than the queue shows. */
+.tri-more { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+
+/* Focus: "From today's plan · N left" eyebrow chip. */
+.focus-plan-chip { font-size: 10.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); margin-left: 6px; }
+
+/* WCAG 2.2 tap targets: pad the small hit areas up to ~24px, pull the box back
+   with negative margins so layout/spacing is unchanged. */
+.check-btn { padding: 3px; margin: -3px; box-sizing: content-box; }
+.pri-dot-btn { padding: 8px; margin: -5px; }
+.dread-dot { padding: 5px; margin: -5px; box-sizing: content-box; }
