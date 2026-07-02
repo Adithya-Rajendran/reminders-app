@@ -119,7 +119,7 @@ describe('McpSection', () => {
     render(<McpSection />)
 
     // Wait for the async GET to resolve and paint the toggle.
-    const toggle = await screen.findByRole('switch', { name: /enable mcp access/i })
+    const toggle = await screen.findByRole('switch', { name: /^enable mcp access$/i })
     expect(toggle).toBeChecked()
   })
 
@@ -128,7 +128,7 @@ describe('McpSection', () => {
     render(<McpSection />)
 
     // Both mcp-capable widgets appear; the "notes" entry (no mcp field) does not.
-    await screen.findByRole('switch', { name: /enable mcp access/i })
+    await screen.findByRole('switch', { name: /^enable mcp access$/i })
     expect(screen.getByText('Reminders')).toBeInTheDocument()
     expect(screen.getByText('Calendar')).toBeInTheDocument()
     expect(screen.queryByText('Notes')).not.toBeInTheDocument()
@@ -149,7 +149,7 @@ describe('McpSection', () => {
     globalThis.fetch = fetchMock
     render(<McpSection />)
 
-    const toggle = await screen.findByRole('switch', { name: /enable mcp access/i })
+    const toggle = await screen.findByRole('switch', { name: /^enable mcp access$/i })
     await userEvent.click(toggle)
 
     await waitFor(() => {
@@ -187,7 +187,7 @@ describe('McpSection', () => {
     render(<McpSection />)
 
     // Wait for GET.
-    await screen.findByRole('switch', { name: /enable mcp access/i })
+    await screen.findByRole('switch', { name: /^enable mcp access$/i })
     expect(screen.getByRole('button', { name: /generate token/i })).toBeInTheDocument()
   })
 
@@ -215,7 +215,7 @@ describe('McpSection', () => {
     globalThis.fetch = makeFetch({ getSettings: DEFAULT_SETTINGS })
     render(<McpSection />)
 
-    await screen.findByRole('switch', { name: /enable mcp access/i })
+    await screen.findByRole('switch', { name: /^enable mcp access$/i })
     expect(screen.getByRole('button', { name: /regenerate/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /revoke/i })).toBeInTheDocument()
   })
@@ -275,10 +275,12 @@ describe('McpSection', () => {
     globalThis.fetch = makeFetch({ getSettings: DEFAULT_SETTINGS })
     render(<McpSection />)
 
-    await screen.findByRole('switch', { name: /enable mcp access/i })
-    // Endpoint text should appear.
-    expect(screen.getByText(new RegExp(`${window.location.origin}/mcp`, 'i'))).toBeInTheDocument()
-    // CLI snippet text.
+    await screen.findByRole('switch', { name: /^enable mcp access$/i })
+    // Endpoint text should appear. Exact-string matcher on purpose: a regex built
+    // from the origin would also match the CLI snippet below (which embeds the
+    // endpoint as a substring) and getByText would fail on multiple matches.
+    expect(screen.getByText(`${window.location.origin}/mcp`)).toBeInTheDocument()
+    // CLI snippet text (only the command block starts with "claude mcp add").
     expect(screen.getByText(/claude mcp add/i)).toBeInTheDocument()
   })
 })
