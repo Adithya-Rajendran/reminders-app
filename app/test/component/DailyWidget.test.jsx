@@ -22,7 +22,8 @@ describe('DailyWidget', () => {
     // (silences the act() warning). NOTE the curly apostrophe — the widget
     // renders 'Today’s focus', not a straight quote.
     expect(await screen.findByText(/today’s focus/i)).toBeInTheDocument()
-    expect(screen.getByText(/suggestions/i)).toBeInTheDocument()
+    // Exact string: the empty-state copy also contains "suggestions" mid-sentence.
+    expect(screen.getByText('Suggestions')).toBeInTheDocument()
   })
 
   it('optimistic-reverts and shows the error alert when plan.set rejects', async () => {
