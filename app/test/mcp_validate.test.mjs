@@ -229,10 +229,13 @@ try {
   validateInput(minSchema, 42)
   validateInput(minSchema, [])
   validateInput(minSchema, null)
-} catch (e) {
+} catch {
   threw = true
 }
 ok(!threw, 'validateInput does not throw on non-object args')
+// And each non-object rejects with a clean error rather than validating as {}.
+ok(validateInput(minSchema, 'not-an-object').ok === false, 'a string arg fails cleanly')
+ok(validateInput(minSchema, []).ok === false, 'an array arg fails cleanly')
 
 console.log(`\nmcp_validate.test: ${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

@@ -34,7 +34,7 @@ ok(hashToken(token) === hash, 'hashToken is deterministic (same input same outpu
 ok(hashToken(token) === hashToken(token), 'hashToken called twice gives same result')
 
 // Different tokens -> different hashes (with overwhelming probability)
-const { token: t2, hash: h2 } = generateToken()
+const { hash: h2 } = generateToken()
 ok(hash !== h2, 'distinct tokens produce distinct hashes')
 
 // --- roundtrip generate -> hashToken matches returned hash ---

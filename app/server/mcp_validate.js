@@ -108,6 +108,11 @@ function validateProperty(key, value, propSchema) {
 // value is a shallow copy of args with only the known properties (absent
 // optionals omitted — handlers supply their own defaults).
 export function validateInput(schema, args) {
+  // Non-object args (a string, number, array…) fail cleanly — the `in` checks
+  // below would otherwise throw on primitives.
+  if (args !== undefined && args !== null && (typeof args !== 'object' || Array.isArray(args))) {
+    return { ok: false, error: 'arguments must be an object' }
+  }
   const input = (args === undefined || args === null) ? {} : args
   const properties = schema.properties || {}
   const required = new Set(schema.required || [])
