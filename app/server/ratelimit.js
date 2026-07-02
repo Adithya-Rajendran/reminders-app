@@ -20,16 +20,22 @@ export class TokenBucket {
   full() { return this.tokens >= this.capacity }
 }
 
-// Per-user buckets keyed on the OIDC sub. A module-level Map (NOT a WeakMap on
-// req.session.user — express-session rehydrates a fresh user object per request,
-// so a WeakMap keyed on it would never hit). Bounded by an opportunistic sweep of
-// full (idle) buckets so it can't grow without limit.
-export function rateLimitMiddleware(perMin) {
+// Per-user buckets keyed on the OIDC sub (or whatever keyFn returns). A
+// module-level Map (NOT a WeakMap on req.session.user — express-session
+// rehydrates a fresh user object per request, so a WeakMap keyed on it would
+// never hit). Bounded by an opportunistic sweep of full (idle) buckets so it
+// can't grow without limit.
+//
+// keyFn lets callers key on something other than the OIDC sub (e.g. an MCP
+// token id, an IP address for anonymous routes). Falsy return -> skip limiting;
+// this matches the original behaviour where a missing sub bypasses the check
+// (requireAuth already guards the route; this is a second layer).
+export function rateLimitMiddleware(perMin, keyFn = (req) => req.session?.user?.sub) {
   const capacity = Math.max(1, perMin)
   const refillPerMs = perMin / 60000
   const buckets = new Map()
   return (req, res, next) => {
-    const sub = req.session?.user?.sub
+    const sub = keyFn(req)
     if (!sub) return next() // requireAuth runs first; this is just defensive
     if (buckets.size > 5000) for (const [k, v] of buckets) { if (v.full()) buckets.delete(k) }
     let b = buckets.get(sub)

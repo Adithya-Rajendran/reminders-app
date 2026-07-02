@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useModalRef } from './useModalRef.js'
 import ReminderGroupsSection from './settings/ReminderGroupsSection.jsx'
+import McpSection from './settings/McpSection.jsx'
 import { WIDGETS } from './widgets/registry.jsx'
 import ConnectionsSection from './settings/ConnectionsSection.jsx'
 import { PROVIDER_PRESETS, ProviderIcon, deriveName, swatchFor } from './settings/providers.jsx'
@@ -249,6 +250,9 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                   return <Panel key={wg.type} accounts={accounts} />
                 })}
                 {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
+                {/* MCP access section — not gated on accounts, since MCP is independent
+                    of CalDAV. Sits between groups and the dev-only panel. */}
+                <McpSection />
                 {/* Widget-wiring inspector is a dev-only diagnostic (the F7 panel). Vite
                     statically strips this in production builds via import.meta.env.DEV. */}
                 {import.meta.env.DEV && <ConnectionsSection />}

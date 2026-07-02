@@ -27,6 +27,21 @@ ok(new Set(types).size === types.length, 'widget types are unique')
 ok(WIDGET_MANIFEST.every((m) => typeof m.type === 'string' && m.type), 'every widget has a non-empty type')
 ok(WIDGET_MANIFEST.every((m) => typeof m.label === 'string' && m.label), 'every widget has a non-empty label')
 ok(WIDGET_MANIFEST.every((m) => typeof m.desc === 'string' && m.desc), 'every widget has a one-line desc (shown in the Add-widget menu)')
+
+// --- optional `mcp` toolset declarations (Settings toggles + server tool filter) ---
+{
+  const seen = new Set()
+  for (const m of WIDGET_MANIFEST) {
+    if (m.mcp === undefined) continue
+    ok(typeof m.mcp.summary === 'string' && m.mcp.summary.length > 0, `${m.type}: mcp.summary is a non-empty string`)
+    ok(Array.isArray(m.mcp.tools) && m.mcp.tools.length > 0, `${m.type}: mcp.tools is a non-empty array`)
+    for (const name of (m.mcp.tools || [])) {
+      ok(typeof name === 'string' && name.startsWith(m.type + '_'), `${m.type}: tool "${name}" is prefixed with the widget type`)
+      ok(!seen.has(name), `${m.type}: tool "${name}" is unique across widgets`)
+      seen.add(name)
+    }
+  }
+}
 ok(WIDGET_MANIFEST_BY_TYPE.size === WIDGET_MANIFEST.length && types.every((t) => WIDGET_MANIFEST_BY_TYPE.get(t)), 'by-type index matches the manifest')
 
 // --- the connection contract: every plug resolves against the app catalog ---

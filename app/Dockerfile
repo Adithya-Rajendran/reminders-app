@@ -33,6 +33,11 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/public ./public
 COPY --from=build /app/server ./server
+# The server imports PURE client modules (widgets/manifest.js, tasklib.js,
+# taskviews.js, reviewstats.js — the MCP tool layer's single source of truth),
+# so the runtime image must carry client/src or the pod crashes on boot with
+# ERR_MODULE_NOT_FOUND. Sources only — the built SPA still comes from /public.
+COPY --from=build /app/client/src ./client/src
 COPY --from=build /app/package.json ./package.json
 USER node
 EXPOSE 8080

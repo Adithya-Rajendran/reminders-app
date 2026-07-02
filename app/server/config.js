@@ -50,6 +50,19 @@ sqlite.exec(`
     ids_json TEXT NOT NULL DEFAULT '[]',
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (user_id, plan_date));
+  -- MCP access: ONE bearer token per user (only its SHA-256 lives here — the
+  -- plaintext is shown once at creation; "regenerate" replaces the row), and
+  -- which widget toolsets the user exposes over /mcp (all off by default).
+  CREATE TABLE IF NOT EXISTS mcp_tokens (
+    user_id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT);
+  CREATE TABLE IF NOT EXISTS mcp_settings (
+    user_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    widgets_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')));
   -- Full-text search index over note bodies. This is derived/cheap-to-recreate
   -- data: it is rebuilt lazily from the WebDAV walk and cleared per-user when
   -- they point notes at a different WebDAV (see notes.setConfig -> noteindex).
@@ -236,6 +249,39 @@ export async function setDailyPlanIds(userId, date, ids) {
     .run(userId, date, JSON.stringify(ids))
   // Old day-selections have no value — prune opportunistically on write.
   sqlite.prepare("DELETE FROM daily_plans WHERE user_id=? AND plan_date < date(?, '-14 days')").run(userId, date)
+}
+
+// ============================================================
+//  MCP access (token + per-widget toolset settings)
+// ============================================================
+export async function getMcpToken(userId) {
+  return sqlite.prepare('SELECT token_hash, created_at, last_used_at FROM mcp_tokens WHERE user_id=?').get(userId) || null
+}
+export async function getMcpTokenByHash(hash) {
+  return sqlite.prepare('SELECT user_id, token_hash FROM mcp_tokens WHERE token_hash=?').get(hash) || null
+}
+export async function setMcpToken(userId, hash) {
+  sqlite.prepare(`INSERT INTO mcp_tokens (user_id, token_hash, created_at, last_used_at) VALUES (?,?,datetime('now'),NULL)
+    ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash, created_at=datetime('now'), last_used_at=NULL`)
+    .run(userId, hash)
+}
+export async function deleteMcpToken(userId) {
+  sqlite.prepare('DELETE FROM mcp_tokens WHERE user_id=?').run(userId)
+}
+export async function touchMcpToken(userId) {
+  sqlite.prepare("UPDATE mcp_tokens SET last_used_at=datetime('now') WHERE user_id=?").run(userId)
+}
+export async function getMcpSettings(userId) {
+  const r = sqlite.prepare('SELECT enabled, widgets_json FROM mcp_settings WHERE user_id=?').get(userId)
+  if (!r) return { enabled: false, widgets: {} }
+  let widgets = {}
+  try { const v = JSON.parse(r.widgets_json); if (v && typeof v === 'object' && !Array.isArray(v)) widgets = v } catch { /* corrupt -> {} */ }
+  return { enabled: bool(r.enabled), widgets }
+}
+export async function setMcpSettings(userId, { enabled, widgets }) {
+  sqlite.prepare(`INSERT INTO mcp_settings (user_id, enabled, widgets_json, updated_at) VALUES (?,?,?,datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET enabled=excluded.enabled, widgets_json=excluded.widgets_json, updated_at=datetime('now')`)
+    .run(userId, enabled ? 1 : 0, JSON.stringify(widgets || {}))
 }
 
 // ============================================================

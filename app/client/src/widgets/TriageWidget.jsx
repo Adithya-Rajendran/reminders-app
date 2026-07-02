@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useTaskList, widgetStore, useWidgetSize, usePopover, atLeastW, atLeastH,
-  selectFrogScored, groupEisenhower, byImportanceThenDue, isRealDate,
+  selectFrogScored, groupEisenhower, byImportanceThenDue, needsTriage,
   careerXp, levelForXp, levelProgress, taskXp, dailyStreak, countCompletions,
   DAILY_GOAL_DEFAULT, TRIAGE_XP, TRIAGE_DAILY_CAP,
   TaskRow, EstimateControl, DreadControl,
@@ -22,9 +22,6 @@ const QUADS = [
   { k: 'Q4', label: 'Later', sub: 'neither' },
 ]
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-// A task is "triaged" once it has both an effort estimate AND a schedule — the two
-// decisions the triage method asks for. Everything still missing one is queued.
-const needsTriage = (t) => !(t.time_estimate > 0 && isRealDate(t.due_date))
 
 // Honor the OS "reduce motion" setting: we don't just zero animation durations
 // (styles.css already does), we skip SPAWNING confetti / fly-up nodes entirely.

@@ -14,6 +14,7 @@ import { rateLimitMiddleware } from './ratelimit.js'
 import * as notes from './notes.js'
 import * as groups from './reminder_groups.js'
 import * as dailyPlan from './daily_plan.js'
+import * as mcp from './mcp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -142,6 +143,20 @@ app.get('/api/daily-plan', requireAuth, async (req, res, next) => {
 app.put('/api/daily-plan', requireAuth, async (req, res, next) => {
   try { res.json(await dailyPlan.setPlan(req.session.user.sub, req.body?.date, req.body?.ids)) } catch (e) { next(e) }
 })
+
+// ---- MCP (see server/mcp.js and docs/mcp.md) ----
+// /mcp is BEARER-token auth (the only route that is): AI clients can't do the
+// OIDC browser dance. Sessions stay untouched — no cookie is read or set here.
+// The bucket keys on the token's resolved user, so the limiter runs post-auth.
+const mcpLimit = rateLimitMiddleware(Number(process.env.MCP_RATE_LIMIT_PER_MIN) || 60, (req) => req.mcpUser?.sub)
+app.post('/mcp', mcp.mcpAuth, mcpLimit, mcp.mcpHandler)
+app.get('/mcp', mcp.mcpMethodNotAllowed)    // stateless transport: no GET event stream
+app.delete('/mcp', mcp.mcpMethodNotAllowed) // stateless transport: no session to delete
+// Management endpoints for Settings (normal session auth).
+app.get('/api/mcp/settings', requireAuth, mcp.getSettingsHandler)
+app.put('/api/mcp/settings', requireAuth, mcp.putSettingsHandler)
+app.post('/api/mcp/token', requireAuth, mcp.createTokenHandler)
+app.delete('/api/mcp/token', requireAuth, mcp.deleteTokenHandler)
 // CalDAV settings + tasks
 app.get('/api/caldav/accounts', requireAuth, caldav.listAccountsHandler)
 // The two outbound-probing routes (add + discover make CalDAV PROPFINDs) share a

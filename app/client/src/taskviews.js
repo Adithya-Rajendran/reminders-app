@@ -139,6 +139,11 @@ export function orderPlanFirst(ranked, planIds) {
   return [...inPlan, ...rest]
 }
 
+// A task is "triaged" once it has both an effort estimate AND a schedule — the two
+// decisions the triage method asks for. Everything still missing one is queued.
+// Shared with TriageWidget.jsx (imported via widget-sdk → taskviews.js).
+export const needsTriage = (t) => !(t.time_estimate > 0 && isRealDate(t.due_date))
+
 // Tasks that are "triaged this week": open (not done), has a real time estimate
 // (> 0), has a real due date, and due tomorrow or within this week — i.e. the
 // user has already decided WHEN and HOW LONG, but they're not yet on the daily

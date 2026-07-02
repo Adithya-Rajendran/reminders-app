@@ -21,6 +21,7 @@
     "check": "for f in server/*.js; do node --check \"$f\"; done"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "better-sqlite3-session-store": "^0.1.0",
     "compression": "^1.8.1",
