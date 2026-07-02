@@ -305,13 +305,19 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title 
     deleteEvent: (body) => api('/api/calendar/events', { method: 'DELETE', body: JSON.stringify(body) }),
     accounts: () => appCache.cached('caldav-accounts', () => api('/api/caldav/accounts'), { ttl: 60_000 }),
   }), [])
+  // The daily plan lives server-side (syncs across browsers, readable by
+  // integrations); widgets reach it only through this capability.
+  const planCap = useMemo(() => ({
+    get: (date) => api('/api/daily-plan?date=' + encodeURIComponent(date)),
+    set: (date, ids) => api('/api/daily-plan', { method: 'PUT', body: JSON.stringify({ date, ids }) }),
+  }), [])
 
   // The app slots: every interface the canvas provides, with its live value. A
   // widget receives only the subset it plugs into (see connections.js) — the
   // dashboard never hands a widget app state it didn't declare a dependency on.
   const appCtx = useMemo(
-    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, onOpenSettings }),
-    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, onOpenSettings],
+    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, plan: planCap, onOpenSettings }),
+    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, planCap, onOpenSettings],
   )
   const slots = useMemo(() => appSlots(appCtx), [appCtx])
 

@@ -32,6 +32,19 @@ export function fakeTasks(initial = [], state = 'ready') {
   }
 }
 
+// Stand-in for ctx.plan (the server-stored daily plan). Records calls so a test
+// can assert "the widget saved this plan" without a fetch.
+export function fakePlan(initialIds = []) {
+  let ids = [...initialIds]
+  const calls = { get: [], set: [] }
+  return {
+    calls,
+    _ids: () => ids,
+    get(date) { calls.get.push(date); return Promise.resolve({ date, ids: [...ids] }) },
+    set(date, next) { calls.set.push([date, next]); ids = [...next]; return Promise.resolve({ date, ids: [...ids] }) },
+  }
+}
+
 // Stand-in for ctx.groups.
 export function fakeGroups(names = []) {
   return {

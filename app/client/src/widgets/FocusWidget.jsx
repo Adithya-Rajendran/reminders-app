@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, appSharedStore, orderPlanFirst, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -14,28 +14,35 @@ const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')
 // quiet "reminders parked" count keeps routine interrupts from breaking focus
 // (pull over push — Mark et al. 2016), and a parking note offloads loose ends to
 // cut attention residue (Leroy 2009) when switching in.
-export default function FocusWidget({ tasks: tasksCap, events, instanceId }) {
+export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId }) {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
 
   const open = useMemo(() => tasks.filter((t) => !t.done && !t.is_goal), [tasks])
 
-  // Read the daily plan written by DailyWidget via appSharedStore. A state counter
-  // is bumped on the 'reminders:plan-changed' window event so FocusWidget re-reads
-  // without polling. The plan shape is { date: 'YYYY-MM-DD', ids: string[] }.
+  // Read the server-stored daily plan (written by DailyWidget via ctx.plan). A
+  // state counter forces a re-read: bumped on the same-tab 'reminders:plan-changed'
+  // CustomEvent, and on window focus so edits from other tabs/browsers (or an
+  // integration) land when the user comes back — no polling.
   const [planTick, setPlanTick] = useState(0)
   useEffect(() => {
     const handler = () => setPlanTick((n) => n + 1)
     window.addEventListener('reminders:plan-changed', handler)
-    return () => window.removeEventListener('reminders:plan-changed', handler)
+    window.addEventListener('focus', handler)
+    return () => {
+      window.removeEventListener('reminders:plan-changed', handler)
+      window.removeEventListener('focus', handler)
+    }
   }, [])
-  const todayPlanIds = useMemo(() => {
+  const [todayPlanIds, setTodayPlanIds] = useState([])
+  useEffect(() => {
+    let alive = true
     const today = new Date()
     const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const saved = appSharedStore.loadJson('daily-plan', null)
-    return saved && saved.date === ymd ? (saved.ids || []) : []
-  }, [planTick]) // planTick is a synthetic dep: it forces a fresh read of external storage
+    plan.get(ymd).then((r) => { if (alive) setTodayPlanIds(Array.isArray(r?.ids) ? r.ids : []) }).catch(() => { /* plan is additive UX — keep the last known list */ })
+    return () => { alive = false }
+  }, [plan, planTick])
 
   const ranked = useMemo(() => {
     const soon = open.filter((t) => isRealDate(t.due_date) && ['overdue', 'today'].includes(dueBucket(t.due_date).k)).sort(byImportanceThenDue)

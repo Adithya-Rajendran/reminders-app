@@ -41,6 +41,15 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS group_calendars (
     user_id TEXT NOT NULL, group_name TEXT NOT NULL, list_id INTEGER NOT NULL,
     PRIMARY KEY (user_id, group_name));
+  -- The daily plan: the few task IDS picked for "today", keyed by user + local
+  -- date. Server-side (was browser localStorage) so it syncs across browsers and
+  -- is readable by integrations; the ids reference CalDAV tasks — no task data
+  -- lives here.
+  CREATE TABLE IF NOT EXISTS daily_plans (
+    user_id TEXT NOT NULL, plan_date TEXT NOT NULL,
+    ids_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, plan_date));
   -- Full-text search index over note bodies. This is derived/cheap-to-recreate
   -- data: it is rebuilt lazily from the WebDAV walk and cleared per-user when
   -- they point notes at a different WebDAV (see notes.setConfig -> noteindex).
@@ -211,6 +220,22 @@ export async function getListById(userId, listId) {
     list: { id: x.list_id, url: x.list_url, displayName: x.display_name, color: x.color, supportsVtodo: bool(x.supports_vtodo), enabled: bool(x.enabled) },
     account: { id: x.account_id, user_id: x.user_id, name: x.name, type: x.type, server_url: x.server_url, username: x.username, password_enc: x.password_enc },
   }
+}
+
+// ============================================================
+//  Daily plan
+// ============================================================
+export async function getDailyPlanIds(userId, date) {
+  const r = sqlite.prepare('SELECT ids_json FROM daily_plans WHERE user_id=? AND plan_date=?').get(userId, date)
+  if (!r) return []
+  try { const v = JSON.parse(r.ids_json); return Array.isArray(v) ? v : [] } catch { return [] }
+}
+export async function setDailyPlanIds(userId, date, ids) {
+  sqlite.prepare(`INSERT INTO daily_plans (user_id, plan_date, ids_json, updated_at) VALUES (?,?,?,datetime('now'))
+    ON CONFLICT(user_id, plan_date) DO UPDATE SET ids_json=excluded.ids_json, updated_at=datetime('now')`)
+    .run(userId, date, JSON.stringify(ids))
+  // Old day-selections have no value — prune opportunistically on write.
+  sqlite.prepare("DELETE FROM daily_plans WHERE user_id=? AND plan_date < date(?, '-14 days')").run(userId, date)
 }
 
 // ============================================================
