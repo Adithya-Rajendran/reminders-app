@@ -5,7 +5,7 @@
 // DTSTART/DUE, COUNT exhaustion -> COMPLETED, mode-2 DUE bump, absolute VALARM
 // shift). The docker run is the oracle; assertions lock ACTUAL current output.
 // Run with:
-//   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/recurrence.test.db node:22 node test/recurrence.test.mjs
+//   docker run --rm -v "$PWD":/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/recurrence.test.db node:22 node test/recurrence.test.mjs
 import ICAL from 'ical.js'
 import {
   advanceRecurringVtodo, applyRepeatFields, repeatFieldsFromVtodo,

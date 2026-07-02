@@ -4,7 +4,7 @@
 // dates, and takes {reminder} objects or bare ISO strings; readReminders reads
 // ALL alarms (absolute as-is, relative DURATION triggers resolved vs DUE/DTSTART),
 // deduped and sorted ascending. Run with:
-//   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app \
+//   docker run --rm -v "$PWD":/app -w /app \
 //     -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/valarm.test.db node:22 \
 //     node test/valarm.test.mjs
 import ICAL from 'ical.js'

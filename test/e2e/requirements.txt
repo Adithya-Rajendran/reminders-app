@@ -1,0 +1,6 @@
+# Pinned e2e backend servers (CalDAV + WebDAV) — captured from a green install
+# on python:3.11. Upgrading = edit these pins (the CI venv cache keys on this
+# file, so a pin change automatically rebuilds the venv).
+Radicale==3.7.5
+wsgidav==4.3.5
+cheroot==11.1.2

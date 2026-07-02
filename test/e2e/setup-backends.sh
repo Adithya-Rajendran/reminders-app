@@ -11,18 +11,21 @@ VENV="$HERE/.venv"
 mkdir -p "$STATE/collections" "$STATE/filesroot"
 
 # Bootstrap the Python venv (CalDAV + WebDAV servers) on first run / in CI.
+# Versions are pinned in requirements.txt — the CI venv cache keys on it.
 if [ ! -x "$VENV/bin/radicale" ]; then
   echo "  creating venv + installing radicale/wsgidav ..."
   "${PYTHON:-python3}" -m venv "$VENV"
   "$VENV/bin/pip" install --quiet --upgrade pip
-  "$VENV/bin/pip" install --quiet 'radicale==3.*' wsgidav cheroot
+  "$VENV/bin/pip" install --quiet -r "$HERE/requirements.txt"
 fi
 
-# First non-loopback IPv4. NOT filtered to RFC1918: this sandbox reports
-# 192.0.2.2 (TEST-NET) which is not private but still passes the guard
-# (ipBlocked falls through to "allowed"); CI runners report a 10.x address.
-IP="$(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.' | grep -vE '^127\.' | head -n1 || true)"
-[ -n "$IP" ] || { echo "FATAL: no non-loopback IPv4 from 'hostname -I'"; exit 1; }
+# First non-loopback IPv4 (overridable via E2E_IP for hosts without
+# `hostname -I`, e.g. macOS/Git-Bash). NOT filtered to RFC1918 — any
+# non-loopback address passes the app's egress guard; loopback NEVER does
+# (ipBlocked always blocks 127.x/169.254.x), which is exactly why the backends
+# are addressed via a real interface IP and never via localhost.
+IP="${E2E_IP:-$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.' | grep -vE '^127\.' | head -n1 || true)}"
+[ -n "$IP" ] || { echo "FATAL: no non-loopback IPv4 from 'hostname -I' — set E2E_IP=<host IPv4> (must not be 127.x/169.254.x; the SSRF guard blocks loopback by design)"; exit 1; }
 printf '%s' "$IP" > "$STATE/ip"
 echo "E2E_IP=$IP"
 

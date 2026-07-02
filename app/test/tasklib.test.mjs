@@ -1,7 +1,7 @@
 // Characterization test for the client task helpers (pure, no DOM/network):
 // isRealDate, dueChip, timeLabel, parseQuickAdd, pdotClass, ZERO_DATE.
 // Locks today's actual output so a future refactor that drifts is caught. Run with:
-//   docker run --rm -v /home/ubuntu/claude/reminders-app/app:/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/tasklib.test.db node:22 node test/tasklib.test.mjs
+//   docker run --rm -v "$PWD":/app -w /app -e CONFIG_STORE=sqlite -e CONFIG_DB_PATH=/tmp/tasklib.test.db node:22 node test/tasklib.test.mjs
 import { parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, isRealDate, pdotClass, ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
