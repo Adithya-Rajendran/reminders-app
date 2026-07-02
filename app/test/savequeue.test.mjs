@@ -110,6 +110,48 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
   ok(!q.isDirty() && attempts === 3, 'succeeds on third attempt, no longer dirty')
 }
 
+// ---- flush during an in-flight save waits for FULL quiescence ----
+// This is the editor-close contract: close() awaits flush() and then reads the
+// state set by onState — so the promise must not resolve while a save (or its
+// trailing coalesced save) is still mid-air.
+{
+  let release
+  const gate = new Promise((r) => { release = r })
+  let saves = 0
+  const q = createSaveQueue({ save: async () => { saves++; if (saves === 1) await gate } })
+  q.markDirty()
+  q.flush() // save #1 in flight, holding on the gate
+  q.markDirty()
+  const closeWait = q.flush() // the editor-close await
+  let resolvedEarly = false
+  closeWait.then(() => { resolvedEarly = true })
+  await tick()
+  ok(!resolvedEarly, 'flush() during an in-flight save does not resolve early')
+  release()
+  await closeWait
+  ok(saves === 2, 'quiescence includes the trailing coalesced save')
+}
+
+// ---- a trailing failure is reported via onState BEFORE the awaited flush resolves ----
+{
+  const states = []
+  let release
+  const gate = new Promise((r) => { release = r })
+  let saves = 0
+  const netErr = new Error('down'); netErr.status = 502
+  const q = createSaveQueue({
+    save: async () => { saves++; if (saves === 1) { await gate; return } throw netErr },
+    onState: (s) => states.push(s),
+  })
+  q.markDirty(); q.flush()
+  q.markDirty()
+  const wait = q.flush()
+  release()
+  await wait
+  ok(states[states.length - 1] === 'error', 'trailing failure lands in onState before the quiescence promise resolves')
+  ok(q.isDirty(), 'trailing non-409 failure re-marks dirty')
+}
+
 // ---- reset forgets unsaved state ----
 {
   let saves = 0

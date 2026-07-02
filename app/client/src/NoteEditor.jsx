@@ -159,7 +159,10 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
       else armDiscard(true)
       return
     }
-    if (stateRef.current === 'ready' && queue.current.isDirty()) {
+    if (stateRef.current === 'ready') {
+      // No isDirty() gate: a save can be mid-air with dirty=false, and flush()
+      // resolves at full quiescence (in-flight + trailing coalesced save), so
+      // this await is what actually prevents closing over an unsettled save.
       try {
         await queue.current.flush()
       } catch {
@@ -221,16 +224,19 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   // ---- 409 conflict resolution ----
   const isConflict = saving === 'error' && lastSaveError?.status === 409
 
-  // [Reload]: fetch the server's current version, replace body + etag. The user
-  // loses their local edits, but the note is consistent again.
+  // [Reload]: fetch the server's current version and take ALL of it — body,
+  // etag, tags, meta, title, folder. The remote change that caused the conflict
+  // may have touched any of these; keeping stale tags would silently overwrite
+  // the remote tag change on the next save (with a now-fresh etag).
   const conflictReload = async () => {
     try {
       const n = await notesApi.get(pathRef.current)
       // Update refs immediately (used synchronously in the next save) and state
       // (React re-render). bodyRef must be in sync with the new body so a
       // rapid edit immediately after reload doesn't re-queue the old body.
-      bodyRef.current = n.body; etagRef.current = n.etag
-      setBody(n.body); setEtag(n.etag)
+      bodyRef.current = n.body; etagRef.current = n.etag; tagsRef.current = n.meta?.tags || []
+      setBody(n.body); setEtag(n.etag); setTags(n.meta?.tags || [])
+      setMeta(n.meta || null); setTitle(n.title); setFolder(n.folder || '')
       queue.current.reset(); setSaving('idle'); setLastSaveError(null)
     } catch { /* stay in conflict state if the reload itself fails */ }
   }
@@ -259,7 +265,15 @@ export default function NoteEditor({ path: initialPath, onClose, onChanged, onDe
   const folderOpts = [...new Set([folder, ...folders].filter(Boolean))].sort()
   const pinned = !!meta?.pinned
   const togglePin = async () => {
-    try { await notesApi.setPinned(pathRef.current, !pinned); setMeta((m) => ({ ...(m || {}), pinned: !pinned })); onChanged?.() } catch { /* ignore */ }
+    try {
+      const r = await notesApi.setPinned(pathRef.current, !pinned)
+      // setPinned rewrites the file server-side (new etag). Apply it — to the
+      // ref synchronously, since the save queue reads etagRef mid-flight — or
+      // the next autosave's If-Match is stale and 409s with a spurious
+      // "changed somewhere else" conflict banner.
+      if (r?.etag) { etagRef.current = r.etag; setEtag(r.etag) }
+      setMeta((m) => ({ ...(m || {}), pinned: !pinned })); onChanged?.()
+    } catch { /* ignore */ }
   }
   const outline = useMemo(() => extractOutline(body), [body])
   const toggleOutline = (v) => { setShowOutline(v); saveJson('notes-outline-open', v) }

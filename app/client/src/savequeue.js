@@ -7,11 +7,17 @@ export function createSaveQueue({ save, onState }) {
   let inFlight = false
   let pending = false
   let dirty = false
+  // Resolves when the queue is fully quiescent — the in-flight PUT *and* any
+  // trailing coalesced save have settled (onState already fired for them).
+  // flush() always returns it, so a caller that must not proceed past unsaved
+  // data (editor close) can genuinely wait. The old flush() returned early
+  // while a save was mid-air — a silent-data-loss hole on close.
+  let settled = Promise.resolve()
+  let resolveSettled = null
 
-  const flush = async () => {
-    if (inFlight) { pending = true; return }
-    if (!dirty) return
+  const run = async () => {
     inFlight = true
+    if (!resolveSettled) settled = new Promise((r) => { resolveSettled = r })
     dirty = false
     onState?.('saving')
     try { await save(); onState?.('saved') }
@@ -22,8 +28,18 @@ export function createSaveQueue({ save, onState }) {
       // editor can render a conflict banner.
       if (err?.status !== 409) dirty = true
       onState?.('error', err)
+    } finally {
+      inFlight = false
+      if (pending) { pending = false; if (dirty) run() }
+      // Quiescent only if the line above didn't chain a trailing run.
+      if (!inFlight) { const r = resolveSettled; resolveSettled = null; r?.() }
     }
-    finally { inFlight = false; if (pending) { pending = false; flush() } }
+  }
+
+  const flush = () => {
+    if (inFlight) pending = true
+    else if (dirty) run()
+    return settled
   }
 
   return {
