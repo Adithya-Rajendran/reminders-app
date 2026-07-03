@@ -58,6 +58,7 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   // omnibox finds a task by its content, not just by navigating to a widget.
   const tasks = useSyncExternalStore(subscribeTasks, getTasks)
   const [areas, setAreas] = useState([])
+  const [noteHits, setNoteHits] = useState([]) // server full-text note-BODY matches
 
   // The note list, loaded once on open (cheap; the server caches it ~15s). A failure
   // or an unconfigured Notes account simply yields no note rows — commands, nav and
@@ -152,6 +153,20 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     return out
   }, [commands, board, tasks, notes, areas, contexts])
 
+  // Full-text note-BODY search (server): the entry list only matches note TITLES,
+  // so a word that lives only inside a note's body would never surface. Debounced;
+  // the hits merge into the results below, tagged Note. Skipped in command mode.
+  useEffect(() => {
+    if (cmdMode || !term) { setNoteHits([]); return undefined }
+    let alive = true
+    const id = setTimeout(() => {
+      notesApi.search(term, 8)
+        .then((r) => { if (alive) setNoteHits(Array.isArray(r?.results) ? r.results : []) })
+        .catch(() => { if (alive) setNoteHits([]) })
+    }, 180)
+    return () => { alive = false; clearTimeout(id) }
+  }, [term, cmdMode])
+
   // Command-mode filter (`>`) narrows to actions + navigation.
   const pool = useMemo(() => (cmdMode ? entries.filter((e) => e.kind === 'command' || e.kind === 'nav') : entries), [cmdMode, entries])
 
@@ -173,8 +188,20 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   // Results: fuzzy-ranked across the pool when there's a query, else the curated list.
   const results = useMemo(() => {
     if (!term) return curated.map((item) => ({ item, positions: [] }))
-    return rankEntries(term, pool).slice(0, 60)
-  }, [term, pool, curated])
+    const ranked = rankEntries(term, pool).slice(0, 60)
+    // Append server full-text note matches the title ranking missed (dedup by path).
+    if (!cmdMode && noteHits.length) {
+      const seen = new Set(ranked.map((r) => r.item.id))
+      for (const h of noteHits) {
+        const id = 'note-' + h.path
+        if (seen.has(id)) continue
+        seen.add(id)
+        const snip = Array.isArray(h.snippet) ? h.snippet.map((s) => s.t).join('').trim().slice(0, 70) : ''
+        ranked.push({ item: { kind: 'note', id, title: h.title || '(untitled note)', subtitle: snip || h.folder || 'match in note body', tag: 'Note', run: () => emitOpenNote(h.path) }, positions: [] })
+      }
+    }
+    return ranked
+  }, [term, pool, curated, cmdMode, noteHits])
 
   useEffect(() => { setSel(0) }, [cmdMode, term])
   useEffect(() => { if (sel >= results.length) setSel(Math.max(0, results.length - 1)) }, [results.length, sel])
