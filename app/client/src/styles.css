@@ -1055,6 +1055,9 @@ body {
 @keyframes checkPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
 .repeat-badge { color: var(--faint); font-size: 12px; }
+/* Importance marker on a task row — a star GLYPH (shape, not colour alone) so the
+   first-class importance axis is visible everywhere a task is listed. */
+.imp-star { color: var(--warn); font-size: 12px; line-height: 1; flex: 0 0 auto; }
 .pdot.p0 { background: var(--line-strong); }
 
 /* inline priority + scheduler controls */

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   useTaskList, useWidgetSize, atLeastW, atLeastH,
-  groupEisenhower, byImportanceThenDue, isRealDate, applyOrganizer, useOrganizerFilter,
+  groupEisenhower, byImportanceThenDue, isRealDate, dueChip, applyOrganizer, useOrganizerFilter,
   TaskRow, EmptyState, ErrorState, SkeletonRows, UndoBar,
   IconTarget, IconCheck,
 } from '../widget-sdk'
@@ -61,6 +61,18 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
     return pool.slice().sort(byImportanceThenDue)[0] || null
   }, [quads])
 
+  // Show YOUR WORK: name the concrete signals that made this the pick (importance
+  // flag, urgency, priority) instead of an unexplained assertion.
+  const whyFocus = useMemo(() => {
+    if (!mostImportant) return ''
+    const bits = []
+    if (mostImportant.important) bits.push('important')
+    const c = dueChip(mostImportant.due_date)
+    if (c) bits.push(c.cls === 'overdue' ? 'overdue' : c.label === 'Today' ? 'due today' : `due ${c.label.toLowerCase()}`)
+    if ((mostImportant.priority || 0) >= 4) bits.push('high priority')
+    return bits.length ? bits.join(' · ') : 'top of your open list'
+  }, [mostImportant])
+
   // Persist a drag between quadrants. onDragStart stashes the task id; the target
   // quadrant flips task.important to match its column (Q1/Q2 → true, Q3/Q4 →
   // false) and, if it's an urgent column and the task isn't already urgent-dated,
@@ -99,7 +111,7 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
           </button>
           <div className="tri-focus-body">
             <div className="tri-focus-title">{mostImportant.title}</div>
-            {showWhy && <div className="tri-focus-why">Your most important task right now — do this before easier, busier work.</div>}
+            {showWhy && <div className="tri-focus-why"><b>Why:</b> {whyFocus} — do this before easier, busier work.</div>}
           </div>
         </div>
       ) : (

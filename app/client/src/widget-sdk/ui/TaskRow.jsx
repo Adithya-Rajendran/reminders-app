@@ -109,6 +109,9 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
         />
         <div className="task-main">
           <div className="task-title">
+            {/* Importance is a first-class axis — surface it on EVERY row (a shape, not
+                colour alone); urgency is carried by the due chip's colour below. */}
+            {task.important && <span className="imp-star" title="Important" aria-label="Important">★</span>}
             <span className="t">{task.title}</span>
             {repeats && <span className="repeat-badge" title="Repeating task">↻</span>}
           </div>

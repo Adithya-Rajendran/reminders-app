@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   useTaskList, applyOrganizer, useOrganizerFilter, groupEisenhower, byImportanceThenDue, dueBucket,
-  isRealDate, parseQuickAdd, IconCheck, IconTarget, IconCalendar, IconPlus,
+  isRealDate, dueChip, timeLabel, parseQuickAdd, IconCheck, IconTarget, IconCalendar, IconPlus,
   SkeletonRows, ErrorState, ReconnectBanner, UndoBar,
 } from '../widget-sdk'
 import './OverviewWidget.css'
@@ -98,6 +98,16 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
     return () => { alive = false }
   }, [calendar])
 
+  // The next dated TASK (today or later, not overdue) — so "Next up" is honest about
+  // remaining work, not just calendar events (the Overview was silent about tasks
+  // even while Upcoming showed a full pile due today).
+  const nextTask = useMemo(() => {
+    const nowMs = now.getTime()
+    return open
+      .filter((t) => isRealDate(t.due_date) && dueBucket(t.due_date).k !== 'overdue' && new Date(t.due_date).getTime() >= nowMs - 864e5)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))[0] || null
+  }, [open, now])
+
   // ---- inline quick-capture -> Inbox (clarified:false) ----
   // Overview doesn't get the `projects` plug, so resolve the inbox project id from
   // an existing task (its project_id), falling back to 1 — the same fallback the
@@ -180,17 +190,23 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
             )}
           </div>
 
-          {/* (5) next calendar event today */}
+          {/* (5) next up — the next calendar event AND the next dated task, so this
+              honestly reflects both meetings and remaining work. */}
           <div className="ov-event">
             <div className="ov-sec-label"><IconCalendar size={12} /> Next up</div>
-            {nextEvent ? (
+            {nextEvent && (
               <div className="ov-event-row">
                 <span className="ov-event-time">{eventTime(nextEvent.start, nextEvent.allDay)}</span>
                 <span className="ov-event-title">{nextEvent.title || '(untitled event)'}</span>
               </div>
-            ) : (
-              <div className="ov-event-none">No more events today.</div>
             )}
+            {nextTask && (
+              <div className="ov-event-row ov-event-task">
+                <span className="ov-event-time">{dueChip(nextTask.due_date)?.label || ''}{timeLabel(nextTask.due_date) ? ' ' + timeLabel(nextTask.due_date) : ''}</span>
+                <span className="ov-event-title"><IconCheck size={11} className="ov-task-ic" /> {nextTask.title}</span>
+              </div>
+            )}
+            {!nextEvent && !nextTask && <div className="ov-event-none">Nothing scheduled today.</div>}
           </div>
 
           {/* (6) inline quick-capture -> Inbox */}

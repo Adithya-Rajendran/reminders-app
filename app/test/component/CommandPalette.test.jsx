@@ -23,7 +23,11 @@ vi.mock('../../client/src/api.js', () => ({
   api: vi.fn(async () => ({})),
   tk: vi.fn(async () => []),
   reminderGroups: vi.fn(async () => []),
-  notesApi: { list: vi.fn(async () => ({ configured: true, notes: NOTES })) },
+  notesApi: {
+    list: vi.fn(async () => ({ configured: true, notes: NOTES })),
+    // Full-text search: "kanban" appears only in a note BODY (no task/title match).
+    search: vi.fn(async (q) => ({ results: /kanban/i.test(q) ? [{ path: 'n/Board.md', title: 'Board doc', snippet: [{ t: '…our kanban flow…', hit: true }] }] : [] })),
+  },
 }))
 
 import CommandPalette from '../../client/src/CommandPalette.jsx'
@@ -82,6 +86,13 @@ describe('CommandPalette omnibox', () => {
     const input = await openPalette()
     await userEvent.type(input, 'weekly')
     await rowShown(/Weekly review/i)
+  })
+
+  it('surfaces a note by its BODY text via server full-text search (not just titles)', async () => {
+    // "kanban" is in no task/title, only a note body — it must still resolve in Ctrl+K.
+    const input = await openPalette()
+    await userEvent.type(input, 'kanban')
+    await rowShown(/Board doc/i)
   })
 
   it('> restricts to commands and runs a passed command', async () => {
