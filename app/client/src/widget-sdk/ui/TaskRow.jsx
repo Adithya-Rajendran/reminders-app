@@ -1,5 +1,6 @@
 import { memo, useRef, useState } from 'react'
-import { dueChip, pdotClass, PRIORITIES, timeLabel, absDate, cueTriggerOf } from '../../tasklib.js'
+import { dueChip, PRIORITIES, timeLabel, absDate, cueTriggerOf } from '../../tasklib.js'
+import { PriorityDot } from './PriorityDot.jsx'
 import { isQuickWin, isTwoMinName, isRecurringTask } from '../../taskviews.js'
 import { computeHabitStats, recentDays } from '../../habitstats.js'
 import { usePopover } from '../../usePopover.js'
@@ -96,7 +97,9 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
 
   return (
     <div className="task-wrap">
-      <div className={`task${task.done ? ' checked' : ''}`}>
+      {/* data-task-id lets the omnibox reveal (scroll + flash) this row when a task
+          is found by content search — see App.jsx onRevealTask. */}
+      <div className={`task${task.done ? ' checked' : ''}`} data-task-id={task.id}>
         <button
           className={`check-btn${task.done ? ' on' : ''}${burst ? ' burst' : ''}`}
           role="checkbox"
@@ -171,7 +174,7 @@ function PriorityControl({ value, onSet }) {
   return (
     <span className="inline-ctl" ref={ref}>
       <button className="pri-dot-btn" aria-label={`Priority: ${PRIORITIES.find((p) => p.v === (value ?? 0))?.label || 'none'}`} title="Priority" aria-haspopup="menu" aria-expanded={open} onKeyDown={openOnArrowDown(open, setOpen)} onClick={() => setOpen((o) => !o)}>
-        <span className={`pdot ${pdotClass(value)}`} />
+        <PriorityDot value={value} />
       </button>
       {open && (
         <div className="mini-menu" role="menu">

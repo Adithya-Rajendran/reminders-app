@@ -14,7 +14,8 @@ import { emitTasksChanged } from './tasksbus.js'
 import { preloadWidgets, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { loadJson } from './storage.js'
 import { UndoBar, LiveAnnouncer } from './widget-sdk'
-import { onBoard, getBoard, flashWidget } from './boardbus.js'
+import { onRevealTask } from './revealbus.js'
+import { revealTaskInDom } from './revealtask.js'
 import { createAndOpenNote } from './noteactions.js'
 import {
   IconBell, IconSun, IconMoon, IconGear, IconLogout,
@@ -323,10 +324,10 @@ export default function App() {
     onCycleDash: (dir) => { if (status === 'ready') cycleDash(dir) },
   })
 
-  // What's on the current board (published by Dashboard) — feeds the palette's
-  // "Go to <widget>" commands.
-  const [boardWidgets, setBoardWidgets] = useState(() => getBoard())
-  useEffect(() => onBoard(setBoardWidgets), [])
+  // Reveal a task the omnibox found by content: scroll its row into view and flash
+  // it (TaskRow stamps [data-task-id]); if it isn't a row on this board, flash a task
+  // widget and announce. The DOM logic lives in revealtask.js so it's unit-testable.
+  useEffect(() => onRevealTask(revealTaskInDom), [])
 
   // Bumped when Settings closes: accounts/projects/groups may have changed, so
   // Dashboard refreshes its meta (fixes the "connected an account but the
@@ -406,24 +407,23 @@ export default function App() {
   // note command), so the palette is a keyboard-driven spine for the whole app.
   // `priority` orders the empty-query list (workflow actions first, rare and
   // destructive ones last) — see palettecmds.js.
+  // App-level commands surfaced in the omnibox (navigation to widget surfaces is
+  // built by the palette itself from the board). `priority` orders the empty-query
+  // list; `aliases` add synonyms the fuzzy match can find (e.g. "capture" → Add
+  // reminder). Widget navigation and content (tasks/notes) are added by the palette.
   const paletteCommands = [
-    { id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, priority: 3, run: () => setCapture(true) },
-    // One "Go to …" command per widget on the current board: scrolls it into
-    // view and flashes it (the palette becomes real navigation on tall boards).
-    ...boardWidgets.map((w) => (
-      { id: 'goto-' + w.i, label: `Go to ${w.title}`, hint: 'Widget on this board', priority: 2, run: () => setTimeout(() => flashWidget(w.i), 0) }
-    )),
+    { id: 'quick-capture', label: 'Add reminder…', hint: 'Capture a task — shortcut: c', icon: IconBell, priority: 3, aliases: ['capture', 'new task', 'add task', 'quick add', 'todo', 'jot'], run: () => setCapture(true) },
     // One "Switch to …" command per other dashboard, so tab switching is
     // keyboard-reachable from the palette (and fuzzy-findable by name).
     ...dashboards.filter((d) => d.id !== activeDash).map((d) => (
-      { id: 'dash-' + d.id, label: `Switch to ${d.name}`, hint: 'Dashboard — Ctrl+[ / ]', priority: 2, run: () => setActiveDash(d.id) }
+      { id: 'dash-' + d.id, label: `Switch to ${d.name}`, hint: 'Dashboard — Ctrl+[ / ]', tag: 'Dashboard', priority: 2, run: () => setActiveDash(d.id) }
     )),
-    { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, priority: 1, run: () => openSettings() },
-    { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', priority: 1, run: () => setHelp(true) },
-    { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, run: toggleTheme },
-    { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
-    { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', run: addDashboard },
-    { id: 'logout', label: 'Log out', icon: IconLogout, priority: -1, run: () => window.location.assign('/auth/logout') },
+    { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, priority: 1, aliases: ['settings', 'preferences', 'accounts', 'connect account', 'caldav', 'nextcloud'], run: () => openSettings() },
+    { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', priority: 1, aliases: ['help', 'keys', 'hotkeys'], run: () => setHelp(true) },
+    { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, aliases: ['dark mode', 'light mode', 'appearance'], run: toggleTheme },
+    { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, aliases: ['theme color', 'highlight color'], run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
+    { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', aliases: ['add dashboard', 'new board', 'new tab'], run: addDashboard },
+    { id: 'logout', label: 'Log out', icon: IconLogout, priority: -1, aliases: ['sign out'], run: () => window.location.assign('/auth/logout') },
   ]
 
   return (

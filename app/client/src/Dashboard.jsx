@@ -21,7 +21,7 @@ import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
 import { recentGroups, pushRecentGroup } from './groups.js'
 import { saveJson } from './storage.js'
-import { publishBoard, onGoToWidget } from './boardbus.js'
+import { publishBoard, onGoToWidget, onAddWidget } from './boardbus.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
   IconList, IconBell, IconCloud,
@@ -404,10 +404,15 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
   // Publish the board contents for the palette's "Go to <widget>" commands, and
   // honor go-to requests with the same scroll+flash the add-widget path uses.
   useEffect(() => {
-    publishBoard(widgets.map((w) => ({ i: w.i, title: titleFor(w) })))
+    // Include `type` so the palette can build type-aware nav (aliases per surface,
+    // and "Add <surface>" for a type not on this board).
+    publishBoard(widgets.map((w) => ({ i: w.i, title: titleFor(w), type: w.type })))
     return () => publishBoard([])
   }, [widgets])
   useEffect(() => onGoToWidget(scrollFlash), [])
+  // The omnibox's "Add <surface>" nav entries add a widget by type (same path as
+  // the toolbar's Add-widget menu, so it scroll-flashes into view once rendered).
+  useEffect(() => onAddWidget((type) => addWidget(type)), [addWidget])
 
   // Settings closed (metaTick bumped): accounts/projects may have changed —
   // re-check the onboarding meta so a freshly connected account lifts the gate

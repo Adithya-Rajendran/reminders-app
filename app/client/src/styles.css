@@ -260,6 +260,30 @@ body {
 .pdot.p3 { background: var(--accent); }
 .pdot.p4 { background: var(--faint); }
 
+/* Priority as ascending bars (PriorityDot) — height AND colour encode the level, so
+   it never relies on colour alone (WCAG 1.4.1). Lit bars = level; unlit bars stay
+   faint so a colour-blind reader gets the level from the glyph's shape. */
+.pbars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; flex: 0 0 auto; }
+.pbars .pbar { width: 2.5px; border-radius: 1px; background: var(--line-strong); }
+.pbars .pbar:nth-child(1) { height: 4px; }
+.pbars .pbar:nth-child(2) { height: 7.5px; }
+.pbars .pbar:nth-child(3) { height: 11px; }
+.pbars.p1 .pbar.on { background: var(--danger); }
+.pbars.p2 .pbar.on { background: var(--warn); }
+.pbars.p3 .pbar.on { background: var(--accent); }
+.pbars.p4 .pbar.on { background: var(--faint); }
+
+/* Reveal flash — the omnibox scrolls a task's row into view and adds .task-flash
+   for ~1.5s so the eye lands on the right row (see App.jsx onRevealTask). */
+@keyframes taskFlash {
+  from { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+  to   { background: transparent; box-shadow: inset 0 0 0 2px transparent; }
+}
+.task.task-flash { border-radius: var(--r-btn); animation: taskFlash 1.5s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .task.task-flash { animation: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--r-btn); }
+}
+
 /* ============================================================
    Checkbox
    ============================================================ */
@@ -1334,6 +1358,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cmdk-row-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cmdk-hl { color: var(--accent); font-weight: 700; }
 .cmdk-row-sub { font-size: 11.5px; color: var(--faint); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Type tag on the right of each omnibox row — the discriminator that lets a mixed
+   result list (task · note · command · nav) read at a glance. */
+.cmdk-tag { flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; }
+.cmdk-tag-task { color: var(--accent); }
+.cmdk-tag-nav, .cmdk-tag-command { color: var(--muted); }
 .cmdk-foot { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel); color: var(--faint); font-size: 11px; }
 .cmdk-foot-keys { display: inline-flex; align-items: center; gap: 5px; }
 .cmdk-foot kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel-solid); color: var(--muted); font: inherit; font-size: 10px; }

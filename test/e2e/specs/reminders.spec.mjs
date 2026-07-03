@@ -41,9 +41,10 @@ test('set priority inline and it persists', async ({ page, request }) => {
   await row.getByRole('menuitem', { name: 'High' }).click()
 
   await expect.poll(async () => (await listTasks(request)).find((x) => x.title === 'Plan the week')?.priority).toBe(3)
-  // Survives a reload (read back from CalDAV, not optimistic state).
+  // Survives a reload (read back from CalDAV, not optimistic state). Priority now
+  // renders as the PriorityDot bars glyph (shape + colour); High → the p2 tier.
   await page.reload()
-  await expect(frame.locator('.task-wrap', { has: page.getByText('Plan the week', { exact: true }) }).locator('.pdot.p2')).toBeVisible()
+  await expect(frame.locator('.task-wrap', { has: page.getByText('Plan the week', { exact: true }) }).locator('.pbars.p2')).toBeVisible()
 })
 
 test('quick-add parses date, priority, label and cue tokens', async ({ page, request }) => {

@@ -12,11 +12,14 @@ import './TriageWidget.css'
 // task.important flag × due-proximity urgency) with actionable rows, plus a
 // "Most important" callout naming the single task to do now. Gamification is
 // retired: this is a calm decision board, not a slot machine.
+// Every quadrant names BOTH axes in the same order (importance · urgency) so the
+// matrix reads as one consistent grid — not "important · urgent" next to a bare
+// "urgent" that leaves the reader guessing the other axis.
 const QUADS = [
   { k: 'Q1', label: 'Do first', sub: 'important · urgent' },
-  { k: 'Q2', label: 'Schedule', sub: 'important' },
-  { k: 'Q3', label: 'Delegate', sub: 'urgent' },
-  { k: 'Q4', label: 'Later', sub: 'neither' },
+  { k: 'Q2', label: 'Schedule', sub: 'important · not urgent' },
+  { k: 'Q3', label: 'Delegate', sub: 'not important · urgent' },
+  { k: 'Q4', label: 'Later', sub: 'not important · not urgent' },
 ]
 
 // The two importance-setting quadrants (Q1/Q2 = important, Q3/Q4 = not). Dragging

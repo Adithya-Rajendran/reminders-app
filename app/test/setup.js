@@ -13,6 +13,13 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver = globalThis.ResizeObserver || ResizeObserverStub
 
+// jsdom implements no layout, so Element.scrollIntoView is absent — components that
+// keep an active row in view (the command palette, menus) call it in an effect. A
+// no-op shim lets them mount without throwing.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {}
+}
+
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = (query) => ({
     matches: false,

@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ModalFrame from './ModalFrame.jsx'
 import { useModalRef } from './useModalRef.js'
 import { emitOpenNote } from './notesbus.js'
 import { notesApi } from './api.js'
-import { fuzzyRank } from './fuzzy.js'
-import { orderCommands } from './palettecmds.js'
+import { rankEntries } from './omnibox.js'
+import { aliasesForType } from './palettecmds.js'
 import { createAndOpenNote } from './noteactions.js'
-import { IconSearch, IconNote, IconPlus, IconFolder, IconCornerDownLeft, IconSpinner } from './icons.jsx'
+import { getTasks, subscribe as subscribeTasks } from './taskstore.js'
+import { emitRevealTask } from './revealbus.js'
+import { getBoard, flashWidget, emitAddWidget } from './boardbus.js'
+import { WIDGET_MANIFEST } from './widgets/manifest.js'
+import { dueChip } from './tasklib.js'
+import { IconSearch, IconNote, IconPlus, IconFolder, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
 
 // Render a label with its fuzzy-matched characters emphasised. Groups runs so
-// the DOM stays small for short note titles.
+// the DOM stays small for short titles.
 function Highlight({ text, positions }) {
   const set = positions && positions.length ? new Set(positions) : null
   if (!set) return text
@@ -26,54 +31,123 @@ function Highlight({ text, positions }) {
   return segs
 }
 
-// Stable DOM id for a result row so aria-activedescendant can point the input at
-// the active option. Keyed by command id / note path (the same key as the row).
-const optionId = (r, cmdMode) => 'cmdk-opt-' + (cmdMode ? r.item.id : r.item.path)
+// Per-kind default icon + right-aligned tag. A command carries its own icon; the
+// others get a stable glyph so the type reads at a glance.
+const KIND_ICON = { command: IconBolt, nav: IconGrid, task: IconCheck, note: IconNote }
+const optionId = (item) => 'cmdk-opt-' + item.id
 
-// App-wide command palette / quick-switcher (Obsidian Ctrl+O / Ctrl+P). Notes
-// mode fuzzy-jumps to any note; typing `>` switches to command mode. Fully
-// keyboard-driven; selecting a note emits on the notesbus so the widget opens it.
+// App-wide command palette / OMNIBOX. Plain typing fuzzy-searches EVERYTHING at
+// once — your commands, board navigation (surfaces, aliased so "triage" finds the
+// renamed "Prioritize"), your live tasks, and your notes — with a type tag per row.
+// Typing `>` is now an OPTIONAL filter to commands + navigation only. Fully
+// keyboard-driven; every row carries a `run`, so activating it just closes + runs.
 export default function CommandPalette({ initialMode = 'notes', commands = [], onClose }) {
   const [raw, setRaw] = useState(initialMode === 'commands' ? '>' : '')
   const [notes, setNotes] = useState(null) // null = loading | [] | [...]
-  const [unconfigured, setUnconfigured] = useState(false)
-  const [loadErr, setLoadErr] = useState(false) // list() failed — distinct from "no notes"
   const [sel, setSel] = useState(0)
   const listRef = useRef(null)
   const ref = useModalRef(onClose)
 
+  // `>` restricts to commands + navigation (actions), matching the old command
+  // mode; without it, the query searches every source.
   const cmdMode = raw.startsWith('>')
   const term = (cmdMode ? raw.slice(1) : raw).trim()
 
-  // Load the note list once on open (cheap; the server caches it for 15s). A
-  // failure sets loadErr (kept distinct from an empty list) so the user gets a
-  // retry affordance instead of a misleading "No matching note."
-  const [reloadKey, setReloadKey] = useState(0)
-  const retry = () => { setNotes(null); setLoadErr(false); setReloadKey((k) => k + 1) }
+  // Live task list from the shared store (same source every widget reads) — so the
+  // omnibox finds a task by its content, not just by navigating to a widget.
+  const tasks = useSyncExternalStore(subscribeTasks, getTasks)
+
+  // The note list, loaded once on open (cheap; the server caches it ~15s). A failure
+  // or an unconfigured Notes account simply yields no note rows — commands, nav and
+  // tasks still work, so the palette never hard-fails on the Notes backend.
   useEffect(() => {
     let alive = true
     notesApi.list().then((r) => {
       if (!alive) return
-      if (!r.configured) { setNotes([]); setUnconfigured(true); return }
+      if (!r || !r.configured) { setNotes([]); return }
       const list = (r.notes || []).slice().sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
       setNotes(list)
-    }).catch(() => { if (alive) { setNotes([]); setLoadErr(true) } })
+    }).catch(() => { if (alive) setNotes([]) })
     return () => { alive = false }
-  }, [reloadKey])
+  }, [])
 
-  // Built-in note command + any app-level commands the host passes in (settings,
-  // theme, dashboards, …) — so Ctrl/Cmd+K is a single keyboard-driven action spine.
-  const COMMANDS = useMemo(() => [
-    { id: 'new-note', label: 'New note', hint: 'Create a note in Notes — shortcut: n', icon: IconPlus, priority: 1, run: createAndOpenNote },
-    ...commands,
-  ], [commands])
+  // The current board, for type-aware navigation. A surface already on the board
+  // gets "Go to" (scroll + flash); one that isn't gets "Add" (drop it in). Either
+  // way the aliases make a renamed surface reachable by its old name.
+  const board = useMemo(() => getBoard(), [])
 
-  // Commands are additionally ordered by their `priority` (workflow actions
-  // first on an empty query; a tie-nudge when ranking) — see palettecmds.js.
-  const results = useMemo(
-    () => (cmdMode ? orderCommands(fuzzyRank(term, COMMANDS, (c) => c.label), term) : fuzzyRank(term, notes || [], (n) => n.title)),
-    [cmdMode, term, notes, COMMANDS],
-  )
+  // Flatten every source into one typed, rankable entry list. Rebuilt only when a
+  // source actually changes (not per keystroke); ranking runs on `term` below.
+  const entries = useMemo(() => {
+    const out = []
+
+    // Commands (host-provided app actions + a built-in "New note").
+    out.push({ kind: 'command', id: 'new-note', title: 'New note', subtitle: 'Create a note in Notes — shortcut: n', icon: IconPlus, priority: 1, tag: 'Command', run: createAndOpenNote })
+    for (const c of commands) {
+      out.push({
+        kind: 'command', id: c.id, title: c.label, subtitle: c.hint, icon: c.icon,
+        priority: c.priority || 0, tag: c.tag || 'Command',
+        keys: [c.label, ...(c.aliases || [])], run: c.run,
+      })
+    }
+
+    // Navigation: one entry per widget surface. Present → go to it; absent → add it.
+    const onBoardByType = new Map()
+    for (const w of board) { if (!onBoardByType.has(w.type)) onBoardByType.set(w.type, w) }
+    for (const m of WIDGET_MANIFEST) {
+      const here = onBoardByType.get(m.type)
+      const verb = here ? 'Go to' : 'Add'
+      out.push({
+        kind: 'nav', id: 'nav-' + m.type, title: `${verb} ${m.label}`,
+        subtitle: here ? 'On this board' : (m.desc || 'Add to this board'), tag: verb, priority: 2,
+        keys: [`${verb} ${m.label}`, m.label, ...aliasesForType(m.type)],
+        run: here ? () => flashWidget(here.i) : () => emitAddWidget(m.type),
+      })
+    }
+
+    // Live tasks (open only — completed ones would flood content search).
+    for (const t of tasks) {
+      if (!t || t.done || t.id == null) continue
+      const c = dueChip(t.due_date)
+      out.push({
+        kind: 'task', id: 'task-' + t.id, title: t.title || '(untitled task)',
+        subtitle: c ? c.label : 'Task', tag: 'Task', run: () => emitRevealTask(t.id),
+      })
+    }
+
+    // Notes.
+    for (const n of (notes || [])) {
+      out.push({
+        kind: 'note', id: 'note-' + n.path, title: n.title, subtitle: n.folder || '', folder: n.folder,
+        tag: 'Note', run: () => emitOpenNote(n.path),
+      })
+    }
+    return out
+  }, [commands, board, tasks, notes])
+
+  // Command-mode filter (`>`) narrows to actions + navigation.
+  const pool = useMemo(() => (cmdMode ? entries.filter((e) => e.kind === 'command' || e.kind === 'nav') : entries), [cmdMode, entries])
+
+  // The curated empty-state (blank query): the workflow commands + the core surfaces
+  // + a few recent notes — a useful "start here" instead of a blank void. In command
+  // mode the whole action pool is shown, priority-ordered.
+  const curated = useMemo(() => {
+    if (cmdMode) {
+      return [...pool].sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    }
+    const cmds = entries.filter((e) => e.kind === 'command' && (e.priority || 0) >= 1)
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0)).slice(0, 5)
+    const CORE = ['overview', 'inbox', 'triage', 'calendar']
+    const nav = CORE.map((tp) => entries.find((e) => e.id === 'nav-' + tp)).filter(Boolean)
+    const recentNotes = entries.filter((e) => e.kind === 'note').slice(0, 5)
+    return [...cmds, ...nav, ...recentNotes]
+  }, [cmdMode, entries, pool])
+
+  // Results: fuzzy-ranked across the pool when there's a query, else the curated list.
+  const results = useMemo(() => {
+    if (!term) return curated.map((item) => ({ item, positions: [] }))
+    return rankEntries(term, pool).slice(0, 60)
+  }, [term, pool, curated])
 
   useEffect(() => { setSel(0) }, [cmdMode, term])
   useEffect(() => { if (sel >= results.length) setSel(Math.max(0, results.length - 1)) }, [results.length, sel])
@@ -81,7 +155,8 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
 
   const activate = (i = sel) => {
     const r = results[i]; if (!r) return
-    if (cmdMode) { r.item.run?.(); onClose() } else { emitOpenNote(r.item.path); onClose() }
+    onClose()
+    r.item.run?.()
   }
   const PAGE = 8
   const onKeyDown = (e) => {
@@ -89,14 +164,14 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => (results.length ? (s - 1 + results.length) % results.length : 0)) }
     else if (e.key === 'PageDown') { e.preventDefault(); setSel((s) => Math.min(results.length - 1, s + PAGE)) }
     else if (e.key === 'PageUp') { e.preventDefault(); setSel((s) => Math.max(0, s - PAGE)) }
-    // Home/End jump the RESULT list only while the input is empty — with text
-    // in the box they keep their native move-the-caret meaning.
+    // Home/End jump the RESULT list only while the input is empty — with text in the
+    // box they keep their native move-the-caret meaning.
     else if (e.key === 'Home' && !term) { e.preventDefault(); setSel(0) }
     else if (e.key === 'End' && !term) { e.preventDefault(); setSel(Math.max(0, results.length - 1)) }
     else if (e.key === 'Enter') { e.preventDefault(); activate() }
   }
 
-  const loading = notes === null && !cmdMode
+  const loadingNotes = notes === null
 
   return (
     <ModalFrame overlayClass="cmdk-overlay" modalClass="cmdk" ariaLabel="Command palette" onBackdrop={onClose}>
@@ -106,52 +181,44 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
           <input
             className="cmdk-input" value={raw} autoFocus role="combobox" aria-expanded="true" aria-label="Command palette"
             aria-controls="cmdk-listbox" aria-haspopup="listbox"
-            aria-activedescendant={results[sel] ? optionId(results[sel], cmdMode) : undefined}
-            placeholder={cmdMode ? 'Run a command…' : 'Search notes…   (type > for commands)'}
+            aria-activedescendant={results[sel] ? optionId(results[sel].item) : undefined}
+            placeholder={cmdMode ? 'Run a command…' : 'Search tasks, notes, commands…   (type > for commands only)'}
             onChange={(e) => setRaw(e.target.value)} onKeyDown={onKeyDown}
           />
         </div>
         <div className="cmdk-list" id="cmdk-listbox" ref={listRef} role="listbox">
-          {loading ? (
-            <div className="cmdk-empty"><IconSpinner size={18} /> Loading…</div>
-          ) : loadErr && !cmdMode ? (
-            // A failed list() must not masquerade as "no notes" — offer a retry.
-            <div className="cmdk-empty" role="alert">
-              Couldn’t load notes — <button type="button" className="cmdk-retry" onClick={retry}>retry</button>
+          {results.length === 0 ? (
+            <div className="cmdk-empty">
+              {loadingNotes && !term ? <><IconSpinner size={18} /> Loading…</> : cmdMode ? 'No matching command.' : 'No matches — try a task title, note, or command.'}
             </div>
-          ) : unconfigured && !cmdMode ? (
-            <div className="cmdk-empty">Notes aren’t configured yet — connect Nextcloud in Settings.</div>
-          ) : results.length === 0 ? (
-            <div className="cmdk-empty">{cmdMode ? 'No matching command.' : 'No matching note.'}</div>
           ) : results.map((r, i) => {
-            const Item = r.item
-            const isCmd = cmdMode
-            const Ic = isCmd ? (Item.icon || IconPlus) : IconNote
+            const it = r.item
+            const Ic = it.icon || KIND_ICON[it.kind] || IconBolt
             return (
               <button
-                key={isCmd ? Item.id : Item.path} id={optionId(r, isCmd)} type="button" role="option" aria-selected={i === sel}
-                className={`cmdk-row${i === sel ? ' sel' : ''}`}
+                key={it.id} id={optionId(it)} type="button" role="option" aria-selected={i === sel}
+                className={`cmdk-row cmdk-kind-${it.kind}${i === sel ? ' sel' : ''}`}
                 onMouseEnter={() => setSel(i)} onClick={() => activate(i)}
               >
                 <span className="cmdk-row-ic"><Ic size={15} /></span>
                 <span className="cmdk-row-main">
-                  <span className="cmdk-row-title"><Highlight text={isCmd ? Item.label : Item.title} positions={r.positions} /></span>
-                  {isCmd
-                    ? (Item.hint && <span className="cmdk-row-sub">{Item.hint}</span>)
-                    : (Item.folder && <span className="cmdk-row-sub"><IconFolder size={11} /> {Item.folder}</span>)}
+                  <span className="cmdk-row-title"><Highlight text={it.title} positions={r.positions} /></span>
+                  {it.kind === 'note' && it.folder
+                    ? <span className="cmdk-row-sub"><IconFolder size={11} /> {it.folder}</span>
+                    : (it.subtitle && <span className="cmdk-row-sub">{it.subtitle}</span>)}
                 </span>
+                {it.tag && <span className={`cmdk-tag cmdk-tag-${it.kind}`}>{it.tag}</span>}
               </button>
             )
           })}
         </div>
         <div className="cmdk-foot">
           <span className="cmdk-foot-keys"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-          <span className="cmdk-foot-keys"><kbd className="kbd-ic"><IconCornerDownLeft size={11} /></kbd> {cmdMode ? 'run' : 'open'}</span>
+          <span className="cmdk-foot-keys"><kbd className="kbd-ic"><IconCornerDownLeft size={11} /></kbd> open</span>
           <span className="cmdk-foot-keys"><kbd>esc</kbd> close</span>
-          {/* Advertise command mode from the surface people already have open. */}
-          {!cmdMode && <span className="cmdk-foot-keys"><kbd>&gt;</kbd> commands</span>}
+          {!cmdMode && <span className="cmdk-foot-keys"><kbd>&gt;</kbd> commands only</span>}
           <span className="cmdk-foot-spacer" />
-          <span className="cmdk-foot-mode">{cmdMode ? 'Commands' : 'Notes'}</span>
+          <span className="cmdk-foot-mode">{cmdMode ? 'Commands' : 'All'}</span>
         </div>
       </div>
     </ModalFrame>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, pdotClass, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, PriorityDot, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -155,7 +155,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
           <div className="focus-now-body">
             <div className="focus-title">{nowTask.title}</div>
             <div className="focus-meta">
-              <span className={`pdot ${pdotClass(nowTask.priority || 0)}`} aria-hidden="true" />
+              <PriorityDot value={nowTask.priority || 0} />
               <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
               {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
               {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { DateTimePicker, dueChip, timeLabel, absDate, pdotClass, IconCheck, IconClock } from '../widget-sdk'
+import { DateTimePicker, dueChip, timeLabel, absDate, PriorityDot, IconCheck, IconClock } from '../widget-sdk'
 
 // Quick-actions popover for a task chip on the calendar (Complete / Reschedule).
 // Task chips used to be click-dead-ends there ("manage them in a task widget").
@@ -72,7 +72,7 @@ export default function TaskPopover({ task, anchorRect, onComplete, onSchedule, 
       style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 80 }}
     >
       <div className="task-pop-title">
-        <span className={`pdot ${pdotClass(task.priority || 0)}`} aria-hidden="true" />
+        <PriorityDot value={task.priority || 0} standalone />
         <span className="task-pop-t">{task.title}</span>
         {(task.repeat_after || 0) > 0 && <span className="repeat-badge" title="Repeating task">↻</span>}
       </div>
