@@ -298,7 +298,7 @@ export default function App() {
   const captureCreate = async (fields) => {
     const t = await createTask(inboxId, fields)
     insertTask(t); emitTasksChanged()
-    showToast('Captured to Inbox — it will appear in Triage.')
+    showToast('Added to Inbox — clarify it later.')
     return t
   }
 

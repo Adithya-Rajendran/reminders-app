@@ -1750,3 +1750,16 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .gp-trigger.active .gp-val { color: var(--accent); font-weight: 600; }
 .gp-clear { flex: 0 0 auto; color: var(--faint); }
 .gp-clear:hover { color: var(--danger); }
+
+/* ---- Context picker: multi-select checkbox rows reuse the .gp-* surface. The
+   check slot is a fixed-width gutter so labels align whether checked or not. ---- */
+.cp-check { width: 14px; height: 14px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
+
+/* ---- Importance toggle: a .chip that carries its state in TEXT + star fill, not
+   color alone (the star is filled when on / outline when off). The accent tint is
+   a secondary cue layered on top, never the sole signal. ---- */
+.imp-chip { cursor: pointer; border: 1px solid var(--line); }
+.imp-chip.empty { color: var(--muted); background: transparent; border: 1px dashed var(--line-strong); }
+.imp-chip.on { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 40%, transparent); }
+.imp-chip:hover { border-color: var(--accent); }
+.imp-chip svg { opacity: .9; }

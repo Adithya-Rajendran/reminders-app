@@ -1,86 +1,118 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TriageWidget from '../../client/src/widgets/TriageWidget.jsx'
 import { fakeTasks } from './fakeCtx.js'
 
-// The Triage widget renders purely from the injected ctx.tasks capability. XP is a
-// PURE DERIVED view over completions, so the celebration fires when the real
-// completion total rises (a one-off gains a done_at) — not optimistically on click.
-const todayIso = () => { const d = new Date(); d.setHours(9, 0, 0, 0); return d.toISOString() }
+// The Prioritize widget renders purely from the injected ctx.tasks capability.
+// It's the Eisenhower matrix (bucketed by the EXPLICIT task.important flag ×
+// due-proximity urgency) plus a "Most important" callout. No XP/levels/streaks —
+// gamification is retired. Actions (complete, drag-between-quadrants) delegate to
+// the tasks capability.
+const overdue = () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(9, 0, 0, 0); return d.toISOString() }
 
-describe('TriageWidget', () => {
-  it('shows the all-clear state when there are no open tasks', () => {
-    render(<TriageWidget tasks={fakeTasks([])} instanceId="triage-empty" />)
-    expect(screen.getByText(/All clear/i)).toBeInTheDocument()
-    expect(screen.getByText(/Lv 1/)).toBeInTheDocument()
+// jsdom's userEvent has no drag-and-drop; fire the native DnD events directly with
+// a minimal dataTransfer stand-in so we can assert the drop persists via onPatch.
+function drop(sourceEl, targetEl, id) {
+  const data = new Map([['text/plain', String(id)]])
+  const dataTransfer = { getData: (k) => data.get(k) || '', setData: (k, v) => data.set(k, v), effectAllowed: '' }
+  const fire = (el, type) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    ev.dataTransfer = dataTransfer
+    el.dispatchEvent(ev)
+  }
+  fire(sourceEl, 'dragstart')
+  fire(targetEl, 'dragover')
+  fire(targetEl, 'drop')
+}
+
+describe('TriageWidget (Prioritize)', () => {
+  it('shows the nothing-flagged state when no task is important', () => {
+    const cap = fakeTasks([{ id: 1, title: 'Loose task', important: false, done: false, labels: [] }])
+    render(<TriageWidget tasks={cap} instanceId="tri-empty" />)
+    expect(screen.getByText(/Nothing flagged/i)).toBeInTheDocument()
   })
 
-  it('elevates the highest-priority/dread task to the frog "boss" and queues the rest', () => {
+  it('buckets tasks into quadrants by the IMPORTANCE flag, not priority', () => {
     const cap = fakeTasks([
-      { id: 1, title: 'Tax return', priority: 3, dread: 4, done: false, labels: [] },   // → boss
-      { id: 2, title: 'Email landlord', priority: 0, done: false, labels: [] },          // → queue (untriaged)
+      // High priority but NOT flagged important + urgent → Q3 (Delegate), never Q1.
+      { id: 1, title: 'Loud but unimportant', priority: 5, important: false, due_date: overdue(), done: false, labels: [] },
+      // Flagged important + urgent → Q1 (Do first).
+      { id: 2, title: 'Important urgent', priority: 1, important: true, due_date: overdue(), done: false, labels: [] },
+      // Flagged important, no urgency → Q2 (Schedule).
+      { id: 3, title: 'Important later', priority: 0, important: true, done: false, labels: [] },
     ])
-    render(<TriageWidget tasks={cap} instanceId="triage-boss" />)
-    expect(screen.getByText(/Today’s frog · boss/i)).toBeInTheDocument()
-    expect(screen.getByText('Tax return')).toBeInTheDocument()
-    expect(screen.getByText('Email landlord')).toBeInTheDocument() // in the triage queue
+    render(<TriageWidget tasks={cap} instanceId="tri-buckets" />)
+    const q1 = screen.getByText('Do first').closest('.eq')
+    const q2 = screen.getByText('Schedule').closest('.eq')
+    const q3 = screen.getByText('Delegate').closest('.eq')
+    expect(q1).toHaveTextContent('Important urgent')
+    expect(q2).toHaveTextContent('Important later')
+    expect(q3).toHaveTextContent('Loud but unimportant') // priority alone never lands in Q1
+    expect(q1).not.toHaveTextContent('Loud but unimportant')
   })
 
-  it('completing the boss delegates the completion to the capability', async () => {
+  it('names the top important task in the "Most important" callout', () => {
     const cap = fakeTasks([
-      { id: 1, title: 'Tax return', priority: 3, dread: 4, time_estimate: 90, done: false, labels: [] },
+      { id: 1, title: 'Ship release', priority: 4, important: true, due_date: overdue(), done: false, labels: [] },
+      { id: 2, title: 'Minor important', priority: 1, important: true, done: false, labels: [] },
     ])
-    render(<TriageWidget tasks={cap} instanceId="triage-complete" />)
-    await userEvent.click(screen.getByLabelText(/complete: tax return/i))
-    expect(cap.calls.update).toContainEqual([1, { done: true }])
+    render(<TriageWidget tasks={cap} instanceId="tri-focus" />)
+    const focus = screen.getByText(/Most important/i).closest('.tri-focus')
+    expect(focus).toHaveTextContent('Ship release') // Q1 top by priority
   })
 
-  it('animates an XP fly-up only when a real completion is recorded (derived total rises)', () => {
-    const task = { id: 1, title: 'Tax return', priority: 3, dread: 4, time_estimate: 90, done: false, labels: [] }
-    const cap = fakeTasks([task])
-    render(<TriageWidget tasks={cap} instanceId="triage-flyup" />)
-    expect(screen.queryByText(/\+\d+ XP/)).not.toBeInTheDocument() // nothing on mount (history is primed silently)
-    act(() => cap._set([{ ...task, done: true, done_at: todayIso() }])) // server records the completion
-    expect(screen.getByText(/\+\d+ XP/)).toBeInTheDocument()
-  })
-
-  it('fires a level-up when a recorded completion crosses an XP threshold', () => {
-    // A maximal task (P5 · 120m · dread5) is worth enough XP to clear level 1→2.
-    const task = { id: 7, title: 'Ship the release', priority: 5, dread: 5, time_estimate: 120, done: false, labels: [] }
-    const cap = fakeTasks([task])
-    render(<TriageWidget tasks={cap} instanceId="triage-levelup" />)
-    act(() => cap._set([{ ...task, done: true, done_at: todayIso() }]))
-    expect(screen.getByText(/Level 2!/)).toBeInTheDocument()
-  })
-
-  it('matrix quadrants render actionable rows — completing one removes it from the quadrant', async () => {
-    const overdue = () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(9, 0, 0, 0); return d.toISOString() }
+  it('completing the callout task delegates the completion to the capability', async () => {
     const cap = fakeTasks([
-      { id: 1, title: 'Frog task', priority: 5, dread: 5, done: false, labels: [] },
-      { id: 2, title: 'Urgent important', priority: 3, due_date: overdue(), done: false, labels: [] }, // → Q1
+      { id: 5, title: 'Do the thing', priority: 3, important: true, due_date: overdue(), done: false, labels: [] },
     ])
-    render(<TriageWidget tasks={cap} instanceId="triage-matrix-rows" />)
-    await userEvent.click(screen.getByRole('tab', { name: /matrix/i }))
+    render(<TriageWidget tasks={cap} instanceId="tri-complete-focus" />)
+    await userEvent.click(screen.getByRole('button', { name: /complete: do the thing/i }))
+    expect(cap.calls.update).toContainEqual([5, { done: true }])
+  })
+
+  it('completing a quadrant row delegates to the capability and leaves the grid', async () => {
+    const cap = fakeTasks([
+      { id: 7, title: 'Urgent important', priority: 3, important: true, due_date: overdue(), done: false, labels: [] },
+    ])
+    render(<TriageWidget tasks={cap} instanceId="tri-complete-row" />)
     // The quadrant renders a real TaskRow (role=checkbox), not a read-only echo…
-    const box = screen.getByRole('checkbox', { name: /complete: urgent important/i })
-    await userEvent.click(box)
+    await userEvent.click(screen.getByRole('checkbox', { name: /complete: urgent important/i }))
     // …and completing delegates to the capability + optimistically leaves the grid.
-    expect(cap.calls.update).toContainEqual([2, { done: true }])
+    expect(cap.calls.update).toContainEqual([7, { done: true }])
     expect(screen.queryByText('Urgent important')).not.toBeInTheDocument()
   })
 
-  it('the level badge opens the XP explainer with computed level numbers', async () => {
+  it('dragging a task into "Do first" flips important:true and nudges it urgent', () => {
     const cap = fakeTasks([
-      { id: 1, title: 'Tax return', priority: 3, dread: 4, time_estimate: 90, done: false, labels: [] },
+      // Starts not-important, no due date → sits in Q4 (Later).
+      { id: 9, title: 'Reframe me', important: false, done: false, labels: [] },
     ])
-    render(<TriageWidget tasks={cap} instanceId="triage-xp-explainer" />)
-    await userEvent.click(screen.getByRole('button', { name: /lv 1/i }))
-    const dialog = screen.getByRole('dialog', { name: /how xp works/i })
-    // Live-computed numbers (no completions yet → level 1, 0 into the 100 span),
-    // the frog example, and the trust line.
-    expect(dialog).toHaveTextContent(/Level 1 — 0 \/ 100 XP/)
-    expect(dialog).toHaveTextContent(/Tax return/)
-    expect(dialog).toHaveTextContent(/can’t be lost/)
+    render(<TriageWidget tasks={cap} instanceId="tri-drag-up" />)
+    const source = screen.getByText('Reframe me').closest('.eq-drag')
+    const target = screen.getByText('Do first').closest('.eq')
+    drop(source, target, 9)
+    // Q1 = important + urgent: flip the flag AND give it a "now" so it stays put.
+    expect(cap.calls.update).toHaveLength(1)
+    const [id, patch] = cap.calls.update[0]
+    expect(id).toBe(9)
+    expect(patch.important).toBe(true)
+    expect(patch.due_date).toBeTruthy()
+  })
+
+  it('dragging into "Later" clears importance without wiping an existing due date', () => {
+    const due = overdue()
+    const cap = fakeTasks([
+      { id: 11, title: 'Down-rank me', important: true, due_date: due, done: false, labels: [] }, // in Q1
+    ])
+    render(<TriageWidget tasks={cap} instanceId="tri-drag-down" />)
+    const source = screen.getByText('Down-rank me').closest('.eq-drag')
+    const target = screen.getByText('Later').closest('.eq')
+    drop(source, target, 11)
+    // Q4 = not-important, non-urgent column: flip important false, DON'T touch due.
+    expect(cap.calls.update).toContainEqual([11, { important: false }])
+    // No due_date in the patch — a deliberate deadline is never wiped.
+    const [, patch] = cap.calls.update[0]
+    expect(patch.due_date).toBeUndefined()
   })
 })

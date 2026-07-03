@@ -18,7 +18,7 @@ const MAIN_SURFACE = [
   'useTaskList', 'widgetStore', 'loadJson', 'saveJson', 'loadStringSet', 'saveStringSet',
   // pure domain (sampled across the re-exported modules)
   'selectUpcoming', 'selectFrog', 'selectFlowSource', 'selectHabits', 'dueBucket',
-  'computeReview', 'computeHabitStats', 'taskXp', 'levelProgress', 'dailyStreak', 'buildTree', 'sortNotes', 'ancestorsOf', 'pushRecent',
+  'computeReview', 'computeHabitStats', 'buildTree', 'sortNotes', 'ancestorsOf', 'pushRecent',
   'dueChip', 'timeLabel', 'pdotClass', 'PRIORITIES', 'parseQuickAdd', 'ZERO_DATE', 'isRealDate',
   // icons (sampled)
   'IconBell', 'IconCalendar', 'IconNote', 'IconCue', 'IconFrog',

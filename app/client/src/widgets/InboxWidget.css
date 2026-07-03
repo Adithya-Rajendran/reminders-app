@@ -1,0 +1,33 @@
+/* Inbox / Clarify widget — co-located with the widget. All theme-token driven so
+   light/dark + accents follow (same convention as the other widget CSS files). */
+.inbox { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; min-height: 0; }
+
+/* Header: the running count leads — the surface's whole job is to drive it to 0. */
+.ib-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ib-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text); }
+.ib-count { font-size: 12px; font-weight: 700; color: var(--muted); }
+
+/* The focused item card — one decision at a time. */
+.ib-card { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 13px 14px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
+.ib-card-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
+
+/* Clarify controls: the four axes, wrapping so a narrow widget stacks them. */
+.ib-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ib-date { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.ib-date.on { color: var(--text); }
+
+.ib-actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.ib-clarify { display: inline-flex; align-items: center; gap: 5px; }
+.ib-actions .btn.ghost { display: inline-flex; align-items: center; gap: 5px; }
+/* Delete pushes to the trailing edge — a low-frequency, destructive action kept
+   visually apart from the two "keep it" paths. */
+.ib-del { margin-left: auto; }
+.ib-del:hover { color: var(--danger); }
+
+/* Up-next peek: read-only titles so the pile is legible without inviting
+   out-of-order editing (only the focused item is actionable). */
+.ib-upnext { display: flex; flex-direction: column; gap: 4px; }
+.ib-upnext-head { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.ib-upnext-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ib-upnext-item { font-size: 12.5px; color: var(--muted); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-upnext-more { font-size: 11.5px; color: var(--faint); margin-top: 1px; }

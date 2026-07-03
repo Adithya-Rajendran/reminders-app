@@ -72,6 +72,10 @@ export const WIDGET_MANIFEST = [
   // lands on a shape that reads well (cohesion). Reminder: a grid cell is ~40w×30h
   // px, so visual ratio ≈ cell ratio × 1.33 (a visual square ≈ cell aspect 0.75).
   // The effective default (defaultSize, else 10×9) must sit inside the band.
+  // Overview + Inbox are the two spine surfaces: the day-at-a-glance landing and
+  // the clarify-your-captures queue. Listed first so they lead the Add-widget menu.
+  { type: 'overview', label: 'Overview', desc: 'Your day at a glance — what needs attention now', plugs: ['tasks', 'reminder-events', 'calendar', 'daily-plan', 'organizer'], requires: ['caldav'], defaultSize: { w: 12, h: 8 }, minSize: { w: 6, h: 5 }, maxSize: { w: 28, h: 16 }, aspect: { min: 0.9, max: 2.4 } },
+  { type: 'inbox', label: 'Inbox', desc: 'Clarify captured items: give each a project, context, importance and date', plugs: ['tasks', 'organizer'], requires: ['caldav'], defaultSize: { w: 9, h: 11 }, minSize: { w: 6, h: 7 }, maxSize: { w: 20, h: 26 }, aspect: { min: 0.5, max: 1.3 } },
   { type: 'reminders', label: 'Reminders',     desc: 'Actionable task list — snooze, schedule, complete', plugs: ['tasks', 'reminder-events', 'projects', 'reminder-groups'], requires: ['caldav'], pickGroup: true, minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 },
     mcp: { summary: 'Create, list, edit, complete and delete tasks & reminders (incl. natural-language capture)', tools: ['reminders_list', 'reminders_capture', 'reminders_create', 'reminders_update', 'reminders_complete', 'reminders_delete', 'reminders_groups_list'] } }, // task list — portrait to gentle landscape, never a thin strip
   { type: 'upcoming',  label: 'Upcoming',      desc: 'Dated tasks grouped by Today / Tomorrow / This week', plugs: ['tasks', 'projects'], requires: ['caldav'], minSize: { w: 5, h: 5 }, maxSize: { w: 26, h: 28 }, aspect: { min: 0.55, max: 1.45 },
@@ -90,7 +94,7 @@ export const WIDGET_MANIFEST = [
     mcp: { summary: 'Read completion stats, trends and streaks', tools: ['review_stats'] } }, // compact stats card — wide, not a tall sliver
   { type: 'cues',      label: 'Cues (flow)',   desc: 'If-then cue canvas — chain tasks to triggers', plugs: ['tasks', 'reminder-groups'], requires: ['caldav'], pickGroup: true, defaultSize: { w: 14, h: 11 }, minSize: { w: 8, h: 7 }, maxSize: { w: 32, h: 24 }, aspect: { min: 0.65, max: 1.85 },
     mcp: { summary: 'Read cued tasks and set / clear a task’s if-then cue', tools: ['cues_list', 'cues_set'] } }, // queue + canvas board — landscape, needs room
-  { type: 'triage',    label: 'Triage',        desc: 'Eat-the-frog queue + Eisenhower matrix, with XP', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 10, h: 12 }, minSize: { w: 6, h: 8 }, maxSize: { w: 18, h: 26 }, aspect: { min: 0.45, max: 1.05 },
+  { type: 'triage',    label: 'Prioritize',    desc: 'Sort what matters: the Eisenhower matrix + your most important task', plugs: ['tasks'], requires: ['caldav'], defaultSize: { w: 10, h: 12 }, minSize: { w: 6, h: 8 }, maxSize: { w: 18, h: 26 }, aspect: { min: 0.45, max: 1.05 },
     mcp: { summary: 'Read the triage queue / frog / Eisenhower matrix and make triage decisions', tools: ['triage_queue', 'triage_frog', 'triage_matrix', 'triage_set'] } }, // HUD + frog + queue stack — portrait-leaning
   { type: 'daily',     label: 'Daily Plan',    desc: 'Pick 1–3 things for today; shut down at night', plugs: ['tasks', 'projects', 'daily-plan'], requires: ['caldav'], defaultSize: { w: 10, h: 11 }, minSize: { w: 6, h: 6 }, maxSize: { w: 18, h: 24 }, aspect: { min: 0.45, max: 1.05 },
     mcp: { summary: 'Read and edit today’s plan, and get plan suggestions', tools: ['daily_get_plan', 'daily_set_plan', 'daily_plan_add', 'daily_plan_remove', 'daily_suggestions'] } }, // plan/shutdown lists stack — portrait-leaning
@@ -147,4 +151,4 @@ export function resolveWidgetConfig(schema, saved) {
 }
 
 // The clean default board for fresh users and "Reset layout", left to right.
-export const DEFAULT_BOARD = ['reminders', 'upcoming', 'calendar']
+export const DEFAULT_BOARD = ['overview', 'daily', 'upcoming', 'calendar']

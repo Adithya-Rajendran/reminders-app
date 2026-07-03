@@ -1,0 +1,48 @@
+/* Overview widget — the ENGAGE summary that leads the default board. A compact,
+   scannable "am I okay today?" card. All colors come from theme tokens so
+   light/dark + accents follow; meaning is never carried by color alone (every
+   status also has a word and, where it matters, an icon). */
+.ov { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; height: 100%; box-sizing: border-box; }
+
+/* Honest one-line status. The word carries the meaning; the dot/tint is a
+   redundant cue, never the only one. */
+.ov-status { display: flex; align-items: center; gap: 9px; }
+.ov-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
+.ov-status.ok .ov-dot { background: var(--green); }
+.ov-status.warn .ov-dot { background: var(--danger); }
+.ov-status-text { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.ov-status.warn .ov-status-text { color: var(--danger); }
+
+/* Metric strip: OVERDUE + DUE TODAY as two glanceable counts. */
+.ov-metrics { display: flex; gap: 10px; }
+.ov-metric { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
+.ov-metric.warn { background: var(--danger-soft, color-mix(in oklab, var(--danger) 12%, transparent)); border-color: color-mix(in oklab, var(--danger) 32%, transparent); }
+.ov-metric-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--text); }
+.ov-metric.warn .ov-metric-num { color: var(--danger); }
+.ov-metric-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+
+/* Section label shared by "most important" and "next event". */
+.ov-sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); display: flex; align-items: center; gap: 5px; }
+
+/* Today's most important task — a single row with a real complete checkbox. */
+.ov-frog { display: flex; flex-direction: column; gap: 5px; }
+.ov-frog-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 26%, transparent); }
+.ov-frog-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-frog-none { font-size: 12.5px; color: var(--muted); padding: 2px 1px; }
+
+/* The complete checkbox reuses the same visual language as TaskRow's check. */
+.ov-check { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 2px solid var(--line-strong); background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--panel); padding: 0; }
+.ov-check:hover { border-color: var(--accent); }
+.ov-check.on { background: var(--green); border-color: var(--green); }
+
+/* Next calendar event today. */
+.ov-event { display: flex; flex-direction: column; gap: 5px; }
+.ov-event-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
+.ov-event-time { font-size: 12.5px; font-weight: 700; color: var(--accent); flex: none; font-variant-numeric: tabular-nums; }
+.ov-event-title { flex: 1; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-event-none { font-size: 12.5px; color: var(--muted); padding: 2px 1px; }
+
+/* Inline quick-capture -> Inbox (clarified:false). Mirrors the .rem-add form
+   used across task widgets so the whole board captures the same way. */
+.ov-add { margin-top: auto; }
+.ov-err { margin-top: 6px; }
