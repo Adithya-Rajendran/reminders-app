@@ -21,7 +21,7 @@ import { fuzzyMatch } from './fuzzy.js'
 // whose title the user actually typed) still wins on its own score. Deliberately
 // small so the fuzzy score dominates once the query is specific.
 export const KIND_WEIGHT = Object.freeze({
-  command: 1.4, nav: 1.2, note: 0.5, task: 0.4,
+  command: 1.4, nav: 1.2, area: 1.1, context: 1.0, note: 0.5, task: 0.4,
 })
 
 // Rank typed entries against a query. Returns [{ item, score, positions, viaAlias }]

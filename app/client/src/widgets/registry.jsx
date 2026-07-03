@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconTrophy, IconSun, IconTarget, IconInbox } from '../widget-sdk'
+import { IconBell, IconClock, IconCalendar, IconNote, IconPin, IconChart, IconCue, IconTrophy, IconSun, IconTarget, IconInbox } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetConfig } from './manifest.js'
 
@@ -20,6 +20,7 @@ export const LOADERS = {
   reminders: () => import('./RemindersWidget.jsx'),
   calendar: () => import('./CalendarWidget.jsx'),
   notes: () => import('./NotesWidget.jsx'),
+  notepin: () => import('./NotePinWidget.jsx'),
   review: () => import('./ReviewWidget.jsx'),
   cues: () => import('./CuesWidget.jsx'),
   triage: () => import('./TriageWidget.jsx'),
@@ -36,6 +37,7 @@ const UpcomingWidget = lazy(LOADERS.upcoming)
 const RemindersWidget = lazy(LOADERS.reminders)
 const CalendarWidget = lazy(LOADERS.calendar)
 const NotesWidget = lazy(LOADERS.notes)
+const NotePinWidget = lazy(LOADERS.notepin)
 const ReviewWidget = lazy(LOADERS.review)
 const CuesWidget = lazy(LOADERS.cues)
 const TriageWidget = lazy(LOADERS.triage)
@@ -72,10 +74,10 @@ const RENDERERS = {
     icon: IconBell,
     title: (w) => w.group || 'Reminders', // a group-locked widget shows the group name
     render: (w, ctx) => (
-      <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} group={w.group || null} instanceId={w.i} />
+      <RemindersWidget tasks={ctx.tasks} events={ctx.events} projects={ctx.projects} groups={ctx.groups} organizer={ctx.organizer} group={w.group || null} instanceId={w.i} />
     ),
   },
-  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} instanceId={w.i} config={widgetConfig(w)} /> },
+  upcoming: { icon: IconClock, render: (w, ctx) => <UpcomingWidget tasks={ctx.tasks} projects={ctx.projects} organizer={ctx.organizer} instanceId={w.i} config={widgetConfig(w)} /> },
   calendar: { icon: IconCalendar, render: (w, ctx) => <CalendarWidget tasks={ctx.tasks} calendar={ctx.calendar} /> },
   notes: {
     icon: IconNote,
@@ -83,9 +85,10 @@ const RENDERERS = {
     settingsPanel: NotesFolderPanel,
     render: (w, ctx) => <NotesWidget notes={ctx.notes} onOpenSettings={ctx.onOpenSettings} instanceId={w.i} />,
   },
+  notepin: { icon: IconPin, render: (w, ctx) => <NotePinWidget notes={ctx.notes} instanceId={w.i} /> },
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
-  triage: { icon: IconTrophy, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} instanceId={w.i} /> },
+  triage: { icon: IconTrophy, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
   daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} plan={ctx.plan} instanceId={w.i} /> },
   focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} plan={ctx.plan} instanceId={w.i} /> },
 }

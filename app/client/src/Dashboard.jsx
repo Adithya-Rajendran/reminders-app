@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk, reminderGroups, notesApi } from './api.js'
 import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks, insertTask } from './taskstore.js'
 import { getOrganizerFilter, setOrganizerFilter, subscribeOrganizerFilter } from './organizerfilter.js'
 import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
 import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
-import { onOpenNote, emitOpenNote } from './notesbus.js'
+import { onOpenNote, emitOpenNote, hasOpenNoteListener } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
 import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
 import { SkeletonRows, UndoBar } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
+  applyCollapsed, restoreCollapsedHeights,
   stripDerivedTiers, boardSignature,
 } from './dashlayout.js'
 import { appCache } from './fetchcache.js'
@@ -67,6 +68,9 @@ const constraintsFor = (type) => {
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 const newId = () => 'w-' + crypto.randomUUID()
+// Grid rows a collapsed widget occupies (header only) — ~76px at rowHeight 30 + 16
+// margin, enough for the header bar with the body hidden.
+const COLLAPSED_H = 2
 
 // Scroll a widget's frame into view and flash it — shared by the add-widget
 // feedback and the palette's "Go to <widget>" commands.
@@ -225,6 +229,10 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
     return () => { stopped = true; clearTimeout(timer); if (es) es.close() }
   }, [])
 
+  // Which widgets are collapsed (header-only) — layered onto the constrained layouts
+  // at render, and reversed in onLayoutChange so the real (expanded) height survives.
+  const collapsedIds = useMemo(() => new Set(widgets.filter((w) => w.collapsed).map((w) => w.i)), [widgets])
+
   const persist = useCallback((nextWidgets, nextLayouts) => {
     if (!loaded) return // gate saves until after hydration (RGL footgun)
     clearTimeout(saveTimer.current)
@@ -245,8 +253,19 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
 
   const onLayoutChange = (_current, all) => {
     if (!loaded) return
-    setLayouts(all)
-    persist(widgets, all)
+    // Collapsed widgets render at a locked header height; restore their real height
+    // from the source layouts so RGL's report can't overwrite the expanded size.
+    const restored = restoreCollapsedHeights(all, layouts, collapsedIds)
+    setLayouts(restored)
+    persist(widgets, restored)
+  }
+
+  // Collapse/expand a widget to header-only (a header-level minimize). Persisted on
+  // the widget item; boardSignature counts it, so the save isn't skipped as a no-op.
+  const toggleCollapse = (id) => {
+    const nextWidgets = widgets.map((w) => (w.i === id ? { ...w, collapsed: !w.collapsed } : w))
+    setWidgets(nextWidgets)
+    persist(nextWidgets, layouts)
   }
 
   const addWidget = (type, group) => {
@@ -328,7 +347,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
     fetch: () => appCache.cached('groups', reminderGroups, { ttl: 30_000 }),
     recent: recentGroups, pushRecent: pushRecentGroup, onNewGroup,
   }), [onNewGroup])
-  const notesCap = useMemo(() => ({ ...notesApi, onOpenNote, emitOpenNote }), [])
+  const notesCap = useMemo(() => ({ ...notesApi, onOpenNote, emitOpenNote, hasOpenNoteListener }), [])
   const calendarCap = useMemo(() => ({
     listEvents: (start, end) => api(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
     createEvent: (body) => api('/api/calendar/events', { method: 'POST', body: JSON.stringify(body) }),
@@ -387,7 +406,10 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
   // from the registry at render time, so saved layouts never need migrating and the
   // constraints track the current registry. (Aspect isn't an RGL item prop — it's
   // enforced live in onResize below.)
-  const layoutsWithConstraints = useMemo(() => applyConstraints(layouts, widgets, constraintsFor), [layouts, widgets])
+  const layoutsWithConstraints = useMemo(
+    () => applyCollapsed(applyConstraints(layouts, widgets, constraintsFor), collapsedIds, COLLAPSED_H),
+    [layouts, widgets, collapsedIds],
+  )
 
   // After a widget is added it renders at the bottom of the board (off-screen on a
   // full board), with no feedback. Once its node exists, scroll it into view and
@@ -478,6 +500,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
   return (
     <>
       <Toolbar projects={projects} onAdd={addWidget} onReset={resetLayout} onNewGroup={onNewGroup} title={title} />
+      <BoardFilterBar organizer={organizerCap} />
       <div className="grid-wrap">
         {widgets.length === 0 ? (
           <div
@@ -491,7 +514,7 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
             {/* A few concrete starters so a fresh board teaches its own shortcuts. */}
             <ul className="empty-tips state-sub" style={{ margin: '18px auto 0', maxWidth: 320, textAlign: 'left' }}>
               <li>Press <kbd>c</kbd> anywhere to capture a task</li>
-              <li>Ctrl/⌘ K searches notes — type <b>&gt;</b> for commands, <kbd>?</kbd> for all shortcuts</li>
+              <li>Ctrl/⌘ K searches tasks, notes &amp; commands — <kbd>?</kbd> for all shortcuts</li>
               <li>Quick-add like “gym tomorrow 7am !2 *health”</li>
             </ul>
           </div>
@@ -529,6 +552,8 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
                     type={w.type}
                     title={titleFor(w)}
                     group={w.group}
+                    collapsed={!!w.collapsed}
+                    onToggleCollapse={() => toggleCollapse(w.i)}
                     onRemove={() => removeWidget(w.i)}
                     configSchema={configSchema}
                     configValues={configSchema ? resolveWidgetConfig(configSchema, w.config) : null}
@@ -606,6 +631,40 @@ function WidgetRequirement({ title, reqs, onOpenSettings }) {
 }
 
 /* ---------- Toolbar ---------- */
+// The active-filter strip: when the board is scoped to an Area/Context (from the
+// omnibox or a widget), show what it's scoped to with a one-click Clear, so a
+// filtered board is never a silent dead-end ("where did my other tasks go?").
+// Renders nothing when there's no active filter.
+function BoardFilterBar({ organizer }) {
+  const filter = useSyncExternalStore(organizer.subscribe, organizer.getFilter, organizer.getFilter)
+  const [areas, setAreas] = useState([])
+  const active = !!(filter && (filter.areaId || filter.context))
+  useEffect(() => {
+    if (!filter?.areaId) return undefined
+    let alive = true
+    organizer.areas().then((a) => { if (alive) setAreas(Array.isArray(a) ? a : []) }).catch(() => {})
+    return () => { alive = false }
+  }, [organizer, filter?.areaId])
+  if (!active) return null
+  const area = filter.areaId ? areas.find((a) => a.id === filter.areaId) : null
+  const label = filter.areaId ? (area?.name || 'Area') : ('@' + filter.context)
+  const kind = filter.areaId ? (area?.kind === 'project' ? 'Project' : 'Area') : 'Context'
+  return (
+    <div className="board-filter" role="status" aria-live="polite">
+      <IconList size={13} className="board-filter-ic" />
+      <span className="board-filter-label">Filtered to <b>{label}</b></span>
+      <span className="board-filter-kind">{kind}</span>
+      <button
+        className="board-filter-clear"
+        onClick={() => organizer.setFilter({ areaId: null, context: null })}
+        aria-label={`Clear the ${label} filter — show all tasks`}
+      >
+        <IconX size={13} /> Clear
+      </button>
+    </div>
+  )
+}
+
 function Toolbar({ projects, onAdd, onReset, onNewGroup, title }) {
   const now = new Date()
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
@@ -694,7 +753,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
 }
 
 /* ---------- Widget frame ---------- */
-function WidgetFrame({ type, title, group, onRemove, children, configSchema, configValues, onConfigure }) {
+function WidgetFrame({ type, title, group, collapsed, onToggleCollapse, onRemove, children, configSchema, configValues, onConfigure }) {
   const Ic = WIDGET_TYPES.get(type)?.icon || IconList
   // One ResizeObserver per widget, on the body (the real scroll container). The
   // resulting size class is broadcast through context so any widget can adapt its
@@ -706,7 +765,7 @@ function WidgetFrame({ type, title, group, onRemove, children, configSchema, con
     // pointer-only (react-grid-layout has no keyboard path); the keyboard route to
     // change the board is the toolbar — Add widget / Reset layout — and each
     // widget's Remove button, which are all reachable controls.
-    <div className="widget" role="group" aria-label={title}>
+    <div className={`widget${collapsed ? ' collapsed' : ''}`} role="group" aria-label={title}>
       <div className="widget-head" title="Drag to move (pointer); use the toolbar to change the layout">
         <span className="widget-title">
           <Ic size={17} />
@@ -720,6 +779,19 @@ function WidgetFrame({ type, title, group, onRemove, children, configSchema, con
               `config`) — opens a generic form built from that schema. */}
           {configSchema && onConfigure && (
             <WidgetConfigButton title={title} schema={configSchema} values={configValues} onSave={onConfigure} />
+          )}
+          {/* Collapse/expand to header-only. Always visible (unlike the hover-only
+              remove) so the header's controls are discoverable at a glance. */}
+          {onToggleCollapse && (
+            <button
+              className="iconbtn sm widget-collapse"
+              aria-label={collapsed ? `Expand ${title} widget` : `Collapse ${title} widget`}
+              aria-expanded={!collapsed}
+              title={collapsed ? 'Expand' : 'Collapse'}
+              onClick={onToggleCollapse}
+            >
+              <IconChevDown size={15} style={{ transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform 120ms ease' }} />
+            </button>
           )}
           <button
             className="iconbtn sm danger-hover widget-remove"

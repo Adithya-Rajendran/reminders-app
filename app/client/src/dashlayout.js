@@ -165,7 +165,9 @@ export function stripDerivedTiers(layouts) {
 // scrollbar jitter with nothing semantically changed. Pure + node-tested.
 export function boardSignature(widgets, layouts) {
   const byI = (a, b) => (a.i < b.i ? -1 : a.i > b.i ? 1 : 0)
-  const w = (widgets || []).map(({ i, type, group }) => ({ i, type, group: group ?? null })).sort(byI)
+  // `collapsed` is part of the persisted state (a header-only minimize), so a
+  // collapse/expand must count as a real change — otherwise the no-op guard skips it.
+  const w = (widgets || []).map(({ i, type, group, collapsed }) => ({ i, type, group: group ?? null, collapsed: !!collapsed })).sort(byI)
   const src = stripDerivedTiers(layouts)
   const l = {}
   for (const bp of Object.keys(src).sort()) {
@@ -174,6 +176,39 @@ export function boardSignature(widgets, layouts) {
       .sort(byI)
   }
   return JSON.stringify({ w, l })
+}
+
+// Render-time COLLAPSE: a collapsed widget renders at a fixed header-only height and
+// is locked (non-resizable). Layered AFTER applyConstraints and NEVER persisted — the
+// source layouts keep the real (expanded) height, so expanding just drops the
+// override. `collapsedIds` is a Set of widget instance ids. Non-mutating.
+export function applyCollapsed(layouts, collapsedIds, h) {
+  if (!collapsedIds || collapsedIds.size === 0) return layouts
+  const out = {}
+  for (const bp of Object.keys(layouts || {})) {
+    out[bp] = (layouts[bp] || []).map((it) => (
+      collapsedIds.has(it.i) ? { ...it, h, minH: h, maxH: h, isResizable: false } : it
+    ))
+  }
+  return out
+}
+
+// The inverse for onLayoutChange: react-grid-layout reports collapsed items at the
+// locked header height, which must not overwrite their real height in state /
+// persistence. Restore each collapsed item's height from the source (expanded)
+// layouts. Non-mutating.
+export function restoreCollapsedHeights(rglLayouts, sourceLayouts, collapsedIds) {
+  if (!collapsedIds || collapsedIds.size === 0) return rglLayouts
+  const out = {}
+  for (const bp of Object.keys(rglLayouts || {})) {
+    const src = (sourceLayouts && sourceLayouts[bp]) || []
+    out[bp] = (rglLayouts[bp] || []).map((it) => {
+      if (!collapsedIds.has(it.i)) return it
+      const s = src.find((x) => x.i === it.i)
+      return s ? { ...it, h: s.h } : it
+    })
+  }
+  return out
 }
 
 // Stamp per-widget size constraints (Apple-style floors + ceilings + resize policy)
