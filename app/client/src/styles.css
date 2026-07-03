@@ -519,6 +519,15 @@ body {
 .toolbar .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .toolbar-spacer { flex: 1; }
 
+/* Active organizer-filter strip (Area/Context scope) below the toolbar. Matches the
+   board's canvas width so it lines up with the grid. */
+.board-filter { display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--canvas-max); margin: 0 auto; padding: 4px 24px 2px; box-sizing: border-box; font-size: 12.5px; color: var(--muted); }
+.board-filter-ic { color: var(--accent); flex: none; }
+.board-filter-label b { color: var(--text); font-weight: 700; }
+.board-filter-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+.board-filter-clear { margin-left: 2px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-strong); background: var(--panel2); color: var(--text); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.board-filter-clear:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ---------- Dashboard grid ---------- */
 .grid-wrap { padding: 8px 24px 40px; flex: 1; }
 .grid {
@@ -598,6 +607,16 @@ body {
 /* Touch / pointer-less devices have no hover — the Remove (X) would otherwise be
    permanently invisible. Mirror the .task-del / .feed-actions touch overrides. */
 @media (hover: none) { .widget-remove { opacity: 1; } }
+
+/* Collapse chevron: a PRIMARY, always-visible control (unlike the hover-only
+   Remove) — its presence advertises that the header is interactive, so the
+   drag-to-move and Remove affordances get discovered too. */
+.widget-collapse { opacity: 0.55; transition: opacity 150ms ease; }
+.widget:hover .widget-collapse, .widget:focus-within .widget-collapse, .widget.collapsed .widget-collapse { opacity: 1; }
+/* Collapsed = header only: hide the body and drop the header's bottom border so the
+   minimized widget reads as a single compact bar. */
+.widget.collapsed .widget-body { display: none; }
+.widget.collapsed .widget-head { border-bottom: 0; }
 
 /* Transient highlight pulse on a freshly added widget (toggled for ~1.2s by
    Dashboard). Outline-only so it doesn't shift layout; tracks the accent token. */

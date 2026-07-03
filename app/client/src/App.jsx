@@ -18,10 +18,15 @@ import { onRevealTask } from './revealbus.js'
 import { revealTaskInDom } from './revealtask.js'
 import { createAndOpenNote } from './noteactions.js'
 import {
-  IconBell, IconSun, IconMoon, IconGear, IconLogout,
+  IconBell, IconSun, IconMoon, IconMonitor, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
 } from './icons.jsx'
 import { ACCENTS, applyAccent } from './accents.js'
+import { effectiveTheme, normalizeThemePref, nextThemePref } from './theme.js'
+
+// Human label + glyph for a theme preference (light / dark / system).
+const THEME_LABEL = { light: 'Light', dark: 'Dark', system: 'System' }
+const themeIcon = (pref) => (pref === 'light' ? IconSun : pref === 'system' ? IconMonitor : IconMoon)
 
 function initialsFor(user) {
   const name = (user?.name || '').trim()
@@ -62,15 +67,20 @@ function Login() {
 }
 
 /* ---------- Theme toggle ---------- */
-function ThemeToggle({ theme, onToggle }) {
+// Tri-state theme control: cycles light → dark → system. Shows the CURRENT
+// preference's glyph and names both the current state and the next in its label,
+// so it never reads as a dead toggle (the old two-state button appeared to do
+// nothing when 'system' already matched the OS scheme).
+function ThemeToggle({ theme, onCycle }) {
+  const next = nextThemePref(theme)
   return (
     <button
       className="iconbtn"
-      onClick={onToggle}
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-      title="Toggle theme"
+      onClick={onCycle}
+      aria-label={`Theme: ${THEME_LABEL[theme]}. Switch to ${THEME_LABEL[next]}.`}
+      title={`Theme: ${THEME_LABEL[theme]} — click for ${THEME_LABEL[next]}`}
     >
-      {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+      {(() => { const Ic = themeIcon(theme); return <Ic size={18} /> })()}
     </button>
   )
 }
@@ -137,7 +147,7 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, 
         {/* Inline control cluster — hidden on narrow screens (the avatar menu
             below carries equivalents); see '.topbar-actions' in styles.css. */}
         <div className="topbar-actions">
-          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          <ThemeToggle theme={theme} onCycle={onToggleTheme} />
           <AccentPicker accent={accent} onPick={onAccent} />
           <button className="iconbtn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
             <IconGear size={18} />
@@ -165,8 +175,8 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, 
               style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}
             >
               <div className="menu-label">{email}</div>
-              <button className="menu-item" role="menuitem" onClick={() => { setMenuOpen(false); onToggleTheme() }}>
-                {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />} Toggle theme
+              <button className="menu-item" role="menuitem" onClick={() => onToggleTheme()}>
+                {(() => { const Ic = themeIcon(theme); return <Ic size={16} /> })()} Theme: {THEME_LABEL[theme]}
               </button>
               {/* Accent color lives here too so it survives the inline cluster
                   being hidden on narrow screens. */}
@@ -261,7 +271,7 @@ function DashboardTabs({ dashboards, active, onSelect, onAdd, onRename, onRemove
 export default function App() {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
-  const [theme, setTheme] = useState(() => localStorage.getItem('reminders-theme') || 'dark')
+  const [theme, setTheme] = useState(() => normalizeThemePref(localStorage.getItem('reminders-theme')))
   const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || 'indigo')
   const [settings, setSettings] = useState(null) // null = closed | { createGroup? }
   // Accepts an optional { createGroup } to open Settings with the group create form
@@ -342,10 +352,18 @@ export default function App() {
     preloadWidgets(loadJson('reminders-last-board-' + activeDash, DEFAULT_BOARD))
   }, [status, activeDash])
 
-  // Theme: persist + reflect on <html data-theme>.
+  // Theme: resolve the preference (light/dark/system) to an effective theme on
+  // <html data-theme>, persist the preference, and — when following the system —
+  // re-resolve live as the OS colour scheme changes.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
+    const apply = () => document.documentElement.setAttribute('data-theme', effectiveTheme(theme))
+    apply()
     localStorage.setItem('reminders-theme', theme)
+    if (theme !== 'system' || typeof window === 'undefined' || !window.matchMedia) return undefined
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => apply()
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
   }, [theme])
 
   // Accent: persist + apply to the accent CSS vars.
@@ -401,7 +419,7 @@ export default function App() {
     setActiveDash((cur) => (cur === id ? next[0].id : cur))
   }
 
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+  const toggleTheme = () => setTheme((t) => nextThemePref(t))
 
   // App-level commands surfaced in the Ctrl/Cmd+K palette (alongside its built-in
   // note command), so the palette is a keyboard-driven spine for the whole app.
@@ -420,7 +438,7 @@ export default function App() {
     )),
     { id: 'open-settings', label: 'Open Settings', hint: 'Accounts, notes folder, groups', icon: IconGear, priority: 1, aliases: ['settings', 'preferences', 'accounts', 'connect account', 'caldav', 'nextcloud'], run: () => openSettings() },
     { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', priority: 1, aliases: ['help', 'keys', 'hotkeys'], run: () => setHelp(true) },
-    { id: 'toggle-theme', label: 'Toggle light / dark theme', icon: theme === 'dark' ? IconSun : IconMoon, aliases: ['dark mode', 'light mode', 'appearance'], run: toggleTheme },
+    { id: 'toggle-theme', label: 'Theme: light / dark / system', icon: themeIcon(theme), aliases: ['dark mode', 'light mode', 'system theme', 'auto theme', 'appearance'], run: toggleTheme },
     { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, aliases: ['theme color', 'highlight color'], run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
     { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', aliases: ['add dashboard', 'new board', 'new tab'], run: addDashboard },
     { id: 'logout', label: 'Log out', icon: IconLogout, priority: -1, aliases: ['sign out'], run: () => window.location.assign('/auth/logout') },

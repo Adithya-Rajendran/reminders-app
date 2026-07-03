@@ -30,6 +30,7 @@ export { default as ImportanceControl } from './ui/ImportanceControl.jsx'
 export { WidgetSizeContext, useWidgetSize, useElementSize } from '../useWidgetSize.js'
 export { usePopover } from '../usePopover.js'
 export { useModalRef } from '../useModalRef.js'
+export { useOrganizerFilter } from './ui/useOrganizerFilter.js'
 
 // ---- size classification (pure) ----
 export { atLeastW, atMostW, atLeastH, atMostH, DEFAULT_WIDGET_SIZE } from '../widgetsize.js'

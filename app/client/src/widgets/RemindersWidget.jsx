@@ -2,7 +2,7 @@ import './RemindersWidget.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useTaskList, selectHabits, isRecurringTask, hasGroup, labelGroup, nextRemind, byImportanceThenDue,
-  parseQuickAdd, dueChip, timeLabel, isRealDate, ZERO_DATE,
+  applyOrganizer, useOrganizerFilter, parseQuickAdd, dueChip, timeLabel, isRealDate, ZERO_DATE,
   useWidgetSize, atMostW, atLeastH, GroupPicker, TaskRow, DateTimePicker,
   SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, widgetStore,
   IconBell, IconClock, IconPlus, IconChevR, IconFlame, IconSort,
@@ -14,7 +14,7 @@ const SORT_KEY = 'reminders-sort'
 // Your reminders. By default they're grouped into collapsible sections by tag
 // (Work/Personal/…) with a quick-add. A group-locked widget (the `group` prop)
 // shows only that group as a flat list and drops new reminders straight into it.
-export default function RemindersWidget({ tasks: tasksCap, events, projects, groups: groupsCap, group, instanceId }) {
+export default function RemindersWidget({ tasks: tasksCap, events, projects, groups: groupsCap, organizer, group, instanceId }) {
   const inboxId = projects?.[0]?.id
   // Derive from the shared task store (one /api/tasks fetch for the whole board).
   // We take the whole list and split it into a Habits section (recurring tasks,
@@ -22,6 +22,13 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   // tasks carrying a reminder) — so habits live here instead of a separate widget.
   const selector = useCallback((all) => all, [])
   const { tasks: allTasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  // Scope the ENTIRE widget (index + lists) to the board's active Area/Context. Doing
+  // it once — rather than only on the visible lists — means an in-scope subtask whose
+  // parent is OUT of scope isn't silently dropped: with the parent absent from the
+  // index it's no longer treated as a child and is promoted to a top-level row. A
+  // no-op when unfiltered (applyOrganizer returns the list unchanged).
+  const filter = useOrganizerFilter(organizer)
+  const scoped = useMemo(() => applyOrganizer(allTasks, filter), [allTasks, filter])
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
   // Sort order, persisted per instance. "soonest" = next reminder first;
   // "priority" = importance-first (counters the mere-urgency effect — see taskviews).
@@ -33,17 +40,17 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   // children — the standalone Goals widget folded in here as plain subtasks.
   const byUid = useMemo(() => {
     const m = new Map()
-    for (const t of allTasks) if (t.uid) m.set(t.uid, t)
+    for (const t of scoped) if (t.uid) m.set(t.uid, t)
     return m
-  }, [allTasks])
+  }, [scoped])
   const childrenByParent = useMemo(() => {
     const m = new Map()
-    for (const t of allTasks) {
+    for (const t of scoped) {
       if (t.goal && byUid.has(t.goal)) { if (!m.has(t.goal)) m.set(t.goal, []); m.get(t.goal).push(t) }
     }
     for (const arr of m.values()) arr.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0)) // open first, done last
     return m
-  }, [allTasks, byUid])
+  }, [scoped, byUid])
   const isChild = useCallback((t) => !!(t.goal && byUid.has(t.goal)), [byUid])
 
   // Top-level reminder rows: open, non-recurring, not a subtask, and either
@@ -51,15 +58,15 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
   // (no date + no reminder) — the capture Inbox shows here under "No group" and in
   // the Triage queue to be processed later. Soonest first.
   const reminders = useMemo(() => {
-    let list = allTasks.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal || (!isRealDate(t.due_date) && (t.reminders || []).length === 0)))
+    let list = scoped.filter((t) => !t.done && !isRecurringTask(t) && !isChild(t) && ((t.reminders || []).length > 0 || childrenByParent.has(t.uid) || t.is_goal || (!isRealDate(t.due_date) && (t.reminders || []).length === 0)))
     if (group) list = list.filter((t) => hasGroup(t, group))
     return list.sort(sortMode === 'priority' ? byImportanceThenDue : (a, b) => nextRemind(a) - nextRemind(b))
-  }, [allTasks, group, isChild, childrenByParent, sortMode])
+  }, [scoped, group, isChild, childrenByParent, sortMode])
   const habits = useMemo(() => {
-    let h = selectHabits(allTasks).filter((t) => !isChild(t))
+    let h = selectHabits(scoped).filter((t) => !isChild(t))
     if (group) h = h.filter((t) => hasGroup(t, group))
     return h
-  }, [allTasks, group, isChild])
+  }, [scoped, group, isChild])
 
   // Add a subtask under a parent reminder via RELATED-TO (goal_uid). Reuses the
   // NL quick-add parser so subtasks accept the same date/priority/label/cue tokens.

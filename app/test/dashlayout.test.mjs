@@ -4,7 +4,7 @@
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE, DERIVED_TIERS,
   scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, fitWidthToContract, nextSlot,
-  stripDerivedTiers, boardSignature,
+  stripDerivedTiers, boardSignature, applyCollapsed, restoreCollapsedHeights,
 } from '../client/src/dashlayout.js'
 
 let pass = 0, fail = 0
@@ -200,6 +200,26 @@ ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interio
   ok(boardSignature(widgets.map((w) => (w.i === 'b' ? { ...w, type: 'notes' } : w)), lay) !== sig, 'a changed widget type changes the signature')
   ok(boardSignature(widgets.map((w) => (w.i === 'a' ? { ...w, group: 'work' } : w)), lay) !== sig, 'a changed widget group changes the signature')
   ok(boardSignature(widgets, { ...lay, md: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 9 }] }) !== sig, 'an added authoritative tier changes the signature')
+  ok(boardSignature(widgets.map((w) => (w.i === 'a' ? { ...w, collapsed: true } : w)), lay) !== sig, 'collapsing a widget changes the signature')
+}
+
+// --- applyCollapsed / restoreCollapsedHeights (render-time header-only minimize) ---
+{
+  const lay = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 12 }], md: [{ i: 'a', x: 0, y: 0, w: 8, h: 7 }, { i: 'b', x: 0, y: 7, w: 8, h: 10 }] }
+  const ids = new Set(['a'])
+  const col = applyCollapsed(lay, ids, 2)
+  ok(col.lg[0].h === 2 && col.lg[0].minH === 2 && col.lg[0].maxH === 2 && col.lg[0].isResizable === false, 'collapsed item is locked to the header height across props')
+  ok(col.md[0].h === 2, 'collapse applies to every breakpoint')
+  ok(col.lg[1].h === 12 && col.md[1].h === 10, 'a non-collapsed item is untouched')
+  ok(lay.lg[0].h === 9, 'applyCollapsed is non-mutating (source keeps the real height)')
+  ok(applyCollapsed(lay, new Set(), 2) === lay, 'no collapsed ids → identity (same reference)')
+
+  // RGL then reports the collapsed height; restore it from the source layouts.
+  const rglReport = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 2 }, { i: 'b', x: 0, y: 2, w: 10, h: 12 }] }
+  const restored = restoreCollapsedHeights(rglReport, lay, ids)
+  ok(restored.lg[0].h === 9, 'restore pulls the collapsed item height back from the source (expanded) layout')
+  ok(restored.lg[1].h === 12, 'a non-collapsed item keeps the reported height')
+  ok(restoreCollapsedHeights(rglReport, lay, new Set()) === rglReport, 'no collapsed ids → identity')
 }
 
 console.log(`dashlayout: ${pass} passed, ${fail} failed`)

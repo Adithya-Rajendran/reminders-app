@@ -11,7 +11,7 @@ const MAIN_SURFACE = [
   // announcements + notices (UX polish round 2)
   'announce', 'LiveAnnouncer', 'emitNotice', 'onNotice',
   // hooks
-  'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover', 'useModalRef', 'useMenuKeyNav',
+  'WidgetSizeContext', 'useWidgetSize', 'useElementSize', 'usePopover', 'useModalRef', 'useMenuKeyNav', 'useOrganizerFilter',
   // sizing
   'atLeastW', 'atMostW', 'atLeastH', 'atMostH', 'DEFAULT_WIDGET_SIZE',
   // task list + storage

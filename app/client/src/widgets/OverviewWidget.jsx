@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  useTaskList, applyOrganizer, groupEisenhower, byImportanceThenDue, dueBucket,
+  useTaskList, applyOrganizer, useOrganizerFilter, groupEisenhower, byImportanceThenDue, dueBucket,
   isRealDate, parseQuickAdd, IconCheck, IconTarget, IconCalendar, IconPlus,
   SkeletonRows, ErrorState, ReconnectBanner, UndoBar,
 } from '../widget-sdk'
@@ -35,13 +35,9 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(tasksCap, selector)
 
-  // React to the global active filter (Area/Context). useSyncExternalStore keeps the
-  // organizer capability a stable reference while the widget re-renders on changes.
-  // organizer is optional in principle (a board could omit the plug), so guard it.
-  const filter = useSyncExternalStore(
-    organizer?.subscribe || (() => () => {}),
-    organizer?.getFilter || (() => null),
-  )
+  // React to the global active filter (Area/Context) via the shared SDK hook, so
+  // when the user scopes the board this summary scopes with it.
+  const filter = useOrganizerFilter(organizer)
   const scoped = useMemo(() => applyOrganizer(tasks, filter), [tasks, filter])
 
   // A single "now" per render pass so overdue/urgent/frog all agree on the instant.

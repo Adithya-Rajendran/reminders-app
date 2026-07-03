@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, selectUpcoming, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
+import { useTaskList, selectUpcoming, applyOrganizer, useOrganizerFilter, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
 
 const COLLAPSE_KEY = 'upcoming-collapsed'
 // Default a quick-added task to today at 9am so it lands in the "Today" bucket
@@ -15,7 +15,7 @@ function todayDefault() {
 // browsing it passively triggers recall ("oh, I need to…"), the "opportunistic
 // rehearsal" calendars are valued for. Within each day, importance leads so a
 // trivial-but-sooner task can't bury an important one (the mere-urgency effect).
-export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId, config = {} }) {
+export default function UpcomingWidget({ tasks: tasksCap, projects, organizer, instanceId, config = {} }) {
   const inboxId = projects?.[0]?.id
   const selector = useCallback((all) => selectUpcoming(all), [])
   const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
@@ -36,8 +36,9 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, instanceId, 
   const compact = atMostW(sz, 'sm') || atMostH(sz, 'xs')
   const capped = atMostH(sz, 'xs')
 
-  // A filter, not new persistence: optionally narrow the list to 2-minute wins.
-  const shown = useMemo(() => (quickOnly ? tasks.filter(isQuickWin) : tasks), [tasks, quickOnly])
+  // Narrow the list to the board's active Area/Context, then optionally to 2-minute wins.
+  const filter = useOrganizerFilter(organizer)
+  const shown = useMemo(() => applyOrganizer(quickOnly ? tasks.filter(isQuickWin) : tasks, filter), [tasks, quickOnly, filter])
   const quickCount = useMemo(() => tasks.filter(isQuickWin).length, [tasks])
 
   const groups = useMemo(() => {

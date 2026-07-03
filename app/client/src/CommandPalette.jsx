@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import ModalFrame from './ModalFrame.jsx'
 import { useModalRef } from './useModalRef.js'
 import { emitOpenNote } from './notesbus.js'
-import { notesApi } from './api.js'
+import { notesApi, api } from './api.js'
 import { rankEntries } from './omnibox.js'
 import { aliasesForType } from './palettecmds.js'
 import { createAndOpenNote } from './noteactions.js'
 import { getTasks, subscribe as subscribeTasks } from './taskstore.js'
+import { getOrganizerFilter, setOrganizerFilter } from './organizerfilter.js'
 import { emitRevealTask } from './revealbus.js'
 import { getBoard, flashWidget, emitAddWidget } from './boardbus.js'
 import { WIDGET_MANIFEST } from './widgets/manifest.js'
 import { dueChip } from './tasklib.js'
-import { IconSearch, IconNote, IconPlus, IconFolder, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
+import { IconSearch, IconNote, IconPlus, IconFolder, IconList, IconX, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
 
 // Render a label with its fuzzy-matched characters emphasised. Groups runs so
 // the DOM stays small for short titles.
@@ -33,7 +34,7 @@ function Highlight({ text, positions }) {
 
 // Per-kind default icon + right-aligned tag. A command carries its own icon; the
 // others get a stable glyph so the type reads at a glance.
-const KIND_ICON = { command: IconBolt, nav: IconGrid, task: IconCheck, note: IconNote }
+const KIND_ICON = { command: IconBolt, nav: IconGrid, task: IconCheck, note: IconNote, area: IconFolder, context: IconList }
 const optionId = (item) => 'cmdk-opt-' + item.id
 
 // App-wide command palette / OMNIBOX. Plain typing fuzzy-searches EVERYTHING at
@@ -56,6 +57,7 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   // Live task list from the shared store (same source every widget reads) — so the
   // omnibox finds a task by its content, not just by navigating to a widget.
   const tasks = useSyncExternalStore(subscribeTasks, getTasks)
+  const [areas, setAreas] = useState([])
 
   // The note list, loaded once on open (cheap; the server caches it ~15s). A failure
   // or an unconfigured Notes account simply yields no note rows — commands, nav and
@@ -70,6 +72,15 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     }).catch(() => { if (alive) setNotes([]) })
     return () => { alive = false }
   }, [])
+
+  // Areas/Projects for the organizer entries — a small, rarely-changing list; fetch
+  // once on open. Contexts are derived from the live task labels (no fetch).
+  useEffect(() => {
+    let alive = true
+    api('/api/areas').then((a) => { if (alive) setAreas(Array.isArray(a) ? a : []) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const contexts = useMemo(() => [...new Set(tasks.flatMap((t) => (t.labels || []).map((l) => l.title || l)).filter(Boolean))].sort(), [tasks])
 
   // The current board, for type-aware navigation. A surface already on the board
   // gets "Go to" (scroll + flash); one that isn't gets "Add" (drop it in). Either
@@ -105,6 +116,22 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
       })
     }
 
+    // Areas/Projects and Contexts — selecting one SCOPES the whole board to it (the
+    // board filter bar then shows the active scope + a Clear). Not a dead-end now
+    // that every browse widget honours the organizer filter.
+    for (const a of areas) {
+      const kind = a.kind === 'project' ? 'Project' : 'Area'
+      out.push({ kind: 'area', id: 'area-' + a.id, title: a.name, subtitle: `Scope the board to this ${kind.toLowerCase()}`, tag: kind, keys: [a.name], run: () => setOrganizerFilter({ areaId: a.id, context: null }) })
+    }
+    for (const c of contexts) {
+      out.push({ kind: 'context', id: 'ctx-' + c, title: '@' + c, subtitle: 'Scope the board to this context', tag: 'Context', keys: [c, '@' + c], run: () => setOrganizerFilter({ areaId: null, context: c }) })
+    }
+    // Offer a clear only when a scope is actually active.
+    const f = getOrganizerFilter()
+    if (f && (f.areaId || f.context)) {
+      out.push({ kind: 'command', id: 'clear-filter', title: 'Clear board filter', subtitle: 'Show tasks from all areas & contexts', icon: IconX, priority: 2, tag: 'Command', keys: ['Clear board filter', 'clear filter', 'show all', 'unfilter', 'reset scope'], run: () => setOrganizerFilter({ areaId: null, context: null }) })
+    }
+
     // Live tasks (open only — completed ones would flood content search).
     for (const t of tasks) {
       if (!t || t.done || t.id == null) continue
@@ -123,7 +150,7 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
       })
     }
     return out
-  }, [commands, board, tasks, notes])
+  }, [commands, board, tasks, notes, areas, contexts])
 
   // Command-mode filter (`>`) narrows to actions + navigation.
   const pool = useMemo(() => (cmdMode ? entries.filter((e) => e.kind === 'command' || e.kind === 'nav') : entries), [cmdMode, entries])

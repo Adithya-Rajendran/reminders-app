@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   useTaskList, useWidgetSize, atLeastW, atLeastH,
-  groupEisenhower, byImportanceThenDue, isRealDate,
+  groupEisenhower, byImportanceThenDue, isRealDate, applyOrganizer, useOrganizerFilter,
   TaskRow, EmptyState, ErrorState, SkeletonRows, UndoBar,
   IconTarget, IconCheck,
 } from '../widget-sdk'
@@ -38,10 +38,11 @@ function soonDue() {
   return d.toISOString()
 }
 
-export default function TriageWidget({ tasks: tasksCap }) {
+export default function TriageWidget({ tasks: tasksCap, organizer }) {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, onSchedule, onSetPriority, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const sz = useWidgetSize()
+  const filter = useOrganizerFilter(organizer)
 
   const wide = atLeastW(sz, 'lg')
   const showWhy = atLeastH(sz, 'sm')
@@ -49,7 +50,7 @@ export default function TriageWidget({ tasks: tasksCap }) {
   // Which quadrant is under a drag right now — only for the drop-target highlight.
   const [dragOver, setDragOver] = useState(null)
 
-  const quads = useMemo(() => groupEisenhower(tasks, new Date()), [tasks])
+  const quads = useMemo(() => groupEisenhower(applyOrganizer(tasks, filter), new Date()), [tasks, filter])
 
   // "Most important" = the single task to do now: the top of the important+urgent
   // pile, else the top important-but-not-urgent one. byImportanceThenDue orders by
