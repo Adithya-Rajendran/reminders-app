@@ -12,6 +12,7 @@ ok(isKnownInterface('tasks') && isKnownInterface('settings'), 'known interfaces 
 ok(!isKnownInterface('nope'), 'unknown interface is not known')
 ok(Object.isFrozen(APP_INTERFACES) && Object.isFrozen(APP_INTERFACES.tasks), 'catalog + entries frozen')
 ok(APP_INTERFACES['reminder-events'].keys[0] === 'events', 'reminder-events injects ctx.events')
+ok(isKnownInterface('organizer') && APP_INTERFACES['organizer'].keys[0] === 'organizer', 'organizer interface injects ctx.organizer')
 
 // --- normalizePlugs: shapes, dedupe, required-wins, junk-tolerance ---
 ok(normalizePlugs(['tasks']).length === 1 && normalizePlugs(['tasks'])[0].interface === 'tasks', 'string plug -> entry')

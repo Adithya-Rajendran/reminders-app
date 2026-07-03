@@ -3,7 +3,7 @@
 // not clobber foreign properties/alarms. Imports only ical.js (no SQLite).
 // Run with: node test/vtodo_meta.test.mjs
 import ICAL from 'ical.js'
-import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from '../server/vtodo_meta.js'
+import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, splitDescription, readHabitLog, writeHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate, readArea, writeArea, readImportant, writeImportant, readClarified, writeClarified } from '../server/vtodo_meta.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -222,6 +222,37 @@ ok(readCueTrigger(makeVtodo().vt) === null, 'absent cue_trigger reads as null')
   writeEstimate(vt, 0); ok(readEstimate(vt) === 0 && vt.getAllProperties('x-reminders-estimate').length === 0, 'estimate 0 clears the prop')
   writeEstimate(vt, 'nope'); ok(readEstimate(vt) === 0, 'non-numeric estimate -> 0')
   ok(readEstimate(makeVtodo().vt) === 0, 'absent estimate reads as 0')
+}
+
+// ---- v2 organizing dimensions round-trip: area / important / clarified ----
+{
+  const { vcal, vt } = makeVtodo()
+  writeArea(vt, 'area-abc')
+  writeImportant(vt, true)
+  writeClarified(vt, true)
+  vt.updatePropertyWithValue('x-foo-custom', 'keepme') // foreign X-prop survives
+  const rt = roundtrip(vcal)
+  ok(readArea(rt) === 'area-abc', 'area id round-trips')
+  ok(readImportant(rt) === true, 'important=true round-trips')
+  ok(readClarified(rt) === true, 'clarified=true round-trips')
+  ok(rt.getFirstPropertyValue('x-foo-custom') === 'keepme', 'foreign prop preserved alongside v2 fields')
+}
+{
+  // Absent fields read as sensible spine defaults (legacy tasks).
+  const { vt } = makeVtodo()
+  ok(readArea(vt) === '', 'absent area reads as empty string')
+  ok(readImportant(vt) === false, 'absent important reads as false')
+  ok(readClarified(vt) === false, 'absent clarified reads as false (Inbox)')
+}
+{
+  // Clearing: writing false/empty removes the prop entirely (no stale X-props).
+  const { vt } = makeVtodo()
+  writeImportant(vt, true); writeImportant(vt, false)
+  ok(readImportant(vt) === false && vt.getAllProperties('x-reminders-important').length === 0, 'important=false clears the prop')
+  writeArea(vt, 'x'); writeArea(vt, '')
+  ok(readArea(vt) === '' && vt.getAllProperties('x-reminders-area').length === 0, 'empty area clears the prop')
+  writeClarified(vt, true); writeClarified(vt, false)
+  ok(readClarified(vt) === false && vt.getAllProperties('x-reminders-clarified').length === 0, 'clarified=false clears the prop')
 }
 
 console.log(`\nvtodo_meta.test: ${pass} passed, ${fail} failed`)

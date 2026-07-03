@@ -43,6 +43,27 @@ export function selectFlowSource(tasks, group) {
   return list
 }
 
+// ---- v2 organizing dimensions: Inbox (Capture→Clarify) + Area/Context filters ----
+// The Inbox holds captured-but-unclarified tasks. Capture creates them with
+// clarified=false; a deliberate Clarify pass sets clarified=true (assigning
+// area/context/importance/date). Only open, unclarified tasks are the Inbox.
+export const selectInbox = (tasks) => (tasks || []).filter((t) => !t.done && t.clarified === false)
+
+// Filter by Project/Area membership (a single area id) or by a Context (a label
+// title). An empty filter is a pass-through, so a widget can apply the global
+// active filter unconditionally.
+export const byArea = (tasks, areaId) => (!areaId ? (tasks || []) : (tasks || []).filter((t) => t.area === areaId))
+export const byContext = (tasks, context) => (!context ? (tasks || []) : (tasks || []).filter((t) => (t.labels || []).some((l) => (l.title || l) === context)))
+
+// Apply the global organizer filter { areaId?, context? } — used by every task
+// widget so filtering by an Area or Context happens once and scopes the board.
+export function applyOrganizer(tasks, filter) {
+  let list = tasks || []
+  if (filter && filter.areaId) list = byArea(list, filter.areaId)
+  if (filter && filter.context) list = byContext(list, filter.context)
+  return list
+}
+
 // Stalled tasks: open, not a goal, with NO due date AND NO reminder — i.e. items
 // sitting without a concrete next action or schedule. The Weekly Review surfaces
 // these so the user gives each a specific next step; forming a plan (not finishing

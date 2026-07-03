@@ -8,7 +8,7 @@ import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_
 import { cacheDecision } from './readcache.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
-import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate } from './vtodo_meta.js'
+import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate, readArea, writeArea, readImportant, writeImportant, readClarified, writeClarified } from './vtodo_meta.js'
 import { accountOf, baseOf, okPut, err } from './util.js'
 import { ZERO_DATE as ZERO } from './constants.js'
 import { encodeTaskId, decodeTaskId, encodeLabelId, decodeLabelId } from './taskid.js'
@@ -46,6 +46,9 @@ export function serializeVtodo(vt, listId, objectUrl) {
     repeat_after: rep.repeat_after, repeat_mode: rep.repeat_mode,
     cue: readCue(vt), cue_trigger: readCueTrigger(vt),
     dread: readDread(vt), time_estimate: readEstimate(vt),
+    // v2 organizing dimensions: single Project/Area membership, the explicit
+    // importance axis, and the Capture→Clarify inbox state.
+    area: readArea(vt), important: readImportant(vt), clarified: readClarified(vt),
     habit_log: readHabitLog(vt),
     is_goal: readGoalFlag(vt), goal: readParentGoal(vt), goal_plan: readGoalPlan(vt),
     flow: readFlow(vt),
@@ -201,6 +204,9 @@ export async function createTaskCore(sub, projectId, body) {
     if (b.goal_plan) writeGoalPlan(vt, b.goal_plan)
     if (b.goal_uid) writeParentGoal(vt, b.goal_uid)
     if (b.flow) writeFlow(vt, b.flow)
+    if (b.area) writeArea(vt, b.area)
+    if (b.important) writeImportant(vt, true)
+    if (b.clarified) writeClarified(vt, true)
     const pr = clampPriority(b.priority); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr])
     const due = inDue(b.due_date); if (due) setDue(vt, due)
     if (Array.isArray(b.labels) && b.labels.length) setCategories(vt, b.labels.map((l) => l.title || l).filter(Boolean))
@@ -237,6 +243,9 @@ export async function patchTaskCore(sub, taskId, body) {
       if ('goal_plan' in b) writeGoalPlan(vt, b.goal_plan)
       if ('goal_uid' in b) writeParentGoal(vt, b.goal_uid)
       if ('flow' in b) writeFlow(vt, b.flow)
+      if ('area' in b) writeArea(vt, b.area)
+      if ('important' in b) writeImportant(vt, !!b.important)
+      if ('clarified' in b) writeClarified(vt, !!b.clarified)
       if ('priority' in b) { const pr = clampPriority(b.priority); vt.removeAllProperties('priority'); if (pr > 0) vt.updatePropertyWithValue('priority', OUR_TO_ICAL[pr]) }
       if ('due_date' in b) setDue(vt, inDue(b.due_date))
       if ('repeat_after' in b || 'repeat_mode' in b) { const cur = repeatFieldsFromVtodo(vt); applyRepeatFields(vt, 'repeat_after' in b ? b.repeat_after : cur.repeat_after, 'repeat_mode' in b ? b.repeat_mode : cur.repeat_mode) }
