@@ -14,6 +14,7 @@ import { rateLimitMiddleware } from './ratelimit.js'
 import * as notes from './notes.js'
 import * as groups from './reminder_groups.js'
 import * as dailyPlan from './daily_plan.js'
+import * as areas from './areas.js'
 import * as mcp from './mcp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -142,6 +143,20 @@ app.get('/api/daily-plan', requireAuth, async (req, res, next) => {
 })
 app.put('/api/daily-plan', requireAuth, async (req, res, next) => {
   try { res.json(await dailyPlan.setPlan(req.session.user.sub, req.body?.date, req.body?.ids)) } catch (e) { next(e) }
+})
+
+// ---- Projects & Areas (the v2 organizing dimension — see server/areas.js) ----
+app.get('/api/areas', requireAuth, async (req, res, next) => {
+  try { res.json(await areas.list(req.session.user.sub)) } catch (e) { next(e) }
+})
+app.post('/api/areas', requireAuth, async (req, res, next) => {
+  try { res.status(201).json(await areas.create(req.session.user.sub, req.body)) } catch (e) { next(e) }
+})
+app.patch('/api/areas/:id', requireAuth, async (req, res, next) => {
+  try { res.json(await areas.update(req.session.user.sub, req.params.id, req.body)) } catch (e) { next(e) }
+})
+app.delete('/api/areas/:id', requireAuth, async (req, res, next) => {
+  try { res.json(await areas.remove(req.session.user.sub, req.params.id)) } catch (e) { next(e) }
 })
 
 // ---- MCP (see server/mcp.js and docs/mcp.md) ----

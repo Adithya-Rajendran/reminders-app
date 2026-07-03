@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource, orderPlanFirst, selectTriagedThisWeek } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource, orderPlanFirst, selectTriagedThisWeek, selectInbox, byArea, byContext, applyOrganizer } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -228,6 +228,31 @@ ok(UPCOMING_ORDER.join() === 'overdue,today,tomorrow,week,later', 'UPCOMING_ORDE
   ok(result.join() === 't1,t2', 'selectTriagedThisWeek: tomorrow + this-week with estimate only; excludes today/overdue/later/no-estimate/no-date/done/goals')
   ok(selectTriagedThisWeek([]).length === 0, 'selectTriagedThisWeek: empty list -> empty')
   ok(selectTriagedThisWeek(null).length === 0, 'selectTriagedThisWeek: null -> empty')
+}
+
+// ---- v2 organizing dimensions: Inbox + area/context filters ----
+{
+  const tasks = [
+    { id: 1, done: false, clarified: false, area: '', labels: [] },                       // fresh capture -> Inbox
+    { id: 2, done: false, clarified: true, area: 'area-work', labels: [{ title: 'Calls' }] },
+    { id: 3, done: false, clarified: true, area: 'area-home', labels: [{ title: 'Errands' }] },
+    { id: 4, done: true, clarified: false, area: '', labels: [] },                         // done: never Inbox
+    { id: 5, done: false, clarified: false, area: 'area-work', labels: [{ title: 'Calls' }] }, // captured but tagged -> still Inbox
+  ]
+  ok(selectInbox(tasks).map((t) => t.id).join(',') === '1,5', 'selectInbox: open + unclarified only (done excluded)')
+  ok(selectInbox([]).length === 0, 'selectInbox: empty -> empty')
+
+  ok(byArea(tasks, 'area-work').map((t) => t.id).join(',') === '2,5', 'byArea: filters to one area id')
+  ok(byArea(tasks, null).length === tasks.length, 'byArea: null filter is a pass-through')
+  ok(byArea(tasks, 'area-nope').length === 0, 'byArea: unknown area -> none')
+
+  ok(byContext(tasks, 'Calls').map((t) => t.id).join(',') === '2,5', 'byContext: filters by label title')
+  ok(byContext(tasks, '').length === tasks.length, 'byContext: empty is a pass-through')
+
+  ok(applyOrganizer(tasks, { areaId: 'area-work', context: 'Calls' }).map((t) => t.id).join(',') === '2,5', 'applyOrganizer: area AND context')
+  ok(applyOrganizer(tasks, { areaId: 'area-work', context: 'Errands' }).length === 0, 'applyOrganizer: conflicting area+context -> none')
+  ok(applyOrganizer(tasks, null).length === tasks.length, 'applyOrganizer: null filter is a pass-through')
+  ok(applyOrganizer(tasks, {}).length === tasks.length, 'applyOrganizer: empty filter is a pass-through')
 }
 
 console.log(`\ntaskviews.test: ${pass} passed, ${fail} failed`)

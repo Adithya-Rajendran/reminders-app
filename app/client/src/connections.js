@@ -70,6 +70,12 @@ export const APP_INTERFACES = Object.freeze({
     summary: 'Server-stored daily plan (syncs across browsers; readable by integrations). Injects ctx.plan { get(date), set(date, ids) }; dates are the client’s local YYYY-MM-DD.',
     keys: Object.freeze(['plan']),
   }),
+  'organizer': Object.freeze({
+    scope: 'app',
+    userSummary: 'Your Projects, Areas and Contexts — and the active filter that scopes the whole board to one of them.',
+    summary: 'The v2 organizing dimension: the Areas/Projects registry (list/create/update/remove), the set of Contexts, and the global active filter { areaId?, context? } with setFilter/subscribe. Injects ctx.organizer.',
+    keys: Object.freeze(['organizer']),
+  }),
   'settings': Object.freeze({
     scope: 'app',
     userSummary: 'A shortcut to open Settings (for example, to connect an account).',

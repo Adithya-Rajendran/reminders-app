@@ -41,6 +41,16 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS group_calendars (
     user_id TEXT NOT NULL, group_name TEXT NOT NULL, list_id INTEGER NOT NULL,
     PRIMARY KEY (user_id, group_name));
+  -- v2 organizing dimension: the app-owned Projects & Areas registry. A task's
+  -- membership rides its VTODO as X-REMINDERS-AREA (portable, device-syncing), so
+  -- no task data lives here — only the area names/colors/kind the user defines.
+  -- kind: 'project' (finite outcome) | 'area' (ongoing). status: 'active'|'archived'.
+  CREATE TABLE IF NOT EXISTS areas (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'project', color TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active', sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+  CREATE INDEX IF NOT EXISTS areas_user_idx ON areas(user_id);
   -- The daily plan: the few task IDS picked for "today", keyed by user + local
   -- date. Server-side (was browser localStorage) so it syncs across browsers and
   -- is readable by integrations; the ids reference CalDAV tasks — no task data
@@ -83,6 +93,33 @@ const bool = (v) => !!v && v !== 0 && v !== '0'
 
 // Schema is built synchronously at import; kept for the start() call site.
 export async function initConfigSchema() { /* no-op */ }
+
+// ============================================================
+//  Areas & Projects (v2 organizing dimension) — low-level row CRUD.
+//  Business rules (id generation, validation, defaults) live in server/areas.js.
+// ============================================================
+const AREA_COLS = 'id, user_id, name, kind, color, status, sort, created_at'
+export async function listAreas(userId) {
+  return sqlite.prepare(`SELECT ${AREA_COLS} FROM areas WHERE user_id = ? ORDER BY sort ASC, created_at ASC`).all(userId)
+}
+export async function getAreaRow(userId, id) {
+  return sqlite.prepare(`SELECT ${AREA_COLS} FROM areas WHERE user_id = ? AND id = ?`).get(userId, id) || null
+}
+export async function insertArea(row) {
+  sqlite.prepare('INSERT INTO areas (id, user_id, name, kind, color, status, sort) VALUES (@id, @user_id, @name, @kind, @color, @status, @sort)').run(row)
+  return getAreaRow(row.user_id, row.id)
+}
+export async function updateAreaRow(userId, id, patch) {
+  const cur = await getAreaRow(userId, id)
+  if (!cur) return null
+  const next = { ...cur, ...patch }
+  sqlite.prepare('UPDATE areas SET name=@name, kind=@kind, color=@color, status=@status, sort=@sort WHERE user_id=@user_id AND id=@id')
+    .run({ id, user_id: userId, name: next.name, kind: next.kind, color: next.color, status: next.status, sort: Number(next.sort) || 0 })
+  return getAreaRow(userId, id)
+}
+export async function deleteAreaRow(userId, id) {
+  return sqlite.prepare('DELETE FROM areas WHERE user_id = ? AND id = ?').run(userId, id).changes > 0
+}
 
 // ============================================================
 //  Dashboard layouts

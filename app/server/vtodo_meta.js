@@ -26,6 +26,13 @@ const XPROP = {
   flow: 'x-reminders-flow',
   dread: 'x-reminders-dread',
   time_estimate: 'x-reminders-estimate',
+  // v2 organizing dimensions — a task's Project/Area membership (single id from
+  // the app-owned areas registry), the explicit Eisenhower "important" axis, and
+  // the Capture→Clarify inbox state. All optional X-props so legacy tasks read as
+  // no-area / not-important / unclarified (sensible defaults for the spine).
+  area: 'x-reminders-area',
+  important: 'x-reminders-important',
+  clarified: 'x-reminders-clarified',
 }
 
 // ---- low-level text accessors ----
@@ -129,6 +136,25 @@ export function writeCueTrigger(vt, trig) {
 const clampDread = (v) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0 }
 export const readDread = (vt) => clampDread(readMeta(vt, 'dread'))
 export const writeDread = (vt, v) => writeMeta(vt, 'dread', clampDread(v) ? String(clampDread(v)) : '')
+
+// ---- area (Project/Area membership) ----
+// A single app-owned area id (see server/areas.js). "What is this task part of?"
+// Decoupled from which CalDAV calendar the VTODO physically lives in — moving a
+// task between Projects/Areas is a metadata edit, not a calendar migration.
+export const readArea = (vt) => readMeta(vt, 'area')
+export const writeArea = (vt, id) => writeMeta(vt, 'area', String(id || '').trim())
+
+// ---- importance (the Eisenhower "important" axis; boolean) ----
+// A first-class flag, distinct from priority. The matrix's importance quadrant
+// is driven by THIS, not by inferring importance from a priority threshold.
+export const readImportant = (vt) => readMeta(vt, 'important') === '1'
+export const writeImportant = (vt, on) => writeMeta(vt, 'important', on ? '1' : '')
+
+// ---- clarified (Capture→Clarify inbox state; boolean) ----
+// Capture creates tasks UNclarified — they sit in the Inbox until a deliberate
+// Clarify pass assigns area/context/importance/date. Absent = still in the Inbox.
+export const readClarified = (vt) => readMeta(vt, 'clarified') === '1'
+export const writeClarified = (vt, on) => writeMeta(vt, 'clarified', on ? '1' : '')
 
 // ---- time estimate (minutes) ----
 // Optional minutes-to-complete. Enumerating/estimating work counters the planning

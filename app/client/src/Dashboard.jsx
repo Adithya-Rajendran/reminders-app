@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'rea
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk, reminderGroups, notesApi } from './api.js'
 import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks, insertTask } from './taskstore.js'
+import { getOrganizerFilter, setOrganizerFilter, subscribeOrganizerFilter } from './organizerfilter.js'
 import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
 import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
 import { onOpenNote, emitOpenNote } from './notesbus.js'
@@ -341,13 +342,26 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
     get: (date) => api('/api/daily-plan?date=' + encodeURIComponent(date)),
     set: (date, ids) => api('/api/daily-plan', { method: 'PUT', body: JSON.stringify({ date, ids }) }),
   }), [])
+  // The organizing dimension (v2): the Projects/Areas registry, the derived set of
+  // Contexts (task labels), and the global active filter. The filter is an external
+  // store (organizerfilter.js) so widgets react via useSyncExternalStore while this
+  // capability stays a stable reference. Areas aren't cached — a small, rarely-read
+  // list where staleness (a just-created area not showing) is worse than a refetch.
+  const organizerCap = useMemo(() => ({
+    areas: () => api('/api/areas'),
+    createArea: (body) => api('/api/areas', { method: 'POST', body: JSON.stringify(body) }),
+    updateArea: (id, body) => api('/api/areas/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    removeArea: (id) => api('/api/areas/' + encodeURIComponent(id), { method: 'DELETE' }),
+    contexts: () => [...new Set(getTasks().flatMap((t) => (t.labels || []).map((l) => l.title || l)).filter(Boolean))].sort(),
+    getFilter: getOrganizerFilter, setFilter: setOrganizerFilter, subscribe: subscribeOrganizerFilter,
+  }), [])
 
   // The app slots: every interface the canvas provides, with its live value. A
   // widget receives only the subset it plugs into (see connections.js) — the
   // dashboard never hands a widget app state it didn't declare a dependency on.
   const appCtx = useMemo(
-    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, plan: planCap, onOpenSettings }),
-    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, planCap, onOpenSettings],
+    () => ({ tasks: tasksCap, events, projects, groups: groupsCap, notes: notesCap, calendar: calendarCap, plan: planCap, organizer: organizerCap, onOpenSettings }),
+    [tasksCap, events, projects, groupsCap, notesCap, calendarCap, planCap, organizerCap, onOpenSettings],
   )
   const slots = useMemo(() => appSlots(appCtx), [appCtx])
 
