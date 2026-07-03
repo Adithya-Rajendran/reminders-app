@@ -119,6 +119,11 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
             value={focusContexts}
             options={contexts}
             onSet={(next) => patchContexts(focused, next)}
+            // Enable type-to-create: on a fresh account the derived context list is
+            // empty, so without this you could never assign a context during Clarify.
+            // The actual create+assign happens through onSet (which writes the label);
+            // onCreate just flips the create affordance on.
+            onCreate={() => {}}
           />
           <ImportanceControl
             value={!!focused.important}

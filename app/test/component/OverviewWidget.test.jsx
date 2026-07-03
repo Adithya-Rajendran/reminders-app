@@ -83,10 +83,13 @@ describe('OverviewWidget', () => {
 
   it('shows the earliest upcoming calendar event today', async () => {
     const cap = fakeTasks([])
-    // Two events; the earlier one at a future time today is the pick.
+    // Two events at future offsets from NOW (not absolute hours), so 'Standup' is
+    // always the earliest still-upcoming pick regardless of wall-clock time — the
+    // old iso(0,22)/iso(0,23) pinning flaked in the last 2h of the day.
+    const soon = (min) => new Date(Date.now() + min * 60000).toISOString()
     const cal = fakeCalendar([
-      { id: 'e2', title: 'Later meeting', start: iso(0, 23), allDay: false },
-      { id: 'e1', title: 'Standup', start: iso(0, 22), allDay: false },
+      { id: 'e2', title: 'Later meeting', start: soon(30), allDay: false },
+      { id: 'e1', title: 'Standup', start: soon(15), allDay: false },
     ])
     render(<OverviewWidget tasks={cap} calendar={cal} organizer={fakeOrganizer()} instanceId="ov-cal" />)
     expect(await screen.findByText('Standup')).toBeInTheDocument()

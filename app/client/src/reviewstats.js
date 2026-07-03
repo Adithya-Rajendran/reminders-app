@@ -78,20 +78,17 @@ export function weeklyTrend(tasks, now = new Date(), weeks = 8) {
   const spanStart = new Date(curStart); spanStart.setDate(spanStart.getDate() - 7 * (n - 1))
   const nextWk = new Date(curStart); nextWk.setDate(nextWk.getDate() + 7)
   const counts = new Array(n).fill(0)
-  const WEEK_MS = 7 * 24 * 60 * 60 * 1000
-  // DST note: buckets are labeled by startOfWeek() (true local Mondays), but
-  // membership uses a fixed 7-day ms stride from spanStart. Across a DST change a
-  // completion can land up to an hour from its wall-clock Monday; at the day
-  // granularity we bucket (local midnights), that never crosses a week boundary.
-  const base = +spanStart
+  // Bucket by calendar-week boundaries (true local Mondays), NOT a fixed 7*24h ms
+  // stride: across a DST change a week is 167h/169h, so a fixed stride shifts a
+  // late-week completion into the wrong bucket. Precompute each week's local
+  // midnight start; place each completion day in the interval [bounds[i], bounds[i+1]).
+  const bounds = []
+  for (let i = 0; i < n; i++) { const w = new Date(spanStart); w.setDate(w.getDate() + 7 * i); bounds.push(+w) }
+  bounds.push(+nextWk)
   for (const ms of completionDays(tasks, spanStart, nextWk)) {
-    const idx = Math.floor((ms - base) / WEEK_MS)
-    if (idx >= 0 && idx < n) counts[idx]++
+    for (let i = 0; i < n; i++) { if (ms >= bounds[i] && ms < bounds[i + 1]) { counts[i]++; break } }
   }
-  return counts.map((count, i) => {
-    const ws = new Date(spanStart); ws.setDate(ws.getDate() + 7 * i)
-    return { weekStart: +startOfWeek(ws), count }
-  })
+  return counts.map((count, i) => ({ weekStart: bounds[i], count }))
 }
 
 // The weekly review is "due" when no review has been recorded since the start
