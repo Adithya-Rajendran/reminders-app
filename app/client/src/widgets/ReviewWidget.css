@@ -15,6 +15,22 @@
 .rv-bar.empty { background: var(--line-strong); }
 .rv-bar-lbl { font-size: 10.5px; color: var(--faint); font-weight: 600; }
 .rv-spark-cap { font-size: 10.5px; color: var(--faint); margin-top: -8px; }
+
+/* Multi-week trend. The track is the positioning context for the dashed average
+   baseline; the current (in-progress) week is emphasized so it reads as "where
+   you are now" against the trailing bars. */
+.rv-trend { position: relative; }
+/* Prior-weeks average, drawn as a dashed rule across the plot. Meaning is carried
+   by the dash pattern + "avg" tag (NOT color) so it survives color-blindness and
+   the accent theme. Sits behind the bars via a lower stacking order. */
+.rv-trend-base { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line-strong); pointer-events: none; z-index: 0; }
+.rv-trend-base-lbl { position: absolute; right: 0; top: -6px; font-size: 9px; line-height: 1; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--faint); background: var(--panel); padding: 0 2px; }
+.rv-trend .rv-bar-col { position: relative; z-index: 1; } /* bars over the baseline */
+/* Endpoint emphasis: the trailing weeks read as muted history, the current week
+   as the live figure — a wider, fully-opaque bar plus a bold "now" tick. */
+.rv-trend .rv-bar { opacity: .55; }
+.rv-trend .rv-bar-now { opacity: 1; width: 84%; box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
+.rv-trend .rv-now .rv-bar-lbl { color: var(--accent); font-weight: 800; }
 .rv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
 .rv-prompt-body { flex: 1; min-width: 0; }

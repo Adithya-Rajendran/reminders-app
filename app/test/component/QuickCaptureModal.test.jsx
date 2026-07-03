@@ -23,8 +23,54 @@ describe('QuickCaptureModal', () => {
     expect(fields.priority).toBe(2)
     expect(fields.due_date).toBeTruthy()
     expect(fields.labels).toEqual(['work'])
+    // Captures land in the Inbox unclarified — this is the one field capture
+    // always sets, so the parsed NL preview and Inbox routing stay in sync.
+    expect(fields.clarified).toBe(false)
 
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+  })
+
+  it('(d) chain-capture ("keep open") submits with clarified:false, clears the input, keeps the modal open', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    const onClose = vi.fn()
+    render(<QuickCaptureModal onSubmit={onSubmit} onClose={onClose} inboxReady={true} />)
+
+    // Opt into chain-capture via the "keep open" checkbox.
+    await userEvent.click(screen.getByRole('checkbox', { name: /keep open/i }))
+
+    const input = screen.getByLabelText(/capture a task/i)
+    await userEvent.type(input, 'first thought')
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
+    expect(onSubmit.mock.calls[0][0].clarified).toBe(false)
+
+    // Modal stays open (onClose not called) and the input is cleared for the next thought.
+    expect(onClose).not.toHaveBeenCalled()
+    await waitFor(() => expect(input).toHaveValue(''))
+
+    // A second capture goes in the same way, without ever closing the modal.
+    await userEvent.type(input, 'second thought')
+    await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+    expect(onSubmit.mock.calls[1][0].title).toBe('second thought')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('(e) Shift+Enter chain-captures without the checkbox: submits, clears input, keeps modal open', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    const onClose = vi.fn()
+    render(<QuickCaptureModal onSubmit={onSubmit} onClose={onClose} inboxReady={true} />)
+
+    const input = screen.getByLabelText(/capture a task/i)
+    await userEvent.type(input, 'quick idea')
+    // Shift+Enter should submit-and-keep-open; plain Enter would close.
+    await userEvent.type(input, '{Shift>}{Enter}{/Shift}')
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
+    expect(onSubmit.mock.calls[0][0].clarified).toBe(false)
+    expect(onClose).not.toHaveBeenCalled()
+    await waitFor(() => expect(input).toHaveValue(''))
   })
 
   it('(b) inboxReady=false: shows settings CTA alert, does not call onSubmit; CTA calls onClose then onOpenSettings', async () => {

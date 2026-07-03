@@ -1,11 +1,15 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, computeReview, parseYmd, selectStalled, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
+import { useTaskList, computeReview, selectStalled, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
 import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
 const REFLECT_KEY = 'review-reflections'
 const REFLECT_CAP = 52 // ~a year of weekly notes
-const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+// weekStart is a local-midnight ms (from weeklyTrend). A short "M/D" tick under
+// each bar and a fuller label for the hover title — enough to place a week
+// without crowding the axis.
+const weekTick = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}` }
+const weekLabel = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 // A guided review, structured on GTD's three passes. The reflection step is the
 // best-evidenced upgrade: brief written reflection measurably improves subsequent
 // performance (Di Stefano et al., "Learning by Thinking").
@@ -15,8 +19,9 @@ const STEPS = [
   { key: 'creative', title: 'Get creative', sub: 'Reflect on the week, then name next week’s focus.' },
 ]
 
-// Weekly review & feedback loop: completions this week vs last, a 7-day trend,
-// a 30-day total, and a guided once-weekly review that ends in a written
+// Weekly review & feedback loop: completions this week vs last (with an honest
+// first-week label when there's no prior week to compare against), a multi-week
+// trend, a 30-day total, and a guided once-weekly review that ends in a written
 // reflection. Pure derived stats over the shared task store; the "reviewed"
 // timestamp and reflections are client-only UI state in localStorage.
 export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
@@ -99,14 +104,25 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
     )
   }
 
-  const max = Math.max(1, ...review.last7.map((d) => d.count))
-  const up = review.deltaPct >= 0
-  const deltaCls = review.thisWeek === review.lastWeek ? '' : up ? 'rv-up' : 'rv-down'
+  // Multi-week trend: the last N weeks of completions. The endpoint (current,
+  // in-progress week) is emphasized; a faint dashed baseline marks the mean of
+  // the prior weeks so a bar reads as above/below trend without relying on color.
+  const weekly = review.weekly
+  const wkMax = Math.max(1, ...weekly.map((w) => w.count))
+  const prior = weekly.slice(0, -1)
+  const baseline = prior.length ? prior.reduce((s, w) => s + w.count, 0) / prior.length : 0
+  const baselinePct = Math.round((baseline / wkMax) * 100)
 
-  // Content grows with vertical room (the layout stacks top -> spark -> meta ->
+  const up = review.deltaPct >= 0
+  // No comparable last week (baseline 0) means no honest percentage — fall back
+  // to an absolute, first-week-tracked label instead of a divide-by-zero "100%".
+  const deltaCls = !review.hasBaseline ? '' : review.thisWeek === review.lastWeek ? '' : up ? 'rv-up' : 'rv-down'
+
+  // Content grows with vertical room (the layout stacks top -> trend -> meta ->
   // prompt). Very short: just the headline number + delta. A bit taller: add the
-  // sparkline. At the default height and up: day labels, the 30/7-day chips, and
-  // the weekly-review prompt. A narrow widget also trims the delta to arrow + %.
+  // multi-week trend. At the default height and up: week ticks + caption, the
+  // 30/7-day chips, and the weekly-review prompt. A narrow widget also trims the
+  // delta to arrow + %.
   const showSpark = atLeastH(sz, 'sm')
   const showDetails = atLeastH(sz, 'md')
   const showPrompt = atLeastH(sz, 'md')
@@ -121,30 +137,51 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
           <div className="rv-label">done this week</div>
         </div>
         <div className={`rv-delta ${deltaCls}`}>
-          {review.thisWeek === review.lastWeek
-            ? (compactDelta ? '=' : 'same as last week')
-            : compactDelta
-              ? `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}%`
-              : `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}% vs last week (${review.lastWeek})`}
+          {!review.hasBaseline
+            // Honest label when there's no prior week to compare against: no
+            // percentage at all (a "%" here would be a lie about a 0 baseline).
+            ? (compactDelta ? 'first week' : 'first week tracked')
+            : review.thisWeek === review.lastWeek
+              ? (compactDelta ? '=' : 'same as last week')
+              : compactDelta
+                ? `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}%`
+                : `${up ? '▲' : '▼'} ${Math.abs(review.deltaPct)}% vs last week (${review.lastWeek})`}
         </div>
       </div>
 
       {showSpark && (
-        <div className="rv-spark" role="img" aria-label={`Completions over the last 7 days, ${review.last7Total} total`}>
-          {review.last7.map((d) => (
-            <div className="rv-bar-col" key={d.date} title={`${d.date}: ${d.count}`}>
-              <div className="rv-bar-track">
-                <div className={`rv-bar${d.count === 0 ? ' empty' : ''}`} style={{ height: `${d.count === 0 ? 4 : Math.round((d.count / max) * 100)}%` }} />
-              </div>
-              {showDetails && <div className="rv-bar-lbl">{DOW1[parseYmd(d.date).getDay()]}</div>}
+        <div
+          className="rv-spark rv-trend" role="img"
+          aria-label={`Weekly completions over the last ${weekly.length} weeks: ${weekly.map((w) => w.count).join(', ')}. This week ${review.thisWeek}${prior.length ? `, prior weekly average ${baseline.toFixed(1)}` : ''}.`}
+        >
+          {/* Faint dashed baseline = the prior-weeks average. Positioned by height
+              so a bar clearing it reads as "above trend" without relying on color;
+              the dashed style + label carry the meaning for color-blind users. */}
+          {prior.length > 0 && (
+            <div className="rv-trend-base" style={{ bottom: `${baselinePct}%` }} aria-hidden="true">
+              <span className="rv-trend-base-lbl">avg</span>
             </div>
-          ))}
+          )}
+          {weekly.map((w, i) => {
+            const last = i === weekly.length - 1 // the current, in-progress week
+            return (
+              <div className={`rv-bar-col${last ? ' rv-now' : ''}`} key={w.weekStart} title={`${weekLabel(w.weekStart)}: ${w.count}`}>
+                <div className="rv-bar-track">
+                  <div
+                    className={`rv-bar${w.count === 0 ? ' empty' : ''}${last ? ' rv-bar-now' : ''}`}
+                    style={{ height: `${w.count === 0 ? 4 : Math.round((w.count / wkMax) * 100)}%` }}
+                  />
+                </div>
+                {showDetails && <div className="rv-bar-lbl">{last ? 'now' : weekTick(w.weekStart)}</div>}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* One-line legend: the bars are a single series (completions per day), but
-          unlabeled they invited guesses like "completed vs created". */}
-      {showSpark && showDetails && <div className="rv-spark-cap">tasks completed per day · last 7 days</div>}
+      {/* One-line legend: the bars are one series (completions per week), the last
+          bar is this (in-progress) week, and the dashed line is the prior average. */}
+      {showSpark && showDetails && <div className="rv-spark-cap">tasks completed per week · last {weekly.length} weeks · dashed = average</div>}
 
       {showDetails && (
         <div className="rv-meta">

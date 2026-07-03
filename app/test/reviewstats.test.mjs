@@ -1,5 +1,5 @@
 // Pure review-stats logic. Run with: node test/reviewstats.test.mjs
-import { computeReview, startOfWeek, countCompletions, dailyTrend, weeklyPromptDue, parseYmd } from '../client/src/reviewstats.js'
+import { computeReview, startOfWeek, countCompletions, dailyTrend, weeklyPromptDue, parseYmd, weeklyTrend } from '../client/src/reviewstats.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -34,6 +34,7 @@ ok(r.thisWeek === 3, `thisWeek counts one-time + habit-log (got ${r.thisWeek})`)
 // last week: b (Jun10) + habit Jun9 = 2
 ok(r.lastWeek === 2, `lastWeek counts one-time + habit-log (got ${r.lastWeek})`)
 ok(r.deltaPct === 50, `deltaPct (3 vs 2) = 50 (got ${r.deltaPct})`)
+ok(r.hasBaseline === true, 'hasBaseline true when last week > 0')
 
 // ---- last7 trend shape + today's bucket ----
 ok(r.last7.length === 7, 'last7 has 7 days')
@@ -66,7 +67,69 @@ ok(r.promptDue === true, 'computeReview surfaces promptDue')
 // ---- empty input is safe ----
 {
   const e = computeReview([], NOW, null)
-  ok(e.thisWeek === 0 && e.lastWeek === 0 && e.deltaPct === 0, 'empty list -> all zero')
+  // deltaPct is null (not 0) when there's no baseline: an honest "no comparison"
+  // rather than a fake 0% or +100%.
+  ok(e.thisWeek === 0 && e.lastWeek === 0, 'empty list -> zero counts')
+  ok(e.deltaPct === null && e.hasBaseline === false, 'empty list -> no baseline, deltaPct null')
+}
+
+// ---- zero-baseline display logic: no divide-by-zero percentage ----
+{
+  // Completions this week only; nothing last week -> baseline is 0.
+  const firstWeek = [
+    { id: 'x', done: true, done_at: at(2026, 6, 16) },
+    { id: 'y', done: true, done_at: at(2026, 6, 15) },
+  ]
+  const rz = computeReview(firstWeek, NOW, null)
+  ok(rz.thisWeek === 2, `zero-baseline: thisWeek counted (got ${rz.thisWeek})`)
+  ok(rz.lastWeek === 0, 'zero-baseline: lastWeek is 0')
+  ok(rz.hasBaseline === false, 'zero-baseline: hasBaseline false')
+  ok(rz.deltaPct === null, `zero-baseline: deltaPct null, not 100 (got ${rz.deltaPct})`)
+}
+
+// ---- weeklyTrend: bucketing over multiple weeks ----
+{
+  // Weeks (Mon-based) ending with this week (Jun15..21). 4 weeks back:
+  //   wk0 May25..31, wk1 Jun1..7, wk2 Jun8..14, wk3 Jun15..21 (current)
+  const wt = weeklyTrend([
+    { id: 'a', done: true, done_at: at(2026, 6, 16) },              // wk3
+    { id: 'b', done: true, done_at: at(2026, 6, 17) },              // wk3
+    { id: 'c', done: true, done_at: at(2026, 6, 10) },              // wk2
+    { id: 'd', done: false, habit_log: ['2026-06-02', '2026-06-05'] }, // wk1 x2
+    { id: 'e', done: true, done_at: at(2026, 5, 26) },              // wk0
+    { id: 'z', done: true, done_at: at(2026, 5, 20) },              // BEFORE window -> dropped
+  ], NOW, 4)
+  ok(wt.length === 4, `weeklyTrend length = weeks (got ${wt.length})`)
+  ok(wt.map((w) => w.count).join(',') === '1,2,1,2', `weeklyTrend buckets (got ${wt.map((w) => w.count).join(',')})`)
+  // weekStart is the Monday local-midnight ms of each bucket, oldest first, +7d apart.
+  ok(new Date(wt[3].weekStart).getDate() === 15, 'weeklyTrend last bucket starts this Monday (Jun 15)')
+  ok(new Date(wt[0].weekStart).getDate() === 25 && new Date(wt[0].weekStart).getMonth() === 4, 'weeklyTrend first bucket is May 25')
+  ok(wt[3].weekStart - wt[2].weekStart === 7 * 86400000, 'weeklyTrend buckets are 7 days apart')
+}
+
+// ---- weeklyTrend: empty input -> all-zero buckets of the right shape ----
+{
+  const we = weeklyTrend([], NOW, 8)
+  ok(we.length === 8, 'weeklyTrend(empty) has `weeks` buckets')
+  ok(we.every((w) => w.count === 0), 'weeklyTrend(empty) all counts zero')
+  ok(new Date(we[7].weekStart).getDate() === 15, 'weeklyTrend(empty) still ends on this Monday')
+}
+
+// ---- weeklyTrend: single week (weeks=1) -> just the current week ----
+{
+  const w1 = weeklyTrend([
+    { id: 'a', done: true, done_at: at(2026, 6, 16) },  // this week
+    { id: 'b', done: true, done_at: at(2026, 6, 10) },  // last week -> outside a 1-week window
+  ], NOW, 1)
+  ok(w1.length === 1, 'weeklyTrend(1) has a single bucket')
+  ok(w1[0].count === 1, `weeklyTrend(1) counts only the current week (got ${w1[0].count})`)
+  ok(new Date(w1[0].weekStart).getDate() === 15, 'weeklyTrend(1) bucket is this Monday')
+}
+
+// ---- weeklyTrend default matches computeReview.weekly ----
+{
+  ok(r.weekly.length === 8, `computeReview.weekly defaults to 8 weeks (got ${r.weekly.length})`)
+  ok(r.weekly[7].count === r.thisWeek, 'computeReview.weekly last bucket == thisWeek')
 }
 
 console.log(`\nreviewstats.test: ${pass} passed, ${fail} failed`)

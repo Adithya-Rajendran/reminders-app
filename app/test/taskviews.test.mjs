@@ -111,23 +111,25 @@ ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, pr
   ok([y, x].slice().sort(byImportanceThenDue).map((t) => t.id).join() === 'x,y', 'byImportanceThenDue: at equal priority a dated task sorts before an undated one')
 }
 
-// ---- eisenhowerQuadrant ----
+// ---- eisenhowerQuadrant (importance = the EXPLICIT flag, not a priority threshold) ----
 const NOW = new Date()
-ok(eisenhowerQuadrant({ priority: 4, due_date: iso(1 * DAY) }, NOW).q === 'Q1', 'important + urgent -> Q1')
-ok(eisenhowerQuadrant({ priority: 4, due_date: iso(5 * DAY) }, NOW).q === 'Q2', 'important + not urgent -> Q2')
-ok(eisenhowerQuadrant({ priority: 1, due_date: iso(1 * DAY) }, NOW).q === 'Q3', 'not important + urgent -> Q3')
-ok(eisenhowerQuadrant({ priority: 1 }, NOW).q === 'Q4', 'not important + no due -> Q4')
-ok(eisenhowerQuadrant({ priority: 5, due_date: iso(-2 * DAY) }, NOW).q === 'Q1', 'overdue counts as urgent -> Q1')
+ok(eisenhowerQuadrant({ important: true, due_date: iso(1 * DAY) }, NOW).q === 'Q1', 'important + urgent -> Q1')
+ok(eisenhowerQuadrant({ important: true, due_date: iso(5 * DAY) }, NOW).q === 'Q2', 'important + not urgent -> Q2')
+ok(eisenhowerQuadrant({ important: false, due_date: iso(1 * DAY) }, NOW).q === 'Q3', 'not important + urgent -> Q3')
+ok(eisenhowerQuadrant({ important: false }, NOW).q === 'Q4', 'not important + no due -> Q4')
+ok(eisenhowerQuadrant({ important: true, due_date: iso(-2 * DAY) }, NOW).q === 'Q1', 'overdue counts as urgent -> Q1')
+// A high PRIORITY no longer forces importance — that inference was the mis-bucket bug.
+ok(eisenhowerQuadrant({ priority: 5, due_date: iso(1 * DAY) }, NOW).q === 'Q3', 'high priority WITHOUT the important flag is NOT important (Q3, not Q1)')
 
 // ---- groupEisenhower ----
 {
   const g = groupEisenhower([
-    { id: '1', priority: 5, due_date: iso(1 * DAY) },   // Q1
-    { id: '2', priority: 4, due_date: iso(10 * DAY) },  // Q2
-    { id: '3', priority: 0, due_date: iso(1 * DAY) },   // Q3
-    { id: '4', priority: 0 },                           // Q4
-    { id: '5', done: true, priority: 5, due_date: iso(0) }, // excluded
-    { id: '6', is_goal: true, priority: 5 },            // excluded
+    { id: '1', important: true, due_date: iso(1 * DAY) },   // Q1
+    { id: '2', important: true, due_date: iso(10 * DAY) },  // Q2
+    { id: '3', important: false, due_date: iso(1 * DAY) },  // Q3
+    { id: '4', important: false },                          // Q4
+    { id: '5', done: true, important: true, due_date: iso(0) }, // excluded
+    { id: '6', is_goal: true, important: true },            // excluded
   ], NOW)
   ok(g.Q1.length === 1 && g.Q2.length === 1 && g.Q3.length === 1 && g.Q4.length === 1, 'groupEisenhower buckets one per quadrant, excludes done/goals')
 }

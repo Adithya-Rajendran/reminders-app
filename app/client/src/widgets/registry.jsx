@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconTrophy, IconSun, IconTarget } from '../widget-sdk'
+import { IconBell, IconClock, IconCalendar, IconNote, IconChart, IconCue, IconTrophy, IconSun, IconTarget, IconInbox } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetConfig } from './manifest.js'
 
@@ -14,6 +14,8 @@ import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetC
 // every chunk request waits behind the /api/layouts round-trip (a cold-paint
 // waterfall measured at ~200ms+RTT on the deployed app).
 export const LOADERS = {
+  overview: () => import('./OverviewWidget.jsx'),
+  inbox: () => import('./InboxWidget.jsx'),
   upcoming: () => import('./UpcomingWidget.jsx'),
   reminders: () => import('./RemindersWidget.jsx'),
   calendar: () => import('./CalendarWidget.jsx'),
@@ -28,6 +30,8 @@ export const LOADERS = {
 export function preloadWidgets(types) {
   for (const t of new Set(types || [])) { try { LOADERS[t]?.() } catch { /* best-effort */ } }
 }
+const OverviewWidget = lazy(LOADERS.overview)
+const InboxWidget = lazy(LOADERS.inbox)
 const UpcomingWidget = lazy(LOADERS.upcoming)
 const RemindersWidget = lazy(LOADERS.reminders)
 const CalendarWidget = lazy(LOADERS.calendar)
@@ -62,6 +66,8 @@ const FocusWidget = lazy(LOADERS.focus)
 const widgetConfig = (w) => resolveWidgetConfig(WIDGET_MANIFEST_BY_TYPE.get(w.type)?.config, w.config)
 
 const RENDERERS = {
+  overview: { icon: IconSun, render: (w, ctx) => <OverviewWidget tasks={ctx.tasks} events={ctx.events} calendar={ctx.calendar} plan={ctx.plan} organizer={ctx.organizer} instanceId={w.i} /> },
+  inbox: { icon: IconInbox, render: (w, ctx) => <InboxWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
   reminders: {
     icon: IconBell,
     title: (w) => w.group || 'Reminders', // a group-locked widget shows the group name

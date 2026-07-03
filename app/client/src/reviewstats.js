@@ -62,6 +62,35 @@ export function dailyTrend(tasks, now = new Date(), days = 7) {
   return out
 }
 
+// Per-week completion counts for the last `weeks` weeks ending with the current
+// (Monday-based) week, oldest first. Reuses completionDays so recurring
+// habit-log dates and one-off done_at completions are bucketed identically to
+// every other stat here (and stay double-count-free — see the file header).
+//
+// Each bucket is [weekStart, nextWeekStart): weekStart is a local-midnight ms
+// so the widget can key/label bars without re-parsing. The final entry is the
+// in-progress current week (still accumulating), which the widget emphasizes.
+export function weeklyTrend(tasks, now = new Date(), weeks = 8) {
+  const n = Math.max(1, weeks | 0)
+  const curStart = startOfWeek(now)
+  // Oldest bucket starts (n-1) weeks before this week's Monday. One completionDays
+  // pass over the whole span, then a plain integer-division bucketing — O(events).
+  const spanStart = new Date(curStart); spanStart.setDate(spanStart.getDate() - 7 * (n - 1))
+  const nextWk = new Date(curStart); nextWk.setDate(nextWk.getDate() + 7)
+  const counts = new Array(n).fill(0)
+  // Bucket by calendar-week boundaries (true local Mondays), NOT a fixed 7*24h ms
+  // stride: across a DST change a week is 167h/169h, so a fixed stride shifts a
+  // late-week completion into the wrong bucket. Precompute each week's local
+  // midnight start; place each completion day in the interval [bounds[i], bounds[i+1]).
+  const bounds = []
+  for (let i = 0; i < n; i++) { const w = new Date(spanStart); w.setDate(w.getDate() + 7 * i); bounds.push(+w) }
+  bounds.push(+nextWk)
+  for (const ms of completionDays(tasks, spanStart, nextWk)) {
+    for (let i = 0; i < n; i++) { if (ms >= bounds[i] && ms < bounds[i + 1]) { counts[i]++; break } }
+  }
+  return counts.map((count, i) => ({ weekStart: bounds[i], count }))
+}
+
 // The weekly review is "due" when no review has been recorded since the start
 // of the current (Monday-based) week.
 export function weeklyPromptDue(now = new Date(), lastReviewedISO = null) {
@@ -72,24 +101,33 @@ export function weeklyPromptDue(now = new Date(), lastReviewedISO = null) {
 }
 
 // One call for the widget: this-week vs last-week counts, a 7- and 30-day trend,
-// and whether the weekly review prompt should show.
-export function computeReview(tasks, now = new Date(), lastReviewedISO = null) {
+// a multi-week trend, and whether the weekly review prompt should show.
+export function computeReview(tasks, now = new Date(), lastReviewedISO = null, weeks = 8) {
   const wkStart = startOfWeek(now)
   const lastWkStart = new Date(wkStart); lastWkStart.setDate(lastWkStart.getDate() - 7)
   const nextWk = new Date(wkStart); nextWk.setDate(nextWk.getDate() + 7)
   const thisWeek = countCompletions(tasks, wkStart, nextWk)
   const lastWeek = countCompletions(tasks, lastWkStart, wkStart)
-  const deltaPct = lastWeek === 0 ? (thisWeek > 0 ? 100 : 0) : Math.round(((thisWeek - lastWeek) / lastWeek) * 100)
+  // A percentage against a zero baseline is meaningless: "+100%" (or worse,
+  // "+100% vs last week (0)") implies a doubling that never happened. When there's
+  // nothing to compare against, `deltaPct` is null and the widget shows an honest
+  // absolute count instead. hasBaseline is the single flag every consumer branches
+  // on so the "no comparison possible" rule lives in one place.
+  const hasBaseline = lastWeek > 0
+  const deltaPct = hasBaseline ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : null
   const last7 = dailyTrend(tasks, now, 7)
   const trend30 = dailyTrend(tasks, now, 30)
+  const weekly = weeklyTrend(tasks, now, weeks)
   return {
     thisWeek,
     lastWeek,
+    hasBaseline,
     deltaPct,
     last7,
     last7Total: last7.reduce((s, d) => s + d.count, 0),
     trend30,
     last30Total: trend30.reduce((s, d) => s + d.count, 0),
+    weekly,
     promptDue: weeklyPromptDue(now, lastReviewedISO),
   }
 }

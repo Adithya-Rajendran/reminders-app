@@ -1,87 +1,37 @@
-/* Triage widget — eat-the-frog "boss" + triage queue + XP/level HUD + celebration.
-   All theme-token driven so light/dark + accents follow. Motion is additionally
-   gated in JS (we don't spawn confetti/fly-ups under prefers-reduced-motion); the
-   global @media (prefers-reduced-motion) in styles.css zeroes any that do render. */
+/* Prioritize widget — a "Most important" callout + the Eisenhower matrix you
+   decide in. All theme-token driven so light/dark + accents follow. No motion,
+   no points, no celebration: a calm decision surface. */
 .triage { position: relative; display: flex; flex-direction: column; gap: 11px; padding: 11px 13px; }
 
-/* ---- HUD: level + XP bar + today ring + streak + settings ---- */
-.tri-hud { display: flex; align-items: center; gap: 10px; }
-/* The level badge is a BUTTON (it opens the XP explainer) — reset the button
-   chrome but keep the old badge look, plus a hover hint that it's clickable. */
-.tri-level { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 13px; font-weight: inherit; color: var(--accent); white-space: nowrap; background: transparent; border: 0; padding: 3px 5px; margin: -3px -5px; border-radius: 8px; cursor: pointer; }
-.tri-level:hover { background: var(--accent-soft); }
-/* One-shot pulse on the badge while a level-up is live (class comes from the same
-   state as the banner, so it never fires under fx==='none'/reduced motion). */
-.tri-level.lvlup { animation: triBadgePop .8s ease; }
-@keyframes triBadgePop {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.18); background: var(--accent-soft); box-shadow: 0 0 0 5px var(--accent-soft); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
-}
-.tri-level-wrap { display: inline-flex; }
-/* XP explainer panel — a .mini-menu shell with prose rows, not menu items. */
-.tri-xp-pop { min-width: 252px; max-width: 306px; cursor: default; }
-.xp-row { font-size: 12px; color: var(--muted); line-height: 1.45; padding: 5px 7px; }
-.xp-row b { color: var(--text); }
-.xp-row + .xp-row { border-top: 1px solid var(--line); }
-.xp-head { font-weight: 700; color: var(--text); }
-.xp-trust { color: var(--accent); font-weight: 600; }
-.tri-xp { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 50px; }
-.tri-xpbar { flex: 1; height: 8px; min-width: 36px; border-radius: 999px; background: var(--panel2); overflow: hidden; }
-.tri-xpfill { height: 100%; border-radius: 999px; background: var(--accent-grad); transition: width 500ms cubic-bezier(.2, .7, .2, 1); }
-.tri-xptext { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; }
-.tri-ring { position: relative; width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; background: conic-gradient(var(--green) calc(var(--p) * 1%), var(--panel2) 0); display: grid; place-items: center; }
-.tri-ring::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--panel-solid); }
-.tri-ring-n { position: relative; font-size: 11px; font-weight: 800; color: var(--text); }
-.tri-streak { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--faint); white-space: nowrap; }
-.tri-streak.on { color: var(--warn); }
-.tri-gear-wrap { display: inline-flex; }
-.tri-gear { color: var(--faint); }
-.tri-gear-menu { left: auto; right: 0; min-width: 210px; }
+/* ---- "Most important" callout (the one task to do now) ---- */
+.tri-focus { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
+.tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+/* The complete button is a real button (not a bare circle) so it's keyboard- and
+   screen-reader-reachable; the check icon only shows the affordance on hover. */
+.tri-focus-check { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 14px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: transparent; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
+.tri-focus-check:hover, .tri-focus-check:focus-visible { background: color-mix(in oklab, var(--accent) 22%, transparent); color: var(--accent); }
+.tri-focus-body { flex: 1; min-width: 0; margin-top: 10px; }
+.tri-focus-title { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.tri-focus-why { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 
-/* ---- view toggle (uses the global .seg segmented control) ---- */
-.tri-toggle { align-self: flex-start; }
-.tri-toggle button { display: inline-flex; align-items: center; gap: 5px; }
-
-/* ---- frog "boss" card ---- */
-.tri-boss { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
-.tri-boss-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
-.tri-boss-check { flex: 0 0 auto; width: 26px; height: 26px; margin-top: 16px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; transition: background 150ms ease; }
-.tri-boss-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
-.tri-boss-body { flex: 1; min-width: 0; margin-top: 12px; }
-.tri-boss-title { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
-.tri-boss-why { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
-.tri-boss-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-.tri-defer { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 40%, transparent); }
-.tri-worth { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
-
-/* Completion beat: the eaten frog's card holds ~900ms in a done state (struck
-   title, "Frog eaten · +N XP" eyebrow) before the next frog takes the slot. */
-.tri-boss-eaten { animation: triEaten .9s ease forwards; }
-.tri-eaten-title { text-decoration: line-through; color: var(--muted); }
-.tri-boss-eaten .tri-boss-eyebrow { color: var(--green); }
-@keyframes triEaten {
-  0% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: .25; }
-}
-
-/* ---- queue ---- */
-.tri-qhead { margin-top: 2px; }
-.tri-empty { font-size: 12.5px; color: var(--muted); padding: 6px 2px; }
-
-/* ---- Eisenhower matrix (carried over from the retired Frog widget) ---- */
+/* ---- Eisenhower matrix ---- */
 .eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; }
+.eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; transition: background 120ms ease, border-color 120ms ease; }
 .eq-Q1 { border-left: 3px solid var(--danger); }
 .eq-Q2 { border-left: 3px solid var(--accent); }
 .eq-Q3 { border-left: 3px solid var(--warn); }
 .eq-Q4 { border-left: 3px solid var(--line-strong); }
+/* Drop-target feedback while a task is dragged over a quadrant. */
+.eq.drop-over { background: var(--accent-soft); border-color: var(--accent); }
 .eq-head { display: flex; align-items: baseline; justify-content: space-between; }
 .eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
 .eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
 .eq-sub { font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
 .eq-list { display: flex; flex-direction: column; gap: 1px; }
+/* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift
+   feel; the row's own controls still work (drag only starts on the row surface). */
+.eq-drag { cursor: grab; }
+.eq-drag:active { cursor: grabbing; }
 /* Quadrant rows are real (dense) TaskRows — scope tighter metrics here so a full
    interactive row still fits a quadrant's scale without touching global .task. */
 .eq-list .task { padding: 3px 4px; gap: 7px; border-radius: 8px; align-items: center; }
@@ -93,36 +43,7 @@
 .eq-more { font-size: 11px; color: var(--faint); padding: 2px 4px; }
 .eq-empty { font-size: 11.5px; color: var(--faint); }
 
-/* ---- celebration: fly-ups, confetti, level-up banner ---- */
-/* Keep the undo bar above the (pointer-events:none) celebration overlay so a
-   level-up banner / confetti never visually covers the Undo action. No
-   `position` here: the base .undo-bar rule supplies position:sticky (pins the
-   bar to the visible bottom on long lists) — a `relative` override would
-   silently put it back below the fold, exactly the bug the sticky fix fixed. */
+/* Keep the undo bar readable at the bottom of a long board. The base .undo-bar
+   rule supplies position:sticky; don't override `position` here (a `relative`
+   override would silently put it below the fold). */
 .triage .undo-bar { z-index: 7; }
-.tri-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
-.tri-flyup { position: absolute; left: 50%; bottom: 58px; font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, .3); animation: triFly 1100ms ease-out forwards; }
-.tri-flyup.combo { color: var(--warn); font-size: 17px; }
-@keyframes triFly {
-  0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); }
-  18% { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -48px) scale(1.05); }
-}
-.tri-confetti { position: absolute; top: -10px; width: 8px; height: 12px; border-radius: 2px; opacity: .9; animation: triConfetti 1300ms cubic-bezier(.3, .6, .4, 1) forwards; }
-.tri-confetti.c0 { background: var(--accent); }
-.tri-confetti.c1 { background: var(--accent2); }
-.tri-confetti.c2 { background: var(--green); }
-.tri-confetti.c3 { background: var(--warn); }
-@keyframes triConfetti {
-  0% { opacity: 0; transform: translateY(0) rotate(0); }
-  10% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(230px) rotate(var(--rot, 240deg)); }
-}
-.tri-levelup { position: absolute; top: 42%; left: 50%; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; background: var(--accent-grad); color: #fff; font-size: 16px; font-weight: 800; box-shadow: var(--shadow); pointer-events: none; animation: triLevelUp 2200ms ease forwards; }
-@keyframes triLevelUp {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
-  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
-  22% { transform: translate(-50%, -50%) scale(1); }
-  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -58%) scale(1); }
-}

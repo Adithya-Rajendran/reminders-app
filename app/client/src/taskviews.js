@@ -121,9 +121,12 @@ export function selectFrogScored(tasks) {
 }
 
 const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)
-// Eisenhower quadrant from importance (PRIORITY ≥ 3) × urgency (due-proximity).
+// Eisenhower quadrant from the EXPLICIT importance flag × urgency (due-proximity).
+// Importance is a first-class user decision (set in Clarify / by dragging between
+// quadrants), NOT inferred from a priority threshold — that inference was the bug
+// that mis-bucketed the matrix (every urgent, not-flagged task flooded "Delegate").
 export function eisenhowerQuadrant(task, now = new Date()) {
-  const important = (task.priority || 0) >= 3
+  const important = !!task.important
   const urgent = isRealDate(task.due_date) && (new Date(task.due_date).getTime() - (+now)) <= URGENT_MS
   return { q: important ? (urgent ? 'Q1' : 'Q2') : (urgent ? 'Q3' : 'Q4'), important, urgent }
 }

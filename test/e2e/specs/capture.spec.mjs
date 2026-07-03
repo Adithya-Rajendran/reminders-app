@@ -27,8 +27,8 @@ test.describe('Quick Capture', () => {
     await input.fill('Email Sam friday 2pm !2 *work')
     await page.keyboard.press('Enter')
 
-    // App-level toast confirms the capture landed in the inbox.
-    await expect(page.locator('.app-toast')).toContainText('Captured to Inbox')
+    // App-level toast confirms the capture landed in the Inbox (v2 copy).
+    await expect(page.locator('.app-toast')).toContainText('Added to Inbox')
 
     // Overlay closes after submit.
     await expect(page.locator('.capture-overlay')).toBeHidden()
