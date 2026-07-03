@@ -11,6 +11,13 @@ import { fakeTasks } from './fakeCtx.js'
 // the tasks capability.
 const overdue = () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(9, 0, 0, 0); return d.toISOString() }
 
+// The "Most important" callout echoes the top task's title, so a title can appear
+// BOTH in the callout and in its matrix cell — scope grid lookups to the draggable
+// row (.eq-drag) to disambiguate. Quadrant labels (.eq-label) likewise collide with
+// TaskRow's own "Schedule" chip, so scope those to the label element.
+const quadCell = (label) => screen.getByText(label, { selector: '.eq-label' }).closest('.eq')
+const gridRow = (title) => screen.getAllByText(title).map((el) => el.closest('.eq-drag')).find(Boolean)
+
 // jsdom's userEvent has no drag-and-drop; fire the native DnD events directly with
 // a minimal dataTransfer stand-in so we can assert the drop persists via onPatch.
 function drop(sourceEl, targetEl, id) {
@@ -43,9 +50,9 @@ describe('TriageWidget (Prioritize)', () => {
       { id: 3, title: 'Important later', priority: 0, important: true, done: false, labels: [] },
     ])
     render(<TriageWidget tasks={cap} instanceId="tri-buckets" />)
-    const q1 = screen.getByText('Do first').closest('.eq')
-    const q2 = screen.getByText('Schedule').closest('.eq')
-    const q3 = screen.getByText('Delegate').closest('.eq')
+    const q1 = quadCell('Do first')
+    const q2 = quadCell('Schedule')
+    const q3 = quadCell('Delegate')
     expect(q1).toHaveTextContent('Important urgent')
     expect(q2).toHaveTextContent('Important later')
     expect(q3).toHaveTextContent('Loud but unimportant') // priority alone never lands in Q1
@@ -58,7 +65,7 @@ describe('TriageWidget (Prioritize)', () => {
       { id: 2, title: 'Minor important', priority: 1, important: true, done: false, labels: [] },
     ])
     render(<TriageWidget tasks={cap} instanceId="tri-focus" />)
-    const focus = screen.getByText(/Most important/i).closest('.tri-focus')
+    const focus = screen.getByText('Most important', { selector: '.tri-focus-eyebrow' }).closest('.tri-focus')
     expect(focus).toHaveTextContent('Ship release') // Q1 top by priority
   })
 
@@ -89,8 +96,8 @@ describe('TriageWidget (Prioritize)', () => {
       { id: 9, title: 'Reframe me', important: false, done: false, labels: [] },
     ])
     render(<TriageWidget tasks={cap} instanceId="tri-drag-up" />)
-    const source = screen.getByText('Reframe me').closest('.eq-drag')
-    const target = screen.getByText('Do first').closest('.eq')
+    const source = gridRow('Reframe me')
+    const target = quadCell('Do first')
     drop(source, target, 9)
     // Q1 = important + urgent: flip the flag AND give it a "now" so it stays put.
     expect(cap.calls.update).toHaveLength(1)
@@ -106,8 +113,8 @@ describe('TriageWidget (Prioritize)', () => {
       { id: 11, title: 'Down-rank me', important: true, due_date: due, done: false, labels: [] }, // in Q1
     ])
     render(<TriageWidget tasks={cap} instanceId="tri-drag-down" />)
-    const source = screen.getByText('Down-rank me').closest('.eq-drag')
-    const target = screen.getByText('Later').closest('.eq')
+    const source = gridRow('Down-rank me')
+    const target = quadCell('Later')
     drop(source, target, 11)
     // Q4 = not-important, non-urgent column: flip important false, DON'T touch due.
     expect(cap.calls.update).toContainEqual([11, { important: false }])
