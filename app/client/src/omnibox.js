@@ -16,6 +16,8 @@
 //             onto the unrelated title.
 //   priority  optional command nudge (higher = earlier), the same field App sets.
 import { fuzzyMatch } from './fuzzy.js'
+import { WIDGET_MANIFEST } from './widgets/manifest.js'
+import { aliasesForType } from './palettecmds.js'
 
 // Cross-type base weight: a precise command/navigation match should lead over a
 // weak content match on a short query, while a strong content match (a task/note
@@ -61,5 +63,82 @@ export function rankEntries(term, entries) {
     || (String(a.item.title).length - String(b.item.title).length)
     || String(a.item.title).localeCompare(String(b.item.title)),
   )
+  return out
+}
+
+// Flatten every palette source into ONE typed, rankable entry list — the shape
+// rankEntries() consumes. Kept pure (no React/DOM) so the framework-free node tests
+// exercise the wiring: which sources, in what order, with which id/tag/keys, the
+// Go-to-vs-Add nav verb, and the conditional Clear-filter row. The side-effecting bits
+// (`icon` components + the run actions) are INJECTED via `actions`, so this module
+// stays free of React and of the app's buses. WIDGET_MANIFEST + aliasesForType are
+// pure data and imported directly; `dueChip` (which drags in the api client) is
+// injected. `sources.filter` is the CURRENT organizer filter (drives the Clear row).
+export function buildEntries(sources, actions) {
+  const { commands = [], board = [], tasks = [], notes = [], areas = [], contexts = [], filter = null } = sources || {}
+  const {
+    newNoteIcon, clearFilterIcon, dueChip,
+    onNewNote, onGoTo, onAdd, onScope, onRevealTask, onOpenNote,
+  } = actions || {}
+  const out = []
+
+  // Commands (host-provided app actions + a built-in "New note").
+  out.push({ kind: 'command', id: 'new-note', title: 'New note', subtitle: 'Create a note in Notes — shortcut: n', icon: newNoteIcon, priority: 1, tag: 'Command', run: onNewNote })
+  for (const c of commands) {
+    out.push({
+      kind: 'command', id: c.id, title: c.label, subtitle: c.hint, icon: c.icon,
+      priority: c.priority || 0, tag: c.tag || 'Command',
+      keys: [c.label, ...(c.aliases || [])], run: c.run,
+    })
+  }
+
+  // Navigation: one entry per widget surface. Present → go to it; absent → add it.
+  const onBoardByType = new Map()
+  for (const w of board) { if (!onBoardByType.has(w.type)) onBoardByType.set(w.type, w) }
+  for (const m of WIDGET_MANIFEST) {
+    const here = onBoardByType.get(m.type)
+    const verb = here ? 'Go to' : 'Add'
+    out.push({
+      kind: 'nav', id: 'nav-' + m.type, title: `${verb} ${m.label}`,
+      subtitle: here ? 'On this board' : (m.desc || 'Add to this board'), tag: verb, priority: 2,
+      keys: [`${verb} ${m.label}`, m.label, ...aliasesForType(m.type)],
+      run: here ? () => onGoTo(here) : () => onAdd(m.type),
+    })
+  }
+
+  // Areas/Projects and Contexts — selecting one SCOPES the whole board to it (the
+  // board filter bar then shows the active scope + a Clear). Not a dead-end: the
+  // task-list widgets (Overview, Reminders, Upcoming, Prioritize, Review) all honour
+  // the filter; the Inbox is the deliberate exception — it clarifies every capture
+  // regardless of scope, since captures have no Area/Context until you clarify them.
+  for (const a of areas) {
+    const kind = a.kind === 'project' ? 'Project' : 'Area'
+    out.push({ kind: 'area', id: a.id, title: a.name, subtitle: `Scope the board to this ${kind.toLowerCase()}`, tag: kind, keys: [a.name], run: () => onScope({ areaId: a.id, context: null }) })
+  }
+  for (const c of contexts) {
+    out.push({ kind: 'context', id: 'ctx-' + c, title: '@' + c, subtitle: 'Scope the board to this context', tag: 'Context', keys: [c, '@' + c], run: () => onScope({ areaId: null, context: c }) })
+  }
+  // Offer a clear only when a scope is actually active.
+  if (filter && (filter.areaId || filter.context)) {
+    out.push({ kind: 'command', id: 'clear-filter', title: 'Clear board filter', subtitle: 'Show tasks from all areas & contexts', icon: clearFilterIcon, priority: 2, tag: 'Command', keys: ['Clear board filter', 'clear filter', 'show all', 'unfilter', 'reset scope'], run: () => onScope({ areaId: null, context: null }) })
+  }
+
+  // Live tasks (open only — completed ones would flood content search).
+  for (const t of tasks) {
+    if (!t || t.done || t.id == null) continue
+    const c = dueChip ? dueChip(t.due_date) : null
+    out.push({
+      kind: 'task', id: 'task-' + t.id, title: t.title || '(untitled task)',
+      subtitle: c ? c.label : 'Task', tag: 'Task', run: () => onRevealTask(t.id),
+    })
+  }
+
+  // Notes.
+  for (const n of (notes || [])) {
+    out.push({
+      kind: 'note', id: 'note-' + n.path, title: n.title, subtitle: n.folder || '', folder: n.folder,
+      tag: 'Note', run: () => onOpenNote(n.path),
+    })
+  }
   return out
 }

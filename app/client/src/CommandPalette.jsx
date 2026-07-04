@@ -3,15 +3,13 @@ import ModalFrame from './ModalFrame.jsx'
 import { useModalRef } from './useModalRef.js'
 import { emitOpenNote } from './notesbus.js'
 import { notesApi, api } from './api.js'
-import { rankEntries } from './omnibox.js'
+import { rankEntries, buildEntries } from './omnibox.js'
 import { selectContexts } from './taskviews.js'
-import { aliasesForType } from './palettecmds.js'
 import { createAndOpenNote } from './noteactions.js'
 import { getTasks, subscribe as subscribeTasks } from './taskstore.js'
 import { getOrganizerFilter, setOrganizerFilter } from './organizerfilter.js'
 import { emitRevealTask } from './revealbus.js'
 import { getBoard, onBoard, flashWidget, emitAddWidget } from './boardbus.js'
-import { WIDGET_MANIFEST } from './widgets/manifest.js'
 import { dueChip } from './tasklib.js'
 import { IconSearch, IconNote, IconPlus, IconFolder, IconList, IconX, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
 
@@ -92,72 +90,25 @@ export default function CommandPalette({ initialMode = 'search', commands = [], 
   const [board, setBoard] = useState(() => getBoard())
   useEffect(() => onBoard(setBoard), [])
 
-  // Flatten every source into one typed, rankable entry list. Rebuilt only when a
-  // source actually changes (not per keystroke); ranking runs on `term` below.
-  const entries = useMemo(() => {
-    const out = []
-
-    // Commands (host-provided app actions + a built-in "New note").
-    out.push({ kind: 'command', id: 'new-note', title: 'New note', subtitle: 'Create a note in Notes — shortcut: n', icon: IconPlus, priority: 1, tag: 'Command', run: createAndOpenNote })
-    for (const c of commands) {
-      out.push({
-        kind: 'command', id: c.id, title: c.label, subtitle: c.hint, icon: c.icon,
-        priority: c.priority || 0, tag: c.tag || 'Command',
-        keys: [c.label, ...(c.aliases || [])], run: c.run,
-      })
-    }
-
-    // Navigation: one entry per widget surface. Present → go to it; absent → add it.
-    const onBoardByType = new Map()
-    for (const w of board) { if (!onBoardByType.has(w.type)) onBoardByType.set(w.type, w) }
-    for (const m of WIDGET_MANIFEST) {
-      const here = onBoardByType.get(m.type)
-      const verb = here ? 'Go to' : 'Add'
-      out.push({
-        kind: 'nav', id: 'nav-' + m.type, title: `${verb} ${m.label}`,
-        subtitle: here ? 'On this board' : (m.desc || 'Add to this board'), tag: verb, priority: 2,
-        keys: [`${verb} ${m.label}`, m.label, ...aliasesForType(m.type)],
-        run: here ? () => flashWidget(here.i) : () => emitAddWidget(m.type),
-      })
-    }
-
-    // Areas/Projects and Contexts — selecting one SCOPES the whole board to it (the
-    // board filter bar then shows the active scope + a Clear). Not a dead-end: the
-    // task-list widgets (Overview, Reminders, Upcoming, Prioritize, Review) all honour
-    // the filter; the Inbox is the deliberate exception — it clarifies every capture
-    // regardless of scope, since captures have no Area/Context until you clarify them.
-    for (const a of areas) {
-      const kind = a.kind === 'project' ? 'Project' : 'Area'
-      out.push({ kind: 'area', id: a.id, title: a.name, subtitle: `Scope the board to this ${kind.toLowerCase()}`, tag: kind, keys: [a.name], run: () => setOrganizerFilter({ areaId: a.id, context: null }) })
-    }
-    for (const c of contexts) {
-      out.push({ kind: 'context', id: 'ctx-' + c, title: '@' + c, subtitle: 'Scope the board to this context', tag: 'Context', keys: [c, '@' + c], run: () => setOrganizerFilter({ areaId: null, context: c }) })
-    }
-    // Offer a clear only when a scope is actually active.
-    const f = getOrganizerFilter()
-    if (f && (f.areaId || f.context)) {
-      out.push({ kind: 'command', id: 'clear-filter', title: 'Clear board filter', subtitle: 'Show tasks from all areas & contexts', icon: IconX, priority: 2, tag: 'Command', keys: ['Clear board filter', 'clear filter', 'show all', 'unfilter', 'reset scope'], run: () => setOrganizerFilter({ areaId: null, context: null }) })
-    }
-
-    // Live tasks (open only — completed ones would flood content search).
-    for (const t of tasks) {
-      if (!t || t.done || t.id == null) continue
-      const c = dueChip(t.due_date)
-      out.push({
-        kind: 'task', id: 'task-' + t.id, title: t.title || '(untitled task)',
-        subtitle: c ? c.label : 'Task', tag: 'Task', run: () => emitRevealTask(t.id),
-      })
-    }
-
-    // Notes.
-    for (const n of (notes || [])) {
-      out.push({
-        kind: 'note', id: 'note-' + n.path, title: n.title, subtitle: n.folder || '', folder: n.folder,
-        tag: 'Note', run: () => emitOpenNote(n.path),
-      })
-    }
-    return out
-  }, [commands, board, tasks, notes, areas, contexts])
+  // Flatten every source into one typed, rankable entry list (see omnibox.buildEntries
+  // for the pure wiring). Rebuilt only when a source actually changes (not per
+  // keystroke); ranking runs on `term` below. The side-effecting `icon`/`run` fields
+  // are injected here — buildEntries itself stays React/DOM-free so the node tests can
+  // cover the source/order/id/keys/verb logic. (getOrganizerFilter() is read live, not
+  // a memo dep — the pre-refactor behaviour: the Clear-filter row refreshes with the
+  // next source change, which is fine since setting a filter changes a source too.)
+  const entries = useMemo(() => buildEntries(
+    { commands, board, tasks, notes, areas, contexts, filter: getOrganizerFilter() },
+    {
+      newNoteIcon: IconPlus, clearFilterIcon: IconX, dueChip,
+      onNewNote: createAndOpenNote,
+      onGoTo: (w) => flashWidget(w.i),
+      onAdd: (type) => emitAddWidget(type),
+      onScope: setOrganizerFilter,
+      onRevealTask: emitRevealTask,
+      onOpenNote: emitOpenNote,
+    },
+  ), [commands, board, tasks, notes, areas, contexts])
 
   // Full-text note-BODY search (server): the entry list only matches note TITLES,
   // so a word that lives only inside a note's body would never surface. Debounced;
