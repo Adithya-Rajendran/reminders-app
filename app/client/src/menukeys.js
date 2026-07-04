@@ -17,8 +17,9 @@ export function nextIndex(key, current, length) {
 }
 
 // Keys the hook claims (and preventDefaults) when the menu is open. Left/Right
-// alias Up/Down only for radio-style rows (e.g. the horizontal estimate chips),
-// where horizontal arrows are what a user expects.
+// alias Up/Down for horizontal radio-style rows that opt in via `radio: true`,
+// where horizontal arrows are what a user expects. No menu currently opts in
+// (the former horizontal picker was removed) — kept for future horizontal rows.
 export function claimsKey(key, { radio = false } = {}) {
   if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) return true
   return radio && (key === 'ArrowLeft' || key === 'ArrowRight')
