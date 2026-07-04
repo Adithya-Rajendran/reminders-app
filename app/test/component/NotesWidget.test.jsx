@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import NotesWidget from '../../client/src/widgets/NotesWidget.jsx'
+import { WidgetSizeContext } from '../../client/src/useWidgetSize.js'
 import { fakeNotes } from './fakeCtx.js'
 
 // jsdom has no native drag-and-drop, so fireEvent's DragEvent carries no
@@ -44,6 +45,22 @@ describe('NotesWidget', () => {
     const notes = fakeNotes({ configured: true, notes: [{ path: 'Alpha.md', title: 'Alpha', folder: '', tags: [] }] })
     render(<NotesWidget notes={notes} onOpenSettings={() => {}} instanceId="n1" />)
     expect(await screen.findByText('Alpha')).toBeInTheDocument()
+  })
+
+  it('keeps the compact toolbar to search and new-note controls', async () => {
+    const notes = fakeNotes({ configured: true, notes: [{ path: 'Alpha.md', title: 'Alpha', folder: '', tags: [] }] })
+    render(
+      <WidgetSizeContext.Provider value={{ w: 'sm', h: 'sm', name: 'mini', width: 286, height: 170 }}>
+        <NotesWidget notes={notes} onOpenSettings={() => {}} instanceId="n-compact" />
+      </WidgetSizeContext.Provider>,
+    )
+
+    expect(await screen.findByText('Alpha')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Search notes/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /New note/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sort notes/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Today's note/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /New folder/i })).toBeNull()
   })
 
   // ---- error UX ----

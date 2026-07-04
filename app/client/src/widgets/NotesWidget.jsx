@@ -1,7 +1,7 @@
 import './NotesWidget.css'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  useWidgetSize, atMostW, atLeastW, atLeastH, usePopover,
+  useWidgetSize, atMostW, atMostH, atLeastW, atLeastH, usePopover,
   buildTree, folderKids, noteKids, countNotes, canDropInto,
   sortNotes, SORTS, ancestorsOf, pushRecent, pruneRecent,
   widgetStore,
@@ -125,6 +125,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
   const narrow = atMostW(sz, 'md')
   const wide = atLeastW(sz, 'xl')
   const showAux = atLeastH(sz, 'sm')
+  const compactTools = atMostW(sz, 'sm') || atMostH(sz, 'xs')
 
   // stateRef lets the load callback read the current state without being listed
   // as a dep (which would recreate load() on every state change and cause loops).
@@ -390,21 +391,23 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
       {stale && <ReconnectBanner onRetry={load} />}
       {showSidebar && (
         <aside className="notes-sidebar">
-          <div className="note-toolbar">
+          <div className={`note-toolbar${compactTools ? ' compact' : ''}`}>
             <input className="note-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
-            <div className="note-sort" ref={sortRef}>
-              <button className="iconbtn sm" aria-label="Sort notes" title="Sort notes" aria-haspopup="menu" aria-expanded={sortOpen} onClick={() => setSortOpen((o) => !o)}><IconSort size={15} /></button>
-              {sortOpen && (
-                <div className="menu note-sort-menu" role="menu">
-                  <div className="menu-label">Sort by</div>
-                  {SORTS.map((s) => <button key={s.key} type="button" className={`menu-item${sort === s.key ? ' active' : ''}`} role="menuitem" onClick={() => changeSort(s.key)}>{s.label}</button>)}
-                </div>
-              )}
-            </div>
-            <button className="iconbtn sm" aria-label="Today's note" title="Open today's note" onClick={openToday}><IconSun size={15} /></button>
-            <button className="iconbtn sm" aria-label="New folder" title={sel ? `New folder in ${sel}` : 'New folder'} onClick={() => setFolderPrompt(true)}><IconFolder size={15} /></button>
+            {!compactTools && (
+              <div className="note-sort" ref={sortRef}>
+                <button className="iconbtn sm" aria-label="Sort notes" title="Sort notes" aria-haspopup="menu" aria-expanded={sortOpen} onClick={() => setSortOpen((o) => !o)}><IconSort size={15} /></button>
+                {sortOpen && (
+                  <div className="menu note-sort-menu" role="menu">
+                    <div className="menu-label">Sort by</div>
+                    {SORTS.map((s) => <button key={s.key} type="button" className={`menu-item${sort === s.key ? ' active' : ''}`} role="menuitem" onClick={() => changeSort(s.key)}>{s.label}</button>)}
+                  </div>
+                )}
+              </div>
+            )}
+            {!compactTools && <button className="iconbtn sm" aria-label="Today's note" title="Open today's note" onClick={openToday}><IconSun size={15} /></button>}
+            {!compactTools && <button className="iconbtn sm" aria-label="New folder" title={sel ? `New folder in ${sel}` : 'New folder'} onClick={() => setFolderPrompt(true)}><IconFolder size={15} /></button>}
             <button className="iconbtn sm" aria-label="New note" title={sel ? `New note in ${sel}` : 'New note'} onClick={newNote}><IconPlus size={16} /></button>
-            {templates.length > 0 && (
+            {!compactTools && templates.length > 0 && (
               <div className="note-tpl" ref={tplRef}>
                 <button className="iconbtn sm" aria-label="New from template" title="New from template" aria-haspopup="menu" aria-expanded={tplOpen} onClick={() => setTplOpen((o) => !o)}><IconChevDown size={14} /></button>
                 {tplOpen && (
