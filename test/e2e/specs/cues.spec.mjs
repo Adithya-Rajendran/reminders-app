@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, seedLayout, widget, clearTasks, createTask, listTasks, isoIn } from '../lib.mjs'
+import { gotoApp, seedLayout, widget, clearTasks, createTask, listTasks, taskProjectId, isoIn } from '../lib.mjs'
 
 // Productive flow: model a trigger chain — drag reminder cards onto the board,
 // link them, and annotate cues — all persisting to X-REMINDERS-FLOW on the VTODO.
 test.beforeEach(async ({ request }) => {
   await clearTasks(request)
-  await createTask(request, 1, { title: 'Wake up', reminders: [{ reminder: isoIn(120) }] })
-  await createTask(request, 1, { title: 'Go for a run', reminders: [{ reminder: isoIn(180) }] })
+  const pid = await taskProjectId(request)
+  await createTask(request, pid, { title: 'Wake up', reminders: [{ reminder: isoIn(120) }] })
+  await createTask(request, pid, { title: 'Go for a run', reminders: [{ reminder: isoIn(180) }] })
   await seedLayout(request, [{ type: 'cues' }])
 })
 

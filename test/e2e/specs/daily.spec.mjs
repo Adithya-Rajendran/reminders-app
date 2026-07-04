@@ -1,19 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { STATE, gotoApp, seedLayout, widget, waitWidgetReady, clearTasks, createTask, isoDaysAgo } from '../lib.mjs'
+import { STATE, gotoApp, seedLayout, widget, waitWidgetReady, clearTasks, clearDailyPlan, createTask, isoDaysAgo, ymd } from '../lib.mjs'
 
 // Daily Plan: API correctness, UI suggestion → plan roundtrip, and the Focus
 // widget chip that reflects a non-empty plan.
-
-// Local YYYY-MM-DD in the runner's timezone — same convention the widget uses
-// when posting to /api/daily-plan (dates are local, not UTC).
-const pad = (n) => String(n).padStart(2, '0')
-const ymd = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 
 test.describe('Daily Plan', () => {
   test.afterEach(async ({ request }) => {
     await clearTasks(request)
     // Clear today's plan so a leftover doesn't bleed into the next test.
-    await request.put('/api/daily-plan', { data: { date: ymd(), ids: [] } })
+    await clearDailyPlan(request)
   })
 
   test('plan API roundtrip + validation', async ({ request }) => {

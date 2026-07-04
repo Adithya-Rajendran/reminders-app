@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "e2e": "bash run.sh"
+    "e2e": "bash run.sh",
+    "e2e:resize": "bash run.sh specs/resize-polish.spec.mjs",
+    "e2e:report-check": "node report-check.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

@@ -51,13 +51,12 @@ function FlowNode({ task, pos, dragging, linkArmed, onMoveStart, onLinkStart, on
 
 export default function CuesWidget({ tasks: tasksCap, groups, group: initialGroup }) {
   const selector = useCallback((all) => all, [])
-  const { tasks, state, load, onToggle, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
+  const { tasks, state, load, onToggle, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   // Editing a cue here also derives its typed trigger (time/location/after) so the
   // cue is contextually usable elsewhere (e.g. the Focus widget) — see cueTriggerOf.
   const setCue = useCallback((task, text) => {
-    onSetCue(task, text)
-    onPatch(task, { cue_trigger: text ? cueTriggerOf(text) : null })
-  }, [onSetCue, onPatch])
+    onPatch(task, { cue: text, cue_trigger: text ? cueTriggerOf(text) : null })
+  }, [onPatch])
   const [group, setGroup] = useState(initialGroup || '')
   const [knownGroups, setKnownGroups] = useState([])
   const [drag, setDrag] = useState(null)

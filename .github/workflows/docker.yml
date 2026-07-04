@@ -9,6 +9,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  TZ: UTC
+
 # Serialize publishes; never cancel one mid-manifest-push.
 concurrency:
   group: docker-publish-${{ github.ref }}
@@ -50,6 +53,7 @@ jobs:
       - name: Boot smoke test before pushing
         run: bash app/scripts/smoke-image.sh reminders-app:smoke
       - name: Push
+        id: push
         # A pure gha-cache hit of the build above (~seconds) — same layers.
         uses: docker/build-push-action@v6
         with:
@@ -58,3 +62,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+      - name: Record pushed digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/image"
+          echo "${{ steps.push.outputs.digest }}" > "$RUNNER_TEMP/image/digest.txt"
+          echo "Published ghcr.io/${{ github.repository }}@${{ steps.push.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload image digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digest
+          path: ${{ runner.temp }}/image/digest.txt
+          retention-days: 14

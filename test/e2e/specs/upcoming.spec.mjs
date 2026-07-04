@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, seedLayout, widget, clearTasks, createTask, isoDaysAgo, isoDaysFromNow } from '../lib.mjs'
+import { gotoApp, seedLayout, widget, clearTasks, createTask, taskProjectId, isoDaysAgo, isoDaysFromNow } from '../lib.mjs'
 
 // Productive flow: triage everything scheduled by when it's due, and zoom in on
 // two-minute wins.
 test.beforeEach(async ({ request }) => {
   await clearTasks(request)
-  const p = 1
+  const p = await taskProjectId(request)
   await createTask(request, p, { title: 'Overdue item', due_date: isoDaysAgo(2) })
   await createTask(request, p, { title: 'Today item', due_date: isoDaysFromNow(0) })
   await createTask(request, p, { title: 'Tomorrow item', due_date: isoDaysFromNow(1) })

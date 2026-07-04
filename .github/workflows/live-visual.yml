@@ -1,0 +1,114 @@
+name: live-visual
+
+on:
+  workflow_run:
+    workflows: [deploy]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TZ: UTC
+  DEV_VISUAL_BASE_URL: ${{ vars.DEV_VISUAL_BASE_URL }}
+  DEV_VISUAL_USER: ${{ vars.DEV_VISUAL_USER || 'visual-audit-user' }}
+  DEV_K8S_NAMESPACE: ${{ vars.DEV_K8S_NAMESPACE || 'reminders-app' }}
+  DEV_K8S_DEPLOYMENT: ${{ vars.DEV_K8S_DEPLOYMENT || 'reminders-dev' }}
+
+concurrency:
+  group: live-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resize-audit:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check live visual configuration
+        id: config
+        run: |
+          if [ -z "$DEV_VISUAL_BASE_URL" ]; then
+            echo "::notice::DEV_VISUAL_BASE_URL repo variable is not configured — skipping live visual audit."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.configured == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.configured == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: test/e2e/package-lock.json
+
+      - name: Cache Playwright browsers
+        if: steps.config.outputs.configured == 'true'
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('test/e2e/package-lock.json') }}
+
+      - name: Install e2e deps + browser
+        if: steps.config.outputs.configured == 'true'
+        working-directory: test/e2e
+        run: |
+          npm ci
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Restart dev deployment
+        if: steps.config.outputs.configured == 'true'
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+        run: |
+          if [ -z "$KUBE_CONFIG_DATA" ]; then
+            echo "::notice::KUBE_CONFIG_DATA secret not configured — running live visual audit without restarting dev deployment."
+            exit 0
+          fi
+          echo "$KUBE_CONFIG_DATA" | base64 -d > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          kubectl rollout restart "deployment/$DEV_K8S_DEPLOYMENT" -n "$DEV_K8S_NAMESPACE"
+          app_label=$(kubectl get "deployment/$DEV_K8S_DEPLOYMENT" -n "$DEV_K8S_NAMESPACE" -o jsonpath='{.spec.selector.matchLabels.app}')
+          if [ -z "$app_label" ]; then app_label="$DEV_K8S_DEPLOYMENT"; fi
+          pod=""
+          for i in $(seq 1 60); do
+            pod=$(kubectl get pods -n "$DEV_K8S_NAMESPACE" -l "app=$app_label" -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1)
+            [ -n "$pod" ] && { echo "dev pod ready: $pod"; exit 0; }
+            sleep 5
+          done
+          kubectl get pods -n "$DEV_K8S_NAMESPACE"
+          echo "::error::dev deployment did not become ready"
+          exit 1
+
+      - name: Run live dev resize audit
+        if: steps.config.outputs.configured == 'true'
+        working-directory: test/e2e
+        env:
+          BASE_URL: ${{ env.DEV_VISUAL_BASE_URL }}
+          E2E_USER: ${{ env.DEV_VISUAL_USER }}
+          CI: true
+        run: |
+          npx playwright test specs/resize-polish.spec.mjs
+          npm run e2e:report-check
+
+      - name: Upload live visual artifacts
+        if: ${{ !cancelled() && steps.config.outputs.configured == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-visual-resize-artifacts
+          path: |
+            test/e2e/.artifacts
+            test/e2e/playwright-report
+            test/e2e/test-results
+          retention-days: 14

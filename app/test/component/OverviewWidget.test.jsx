@@ -140,9 +140,10 @@ describe('OverviewWidget', () => {
     ))
 
     expect(await screen.findByText('On track')).toBeInTheDocument()
-    expect(screen.getByLabelText(/0 overdue, 1 due today/i)).toBeInTheDocument()
     expect(screen.getByText('Do the important thing')).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/capture to inbox/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/0 overdue, 1 due today/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Due today')).not.toBeInTheDocument()
     expect(screen.queryByText('Next up')).not.toBeInTheDocument()
   })
 })
