@@ -46,6 +46,10 @@
 .notes-split { flex-direction: row; gap: 0; align-items: stretch; }
 .notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
 .notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
+.notes-sidebar .note-toolbar { min-width: 0; }
+.notes-sidebar .note-search { min-width: 0; }
+.notes-sidebar .note-toolbar.compact { gap: 5px; padding-right: 0; }
+.notes-sidebar .note-toolbar.compact .note-search { padding-left: 8px; padding-right: 8px; }
 .notes-split .notes-main { padding-left: 12px; }
 /* On a very wide widget, give the tree more room so deep paths don't truncate. */
 .notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
