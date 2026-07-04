@@ -66,7 +66,7 @@ export default function AreaPicker({ value = '', areas = [], onSet }) {
         </button>
       ) : null}
       {open && (
-        <AnchoredPopover anchorRef={btnRef} onClose={() => setOpen(false)} navOptions={LIST_NAV} minWidth={200} role="listbox" ariaLabel="Project or area">
+        <AnchoredPopover anchorRef={btnRef} onClose={() => setOpen(false)} navOptions={LIST_NAV} minWidth={200} heightFallback={300} role="listbox" ariaLabel="Project or area">
           <div className="gp-panel">
             <div className="gp-list">
               <button type="button" className={`gp-item${!value ? ' on' : ''}`} role="option" aria-selected={!value} onClick={() => pick('')}>

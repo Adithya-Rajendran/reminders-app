@@ -11,7 +11,7 @@ import { useMenuKeyNav } from './useMenuKeyNav.js'
 //
 // `navOptions` MUST be a stable (module-level) object: useMenuKeyNav keys its effect
 // on it, so a per-render object would re-focus `initial` mid-navigation.
-export function AnchoredPopover({ anchorRef, onClose, navOptions, minWidth = 220, role, ariaLabel, children }) {
+export function AnchoredPopover({ anchorRef, onClose, navOptions, minWidth = 220, heightFallback = 320, role, ariaLabel, children }) {
   const popRef = useRef(null)
   const [pos, setPos] = useState(null)
   // `!!pos`, not `true`: the pop renders null until placed, so keying the hook on
@@ -21,12 +21,16 @@ export function AnchoredPopover({ anchorRef, onClose, navOptions, minWidth = 220
     const r = anchorRef.current?.getBoundingClientRect()
     if (!r) return
     const W = Math.max(minWidth, r.width)
-    const H = popRef.current?.offsetHeight || 320
+    // On the FIRST placement `pos` is null so the portal isn't mounted yet and
+    // popRef has no height — `heightFallback` is the assumed height that decides
+    // flip-above on that first paint (re-measured on the next scroll/resize). Each
+    // picker keeps its original guess so this stays a behaviour-preserving default.
+    const H = popRef.current?.offsetHeight || heightFallback
     const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
     let top = r.bottom + 6
     if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 6)
     setPos({ top, left, width: W })
-  }, [anchorRef, minWidth])
+  }, [anchorRef, minWidth, heightFallback])
   useLayoutEffect(() => { place() }, [place])
   useEffect(() => {
     window.addEventListener('scroll', place, true)
