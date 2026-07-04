@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useRef, useState } from 'react'
 import { IconPlus, IconChevDown, IconX } from '../../icons.jsx'
-import { useMenuKeyNav } from './useMenuKeyNav.js'
+import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // The panel content: a search box, the recent groups (or search matches), and a
 // "New group…" row that routes to Settings (group creation lives there now).
@@ -22,7 +21,7 @@ export function GroupList({ groups = [], recent = [], value, onPick, onNew, neut
         onChange={(e) => setQ(e.target.value)}
         // Enter is the fast path for "type a few letters, pick the top hit" — it
         // picks the first visible row. Arrow/Home/End roving into the option list
-        // is handled by useMenuKeyNav up in GroupPop (which wraps this panel).
+        // is handled by useMenuKeyNav in the AnchoredPopover that wraps this panel.
         onKeyDown={(e) => { if (e.key === 'Enter' && rows.length) { e.preventDefault(); onPick(rows[0]) } }}
         placeholder="Search groups…" aria-label="Search groups"
       />
@@ -49,60 +48,10 @@ export function GroupList({ groups = [], recent = [], value, onPick, onNew, neut
   )
 }
 
-// Portal popover anchored to a trigger (below, flipped above if no room), so it is
-// never clipped by a small/scrolling widget. Dismisses on outside-click / Esc.
-//
 // Keyboard: focus starts in the search box (typing filters), ArrowDown moves into
-// the option list. Module-level options so the object identity is stable — the
-// hook's effect keys on it, and a per-render object would re-focus `initial`.
+// the option list. Module-level options so the object identity is stable — the hook's
+// effect keys on it, and a per-render object would re-focus `initial`.
 const LIST_NAV = { selector: '.gp-item', initial: (el) => el.querySelector('.gp-search') }
-
-function GroupPop({ anchorRef, onClose, children }) {
-  const popRef = useRef(null)
-  const [pos, setPos] = useState(null)
-  // `!!pos`, not `true`: the pop renders null until placed, so keying the hook on
-  // placement makes its effect run only once the panel actually exists in the DOM.
-  useMenuKeyNav(!!pos, popRef, LIST_NAV)
-  const place = useCallback(() => {
-    const r = anchorRef.current?.getBoundingClientRect()
-    if (!r) return
-    const W = Math.max(220, r.width)
-    const H = popRef.current?.offsetHeight || 320
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
-    let top = r.bottom + 6
-    if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 6)
-    setPos({ top, left, width: W })
-  }, [anchorRef])
-  useLayoutEffect(() => { place() }, [place])
-  useEffect(() => {
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
-  }, [place])
-  useEffect(() => {
-    // Capture the element that had focus when this popover mounted (the trigger).
-    // On cleanup we restore focus there if it's orphaned — keyboard users aren't
-    // dumped to <body> after Esc or selecting an item. Same orphan-check idiom as
-    // usePopover.js: if the user clicked another control, leave focus there.
-    const prevFocus = document.activeElement
-    const onDown = (e) => { if (popRef.current && !popRef.current.contains(e.target) && !anchorRef.current?.contains(e.target)) onClose() }
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-      const active = document.activeElement
-      const orphaned = !active || active === document.body || (popRef.current && popRef.current.contains(active))
-      if (orphaned && prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus()
-    }
-  }, [anchorRef, onClose])
-  if (!pos) return null
-  return createPortal(
-    <div ref={popRef} className="gp-pop menu" style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}>{children}</div>,
-    document.body,
-  )
-}
 
 // A searchable group dropdown: the last-3 used groups by default, a search box to
 // find any group, and "New group…" → Settings (no inline group creation).
@@ -135,9 +84,9 @@ export default function GroupPicker({ value, groups = [], recent = [], onChange,
         </button>
       ) : null}
       {open && (
-        <GroupPop anchorRef={btnRef} onClose={() => setOpen(false)}>
+        <AnchoredPopover anchorRef={btnRef} onClose={() => setOpen(false)} navOptions={LIST_NAV}>
           <GroupList groups={groups} recent={recent} value={value} onPick={pick} onNew={handleNew} neutral={neutral} />
-        </GroupPop>
+        </AnchoredPopover>
       )}
     </span>
   )

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useRef, useState } from 'react'
 import { IconChevDown, IconPlus, IconCheck } from '../../icons.jsx'
-import { useMenuKeyNav } from './useMenuKeyNav.js'
+import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // Pick zero or more Contexts for a task (the "@errands / @calls / @deep-work"
 // mode axis, orthogonal to the single Project/Area). Contexts are plain label
@@ -73,52 +72,9 @@ function ContextPanel({ value, options, onToggle, onCreate }) {
   )
 }
 
-// Portal popover anchored under the trigger (flips above if no room). Same
-// placement + focus-restore idiom as GroupPicker; the checkbox items and the
-// search box are the roving targets. Module-level nav options for stable identity;
-// focus starts in the search box, ArrowDown moves into the checkbox list.
+// Module-level nav options for stable identity; focus starts in the search box,
+// ArrowDown moves into the checkbox list.
 const LIST_NAV = { selector: '.gp-item', initial: (el) => el.querySelector('.gp-search') }
-
-function ContextPop({ anchorRef, onClose, children }) {
-  const popRef = useRef(null)
-  const [pos, setPos] = useState(null)
-  useMenuKeyNav(!!pos, popRef, LIST_NAV)
-  const place = useCallback(() => {
-    const r = anchorRef.current?.getBoundingClientRect()
-    if (!r) return
-    const W = Math.max(220, r.width)
-    const H = popRef.current?.offsetHeight || 320
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
-    let top = r.bottom + 6
-    if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 6)
-    setPos({ top, left, width: W })
-  }, [anchorRef])
-  useLayoutEffect(() => { place() }, [place])
-  useEffect(() => {
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
-  }, [place])
-  useEffect(() => {
-    const prevFocus = document.activeElement
-    const onDown = (e) => { if (popRef.current && !popRef.current.contains(e.target) && !anchorRef.current?.contains(e.target)) onClose() }
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-      const active = document.activeElement
-      const orphaned = !active || active === document.body || (popRef.current && popRef.current.contains(active))
-      if (orphaned && prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus()
-    }
-  }, [anchorRef, onClose])
-  if (!pos) return null
-  return createPortal(
-    <div ref={popRef} className="gp-pop menu" style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}>{children}</div>,
-    document.body,
-  )
-}
 
 // value  string[] of selected context titles
 // options  string[] of all known context titles (live, from organizer.contexts())
@@ -152,9 +108,9 @@ export default function ContextPicker({ value = [], options = [], onSet, onCreat
         <IconChevDown size={13} style={{ opacity: 0.7, flex: '0 0 auto' }} />
       </button>
       {open && (
-        <ContextPop anchorRef={btnRef} onClose={() => setOpen(false)}>
+        <AnchoredPopover anchorRef={btnRef} onClose={() => setOpen(false)} navOptions={LIST_NAV}>
           <ContextPanel value={value} options={options} onToggle={toggle} onCreate={onCreate ? create : undefined} />
-        </ContextPop>
+        </AnchoredPopover>
       )}
     </span>
   )

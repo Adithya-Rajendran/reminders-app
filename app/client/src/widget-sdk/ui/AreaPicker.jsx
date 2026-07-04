@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useRef, useState } from 'react'
 import { IconChevDown, IconX } from '../../icons.jsx'
-import { useMenuKeyNav } from './useMenuKeyNav.js'
+import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // A compact control to assign a task's Project/Area — one pick, or "No project/
 // area" to clear. Styled like GroupPicker (same .gp-* surface), but the menu is
@@ -12,58 +11,10 @@ import { useMenuKeyNav } from './useMenuKeyNav.js'
 // multi-select control) are the "what mode am I in" axis. Keeping them as distinct
 // controls mirrors the data model (task.area is one id; contexts are labels).
 
-// Portal popover anchored under the trigger (flips above if there's no room), so a
-// small/scrolling widget never clips it. Same placement + focus-restore idiom as
-// GroupPicker's GroupPop — kept local rather than shared because the panels differ.
-// Module-level nav options so the object identity is stable (the hook keys its
-// effect on it; a per-render object would re-focus `initial` mid-navigation).
+// Module-level nav options so the object identity is stable (useMenuKeyNav keys its
+// effect on it). No `initial` — the grouped list has no search box to focus first,
+// so roving starts on the first row.
 const LIST_NAV = { selector: '.gp-item' }
-
-function AreaPop({ anchorRef, onClose, children }) {
-  const popRef = useRef(null)
-  const [pos, setPos] = useState(null)
-  // `!!pos`, not `true`: the pop renders null until placed, so keying the hook on
-  // placement runs its focus effect only once the panel exists in the DOM.
-  useMenuKeyNav(!!pos, popRef, LIST_NAV)
-  const place = useCallback(() => {
-    const r = anchorRef.current?.getBoundingClientRect()
-    if (!r) return
-    const W = Math.max(200, r.width)
-    const H = popRef.current?.offsetHeight || 300
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
-    let top = r.bottom + 6
-    if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 6)
-    setPos({ top, left, width: W })
-  }, [anchorRef])
-  useLayoutEffect(() => { place() }, [place])
-  useEffect(() => {
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
-  }, [place])
-  useEffect(() => {
-    // Restore focus to the trigger on close if it would otherwise be orphaned
-    // (Esc / picking an item) — keyboard users aren't dumped to <body>. Same
-    // orphan-check as usePopover: if the user clicked another control, leave it.
-    const prevFocus = document.activeElement
-    const onDown = (e) => { if (popRef.current && !popRef.current.contains(e.target) && !anchorRef.current?.contains(e.target)) onClose() }
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-      const active = document.activeElement
-      const orphaned = !active || active === document.body || (popRef.current && popRef.current.contains(active))
-      if (orphaned && prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus()
-    }
-  }, [anchorRef, onClose])
-  if (!pos) return null
-  return createPortal(
-    <div ref={popRef} className="gp-pop menu" style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }} role="listbox" aria-label="Project or area">{children}</div>,
-    document.body,
-  )
-}
 
 // A colored dot echoing the area's own color, so the menu rows and the active
 // trigger read as the same entity the user picked. Falls back to the accent.
@@ -115,7 +66,7 @@ export default function AreaPicker({ value = '', areas = [], onSet }) {
         </button>
       ) : null}
       {open && (
-        <AreaPop anchorRef={btnRef} onClose={() => setOpen(false)}>
+        <AnchoredPopover anchorRef={btnRef} onClose={() => setOpen(false)} navOptions={LIST_NAV} minWidth={200} role="listbox" ariaLabel="Project or area">
           <div className="gp-panel">
             <div className="gp-list">
               <button type="button" className={`gp-item${!value ? ' on' : ''}`} role="option" aria-selected={!value} onClick={() => pick('')}>
@@ -126,7 +77,7 @@ export default function AreaPicker({ value = '', areas = [], onSet }) {
               {!areas.length && <div className="gp-empty">No projects or areas yet</div>}
             </div>
           </div>
-        </AreaPop>
+        </AnchoredPopover>
       )}
     </span>
   )

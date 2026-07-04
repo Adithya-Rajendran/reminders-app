@@ -22,7 +22,7 @@ export default function TaskPopover({ task, anchorRect, onComplete, onSchedule, 
   const [pickOpen, setPickOpen] = useState(false)
 
   // Place below the chip, flip above when out of room, clamp into the viewport
-  // (same placement idiom as the SDK's GroupPop / DateTimePicker).
+  // (same placement idiom as the SDK's AnchoredPopover / DateTimePicker).
   useLayoutEffect(() => {
     const W = 264
     const H = popRef.current?.offsetHeight || 130
