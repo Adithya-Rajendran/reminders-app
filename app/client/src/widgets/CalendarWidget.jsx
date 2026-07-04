@@ -49,10 +49,92 @@ const toIsoEnd = (v, allDay) => {
   if (!v) return null
   const d = new Date(v + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString()
 }
+function startOfWeek(d) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - x.getDay())
+  return x
+}
+function addDays(d, n) {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
+}
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+function fmtRange(start, end) {
+  const last = addDays(end, -1)
+  const mon = new Intl.DateTimeFormat(undefined, { month: 'short' })
+  const day = new Intl.DateTimeFormat(undefined, { day: 'numeric' })
+  const full = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return start.getFullYear() === last.getFullYear() && start.getMonth() === last.getMonth()
+    ? `${mon.format(start)} ${day.format(start)}-${day.format(last)}, ${last.getFullYear()}`
+    : `${full.format(start)}-${full.format(last)}`
+}
+function fmtDay(d) {
+  return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(d)
+}
+function fmtTime(v, allDay) {
+  if (allDay) return 'All day'
+  const d = new Date(v)
+  if (isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(d)
+}
 
 function errText(e) {
   const m = String(e?.message || e || 'Something went wrong')
   try { return JSON.parse(m).error || m } catch { return m }
+}
+
+function MiniAgenda({ rangeStart, rangeEnd, items, loading, onPrev, onNext, onToday, onTaskClick, onEventClick }) {
+  const days = []
+  for (let d = new Date(rangeStart); d < rangeEnd; d = addDays(d, 1)) {
+    const day = new Date(d)
+    const dayItems = items.filter((it) => sameDay(it.startDate, day))
+    if (dayItems.length || sameDay(day, new Date())) days.push({ day, items: dayItems })
+  }
+  return (
+    <div className="cal-mini">
+      <div className="cal-mini-toolbar">
+        <div className="cal-mini-nav">
+          <button type="button" className="iconbtn sm" aria-label="Previous week" onClick={onPrev}>‹</button>
+          <button type="button" className="iconbtn sm" aria-label="Next week" onClick={onNext}>›</button>
+        </div>
+        <div className="cal-mini-title">{fmtRange(rangeStart, rangeEnd)}</div>
+        <button type="button" className="btn ghost sm cal-mini-today" onClick={onToday}>Today</button>
+      </div>
+      <div className="cal-mini-list">
+        {loading && <div className="cal-mini-empty"><IconSpinner size={16} /> Loading calendar…</div>}
+        {!loading && days.length === 0 && <div className="cal-mini-empty">Nothing scheduled this week.</div>}
+        {!loading && days.map(({ day, items: dayItems }) => (
+          <section className="cal-mini-day" key={day.toISOString()}>
+            <div className="cal-mini-day-head">
+              <span>{fmtDay(day)}</span>
+              {sameDay(day, new Date()) && <span>Today</span>}
+            </div>
+            {dayItems.length === 0 ? (
+              <div className="cal-mini-none">No events</div>
+            ) : (
+              dayItems.map((it) => (
+                <button
+                  key={it.key}
+                  type="button"
+                  className={`cal-mini-item ${it.kind === 'task' ? 'task' : 'event'}`}
+                  title={it.kind === 'task' ? 'Click for actions' : 'Edit event'}
+                  onClick={(e) => (it.kind === 'task' ? onTaskClick(it.taskId, e) : onEventClick(it))}
+                >
+                  <span className="cal-mini-time">{fmtTime(it.start, it.allDay)}</span>
+                  <span className="cal-mini-dot" aria-hidden="true" />
+                  <span className="cal-mini-item-title">{it.title}</span>
+                </button>
+              ))
+            )}
+          </section>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function CalendarWidget({ tasks: tasksCap, calendar }) {
@@ -186,6 +268,59 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     { id: 'vevents', events: veventSource },
   ], [taskSource, veventSource])
 
+  // Compact Calendar is a purpose-built agenda instead of FullCalendar's list
+  // table. The table carries intrinsic widths that fight very narrow widgets;
+  // this path keeps the same data and actions, but lays them out with normal
+  // shrinkable flex/grid rules.
+  const [miniAnchor, setMiniAnchor] = useState(() => new Date())
+  const [miniTick, setMiniTick] = useState(0)
+  const [miniEvents, setMiniEvents] = useState([])
+  const [miniLoading, setMiniLoading] = useState(false)
+  const miniRange = useMemo(() => {
+    const start = startOfWeek(miniAnchor)
+    const end = addDays(start, 7)
+    return { start, end, startIso: start.toISOString(), endIso: end.toISOString() }
+  }, [miniAnchor])
+  const bumpMini = useCallback(() => setMiniTick((n) => n + 1), [])
+  useEffect(() => {
+    if (!mini) return
+    let alive = true
+    setMiniLoading(true)
+    calendar.listEvents(miniRange.startIso, miniRange.endIso).then((r) => {
+      if (!alive) return
+      setMiniEvents((r?.events || []).map((e) => ({
+        key: 'event-' + e.id,
+        kind: 'event',
+        id: e.id,
+        title: e.title || '(untitled event)',
+        start: e.start,
+        startDate: new Date(e.start),
+        end: e.end,
+        allDay: !!e.allDay,
+        accountId: e.accountId,
+        objectUrl: e.objectUrl,
+        listUrl: e.listUrl,
+      })).filter((e) => !isNaN(e.startDate.getTime())))
+    }).catch(() => { if (alive) setMiniEvents([]) })
+      .finally(() => { if (alive) setMiniLoading(false) })
+    return () => { alive = false }
+  }, [calendar, mini, miniRange.startIso, miniRange.endIso, miniTick])
+  const miniTasks = useMemo(() => tasksToCalendarEvents(storeTasks).map((e) => ({
+    key: e.id,
+    kind: 'task',
+    title: e.title,
+    start: e.start,
+    startDate: new Date(e.start),
+    allDay: !!e.allDay,
+    taskId: e.extendedProps.taskId,
+  })).filter((e) => !isNaN(e.startDate.getTime()) && e.startDate >= miniRange.start && e.startDate < miniRange.end), [storeTasks, miniRange.start, miniRange.end])
+  const miniItems = useMemo(() => [...miniTasks, ...miniEvents].sort((a, b) => {
+    const ad = a.startDate.getTime(), bd = b.startDate.getTime()
+    if (ad !== bd) return ad - bd
+    if (a.allDay !== b.allDay) return a.allDay ? -1 : 1
+    return a.title.localeCompare(b.title)
+  }), [miniTasks, miniEvents])
+
   // ---- interactions ----
   const onSelect = (arg) => {
     setModal({
@@ -253,6 +388,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     }
     setModal(null)
     refetch()
+    bumpMini()
   }
 
   const deleteModal = async (ev) => {
@@ -265,14 +401,75 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     try {
       await calendar.deleteEvent({ accountId: ev.accountId, objectUrl: ev.objectUrl })
       refetch()
+      bumpMini()
       showUndo('Event deleted', async () => {
         try { await calendar.createEvent(restore) } catch { /* best-effort restore */ }
         refetch()
+        bumpMini()
       })
     } catch {
       refetch() // delete failed — restore the view and tell the user
+      bumpMini()
       showUndo('Couldn’t delete the event', null)
     }
+  }
+
+  if (mini) {
+    return (
+      <div className="cal-wrap cal-mini-wrap" ref={wrapRef} style={{ position: 'relative' }}>
+        <MiniAgenda
+          rangeStart={miniRange.start}
+          rangeEnd={miniRange.end}
+          items={miniItems}
+          loading={miniLoading}
+          onPrev={() => setMiniAnchor((d) => addDays(d, -7))}
+          onNext={() => setMiniAnchor((d) => addDays(d, 7))}
+          onToday={() => setMiniAnchor(new Date())}
+          onTaskClick={(taskId, e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            setTaskPop({ taskId, rect: { top: r.top, left: r.left, bottom: r.bottom, width: r.width } })
+          }}
+          onEventClick={(ev) => setModal({
+            mode: 'edit',
+            key: ev.id,
+            initial: {
+              title: ev.title,
+              allDay: ev.allDay,
+              start: toInput(ev.start, ev.allDay),
+              end: toEndInput(ev.end, ev.allDay) || toInput(ev.start, ev.allDay),
+              accountId: ev.accountId,
+              objectUrl: ev.objectUrl,
+              listUrl: ev.listUrl,
+            },
+          })}
+        />
+        {modal && (
+          <EventModal
+            key={modal.key}
+            mode={modal.mode}
+            initial={modal.initial}
+            calendars={calendars}
+            onSubmit={submitModal}
+            onDelete={deleteModal}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {popTask && (
+          <TaskPopover
+            task={popTask}
+            anchorRect={taskPop.rect}
+            onComplete={(tk) => { setTaskPop(null); onToggle(tk) }}
+            onSchedule={(tk, payload) => { setTaskPop(null); onSchedule(tk, payload) }}
+            onClose={() => setTaskPop(null)}
+          />
+        )}
+        {(taskUndo || undo) && (
+          <div style={{ position: 'absolute', left: 12, right: 12, bottom: 10, zIndex: 5 }}>
+            <UndoBar undo={taskUndo || undo} dismiss={taskUndo ? dismissTaskUndo : dismissUndo} />
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
