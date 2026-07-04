@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'
 import { api, tk, reminderGroups, notesApi } from './api.js'
 import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks, insertTask } from './taskstore.js'
@@ -8,7 +8,10 @@ import { selectContexts } from './taskviews.js'
 import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
 import { onOpenNote, emitOpenNote, hasOpenNoteListener } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
-import { resolveConnections, selectCtx, appSlots, describeConnections } from './connections.js'
+import { appSlots, describeConnections } from './connections.js'
+import { ConnectedWidget, titleFor } from './ConnectedWidget.jsx'
+import { BoardFilterBar } from './BoardFilterBar.jsx'
+import { MobileShell } from './MobileShell.jsx'
 import { SkeletonRows, UndoBar } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
@@ -22,7 +25,7 @@ import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
 import { recentGroups, pushRecentGroup } from './groups.js'
-import { saveJson, loadJson } from './storage.js'
+import { saveJson } from './storage.js'
 import { useMediaQuery } from './useMediaQuery.js'
 import { publishBoard, onGoToWidget, onAddWidget } from './boardbus.js'
 import {
@@ -43,11 +46,6 @@ onTasksChanged(() => appCache.invalidate('groups'))
 
 const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-// Capability prerequisites a widget may declare (manifest.requires) that the host
-// can determine and gate on. Others (e.g. nextcloud) a widget self-handles.
-const KNOWABLE_REQUIREMENTS = new Set(['caldav'])
-const REQUIREMENT_LABEL = { caldav: 'a CalDAV account', nextcloud: 'a Nextcloud account' }
 
 const sizeFor = (type) => ({ ...DEFAULT_SIZE, ...(WIDGET_TYPES.get(type)?.defaultSize || {}) })
 
@@ -559,17 +557,12 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => {
-              const spec = WIDGET_TYPES.get(w.type)
-              // Auto-connect the widget's declared plugs to the app slots, then
-              // hand it ONLY the connected interfaces (least privilege).
-              const { connections } = resolveConnections(spec?.plugs, slots)
-              const ctx = selectCtx(appCtx, connections)
-              // Gate on declared capability requirements the host can determine.
-              const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
               // A per-instance config schema (manifest `config`) surfaces a gear on
               // the widget head; resolveWidgetConfig fills the form with the merged,
-              // validated current values (defaults <- saved).
-              const configSchema = spec?.config
+              // validated current values (defaults <- saved). The connection wiring
+              // + requirement gate + render live in ConnectedWidget (shared with the
+              // mobile shell); the frame owns only the head/collapse/remove/config.
+              const configSchema = WIDGET_TYPES.get(w.type)?.config
               return (
                 // data-wid lets addWidget's effect find this node to scroll/flash it.
                 <div key={w.i} data-wid={w.i}>
@@ -584,9 +577,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
                     configValues={configSchema ? resolveWidgetConfig(configSchema, w.config) : null}
                     onConfigure={configSchema ? (next) => configureWidget(w.i, next) : undefined}
                   >
-                    <WidgetMount spec={spec} w={w} ctx={ctx}>
-                      {unmet.length ? <WidgetRequirement title={titleFor(w)} reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
-                    </WidgetMount>
+                    <ConnectedWidget w={w} appCtx={appCtx} slots={slots} available={available} onOpenSettings={onOpenSettings} />
                   </WidgetFrame>
                 </div>
               )
@@ -627,141 +618,7 @@ function OnboardingCard({ onOpenSettings }) {
   )
 }
 
-/* ---------- Per-instance lifecycle (optional registry `lifecycle` hooks) ---------- */
-// Runs a widget type's optional onMount/onUnmount once per INSTANCE (keyed to w.i,
-// not ctx identity, so re-memoizing a capability doesn't re-fire them). Forward-
-// looking: no widget declares lifecycle hooks today, but the host supports them.
-function WidgetMount({ spec, w, ctx, children }) {
-  const lifecycle = spec?.lifecycle
-  useEffect(() => {
-    lifecycle?.onMount?.(w, ctx)
-    return () => lifecycle?.onUnmount?.(w)
-  }, [w.i]) // eslint deps intentionally minimal: lifecycle is per-instance
-  return children
-}
-
-/* ---------- Unmet capability requirement (manifest.requires) ---------- */
-function WidgetRequirement({ title, reqs, onOpenSettings }) {
-  const what = reqs.map((r) => REQUIREMENT_LABEL[r] || r).join(' & ')
-  return (
-    <div className="state">
-      <div className="state-ic"><IconCloud size={22} /></div>
-      <div className="state-title">{title ? `${title} needs ${what}` : `Needs ${what}`}</div>
-      <div className="state-sub">Connect it in Settings to use this widget.</div>
-      <button className="btn primary sm" style={{ marginTop: 10 }} onClick={() => onOpenSettings?.()}>
-        <IconCloud size={14} /> Open Settings
-      </button>
-    </div>
-  )
-}
-
 /* ---------- Toolbar ---------- */
-// The mobile spine: one surface per tab, in the workflow order.
-const MOBILE_TABS = [
-  { key: 'today', type: 'overview', label: 'Today' },
-  { key: 'inbox', type: 'inbox', label: 'Inbox' },
-  { key: 'calendar', type: 'calendar', label: 'Calendar' },
-  { key: 'notes', type: 'notes', label: 'Notes' },
-  { key: 'review', type: 'review', label: 'Review' },
-]
-
-// The mobile shell: one spine surface at a time with a bottom tab bar and a capture
-// FAB (capture-first), reusing the EXACT widget render + connection machinery — each
-// tab is a full-height canonical widget, connected to the same app slots as on the
-// grid. Desktop keeps the composable grid; this only renders below the breakpoint.
-function MobileShell({ appCtx, slots, available, organizerCap, onOpenSettings, onCapture, dashboardId }) {
-  const [tab, setTab] = useState(() => loadJson('reminders-mtab-' + dashboardId, 'today'))
-  const pick = useCallback((k) => { setTab(k); saveJson('reminders-mtab-' + dashboardId, k) }, [dashboardId])
-  const [viewRef, size] = useElementSize()
-
-  // Own the omnibox nav on mobile: publish the spine tabs as the "board" (so the
-  // palette reflects THIS view, not the hidden grid), and route "Go to <surface>"
-  // (flashWidget 'm-<type>') and "Add <surface>" (emitAddWidget '<type>') to switch
-  // the active TAB. Non-spine types have no mobile surface and no-op (rather than
-  // silently mutating/persisting the unmounted desktop grid).
-  const goToType = useCallback((idOrType) => {
-    const t = MOBILE_TABS.find((x) => x.type === idOrType || 'm-' + x.type === idOrType)
-    if (t) pick(t.key)
-  }, [pick])
-  useEffect(() => {
-    publishBoard(MOBILE_TABS.map((t) => ({ i: 'm-' + t.type, title: t.label, type: t.type })))
-    return () => publishBoard([])
-  }, [])
-  useEffect(() => onGoToWidget(goToType), [goToType])
-  useEffect(() => onAddWidget(goToType), [goToType])
-  const active = MOBILE_TABS.find((t) => t.key === tab) || MOBILE_TABS[0]
-  const spec = WIDGET_TYPES.get(active.type)
-  const { connections } = resolveConnections(spec?.plugs, slots)
-  const ctx = selectCtx(appCtx, connections)
-  const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
-  const w = { i: 'm-' + active.type, type: active.type }
-  return (
-    <div className="mobile-shell">
-      <BoardFilterBar organizer={organizerCap} />
-      <div className="mobile-view" ref={viewRef} data-wsize={size.w} data-hsize={size.h}>
-        <WidgetSizeContext.Provider value={size}>
-          <WidgetBoundary key={active.type}>
-            <Suspense fallback={<SkeletonRows n={6} />}>
-              {spec && (unmet.length
-                ? <WidgetRequirement title={spec.label} reqs={unmet} onOpenSettings={onOpenSettings} />
-                : <WidgetMount spec={spec} w={w} ctx={ctx}>{spec.render(w, ctx)}</WidgetMount>)}
-            </Suspense>
-          </WidgetBoundary>
-        </WidgetSizeContext.Provider>
-      </div>
-      <button className="mobile-fab" aria-label="Capture a task" title="Capture a task" onClick={() => onCapture?.()}>
-        <IconPlus size={24} />
-      </button>
-      <nav className="mobile-tabbar" aria-label="Views">
-        {MOBILE_TABS.map((t) => {
-          const Ic = WIDGET_TYPES.get(t.type)?.icon || IconList
-          const on = t.key === tab
-          return (
-            <button key={t.key} type="button" className={`mobile-tab${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => pick(t.key)}>
-              <Ic size={20} />
-              <span className="mobile-tab-label">{t.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-    </div>
-  )
-}
-
-// The active-filter strip: when the board is scoped to an Area/Context (from the
-// omnibox or a widget), show what it's scoped to with a one-click Clear, so a
-// filtered board is never a silent dead-end ("where did my other tasks go?").
-// Renders nothing when there's no active filter.
-function BoardFilterBar({ organizer }) {
-  const filter = useSyncExternalStore(organizer.subscribe, organizer.getFilter, organizer.getFilter)
-  const [areas, setAreas] = useState([])
-  const active = !!(filter && (filter.areaId || filter.context))
-  useEffect(() => {
-    if (!filter?.areaId) return undefined
-    let alive = true
-    organizer.areas().then((a) => { if (alive) setAreas(Array.isArray(a) ? a : []) }).catch(() => {})
-    return () => { alive = false }
-  }, [organizer, filter?.areaId])
-  if (!active) return null
-  const area = filter.areaId ? areas.find((a) => a.id === filter.areaId) : null
-  const label = filter.areaId ? (area?.name || 'Area') : ('@' + filter.context)
-  const kind = filter.areaId ? (area?.kind === 'project' ? 'Project' : 'Area') : 'Context'
-  return (
-    <div className="board-filter" role="status" aria-live="polite">
-      <IconList size={13} className="board-filter-ic" />
-      <span className="board-filter-label">Filtered to <b>{label}</b></span>
-      <span className="board-filter-kind">{kind}</span>
-      <button
-        className="board-filter-clear"
-        onClick={() => organizer.setFilter({ areaId: null, context: null })}
-        aria-label={`Clear the ${label} filter — show all tasks`}
-      >
-        <IconX size={13} /> Clear
-      </button>
-    </div>
-  )
-}
-
 function Toolbar({ projects, onAdd, onReset, onNewGroup, title }) {
   const now = new Date()
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
@@ -987,10 +844,4 @@ export function WidgetConfigForm({ schema, values, onSave }) {
       </button>
     </form>
   )
-}
-
-function titleFor(w) {
-  const spec = WIDGET_TYPES.get(w.type)
-  if (!spec) return w.type
-  return spec.title ? spec.title(w) : spec.label
 }
