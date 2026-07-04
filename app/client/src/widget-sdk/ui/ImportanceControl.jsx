@@ -1,4 +1,4 @@
-import { Icon } from '../../icons.jsx'
+import { Icon } from '../icons.jsx'
 
 // A clear TWO-STATE toggle for a task's explicit importance flag — the Eisenhower
 // IMPORTANCE axis (task.important), kept separate from urgency (due date) and from

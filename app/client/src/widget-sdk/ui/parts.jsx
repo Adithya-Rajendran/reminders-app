@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { IconRefresh, IconInbox } from '../../icons.jsx'
-import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate, PRIORITIES } from '../../tasklib.js'
+import { IconRefresh, IconInbox } from '../icons.jsx'
+import { parseQuickAdd, dueChip, timeLabel, absDate, isRealDate, PRIORITIES } from '../../domain/tasklib.js'
 import { announce } from './announcer.jsx'
 
 export function SkeletonRows({ n = 5 }) {

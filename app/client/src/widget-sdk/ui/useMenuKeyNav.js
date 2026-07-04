@@ -10,7 +10,7 @@
 // (robust to conditionally rendered rows). `initial` optionally returns the
 // element to focus on open (e.g. the checked radio); default = first item.
 import { useEffect } from 'react'
-import { nextIndex, claimsKey, normalizeKey } from '../../menukeys.js'
+import { nextIndex, claimsKey, normalizeKey } from '../../domain/menukeys.js'
 
 export function useMenuKeyNav(open, ref, { selector = '[role="menuitem"]', initial, radio = false } = {}) {
   useEffect(() => {

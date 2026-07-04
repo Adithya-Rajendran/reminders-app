@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { IconChevDown, IconPlus, IconCheck } from '../../icons.jsx'
+import { IconChevDown, IconPlus, IconCheck } from '../icons.jsx'
 import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // Pick zero or more Contexts for a task (the "@errands / @calls / @deep-work"

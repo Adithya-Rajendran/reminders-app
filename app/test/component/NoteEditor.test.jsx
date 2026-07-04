@@ -6,7 +6,7 @@ import { render, screen, act, fireEvent } from '@testing-library/react'
 // the component test. Replace it with a controlled textarea that forwards edits
 // through props.onChange exactly like the real editor's onUpdate does, so the
 // debounce → save-queue → PUT wiring is what's under test, not tiptap.
-vi.mock('../../client/src/NoteRichEditor.jsx', () => ({
+vi.mock('../../client/src/host/NoteRichEditor.jsx', () => ({
   default: ({ value, onChange }) => (
     <textarea aria-label="note body" value={value} onChange={(e) => onChange(e.target.value)} />
   ),
@@ -26,7 +26,7 @@ function resetServer() {
 }
 resetServer()
 
-vi.mock('../../client/src/api.js', () => ({
+vi.mock('../../client/src/data/api.js', () => ({
   // api()/tk() are unused here but exported by the real module — keep the shape.
   api: () => Promise.resolve({}),
   tk: () => Promise.resolve({}),

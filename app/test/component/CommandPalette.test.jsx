@@ -15,11 +15,11 @@ const { TASKS, NOTES } = vi.hoisted(() => ({
   NOTES: [{ path: 'n/Weekly.md', title: 'Weekly review', folder: 'n', updated: '2026-07-01' }],
 }))
 
-vi.mock('../../client/src/taskstore.js', () => ({
+vi.mock('../../client/src/data/taskstore.js', () => ({
   getTasks: () => TASKS,
   subscribe: () => () => {},
 }))
-vi.mock('../../client/src/api.js', () => ({
+vi.mock('../../client/src/data/api.js', () => ({
   api: vi.fn(async () => ({})),
   tk: vi.fn(async () => []),
   reminderGroups: vi.fn(async () => []),
@@ -31,8 +31,8 @@ vi.mock('../../client/src/api.js', () => ({
 }))
 
 import CommandPalette from '../../client/src/CommandPalette.jsx'
-import { onRevealTask } from '../../client/src/revealbus.js'
-import { onAddWidget } from '../../client/src/boardbus.js'
+import { onRevealTask } from '../../client/src/data/revealbus.js'
+import { onAddWidget } from '../../client/src/data/boardbus.js'
 
 const openPalette = async (props = {}) => {
   render(<CommandPalette onClose={() => {}} commands={[]} {...props} />)

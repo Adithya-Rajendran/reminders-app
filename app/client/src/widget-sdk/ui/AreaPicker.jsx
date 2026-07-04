@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { IconChevDown, IconX } from '../../icons.jsx'
+import { IconChevDown, IconX } from '../icons.jsx'
 import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // A compact control to assign a task's Project/Area — one pick, or "No project/

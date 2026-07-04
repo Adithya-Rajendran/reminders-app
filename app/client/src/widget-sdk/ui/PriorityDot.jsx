@@ -1,4 +1,4 @@
-import { pdotClass, PRIORITIES } from '../../tasklib.js'
+import { pdotClass, PRIORITIES } from '../../domain/tasklib.js'
 
 // Priority conveyed by BAR HEIGHT *and* colour — never colour alone (WCAG 1.4.1,
 // use-of-colour). Three ascending bars light up from the left as priority rises, so

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { IconPlus, IconChevDown, IconX } from '../../icons.jsx'
+import { IconPlus, IconChevDown, IconX } from '../icons.jsx'
 import { AnchoredPopover } from './AnchoredPopover.jsx'
 
 // The panel content: a search box, the recent groups (or search matches), and a
