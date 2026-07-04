@@ -333,7 +333,7 @@ export const MCP_TOOLS = [
   // ============ review ============
   {
     name: 'review_stats', widget: 'review',
-    description: 'Completion stats: this week vs last week (with delta), 7-day trend, 30-day total, streaks. (The weekly-review prompt state is device-local and not included.)',
+    description: 'Completion stats: this week vs last week (with delta), 7-day trend, 30-day total, and a multi-week completion trend. (The weekly-review prompt state is device-local and not included.)',
     inputSchema: obj({}),
     async handler({ sub }) {
       const stats = computeReview(await allTasks(sub), new Date(), null)

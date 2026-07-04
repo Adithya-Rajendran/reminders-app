@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, computeReview, selectStalled, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
+import { useTaskList, computeReview, selectStalled, applyOrganizer, useOrganizerFilter, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
 import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
@@ -24,11 +24,17 @@ const STEPS = [
 // trend, a 30-day total, and a guided once-weekly review that ends in a written
 // reflection. Pure derived stats over the shared task store; the "reviewed"
 // timestamp and reflections are client-only UI state in localStorage.
-export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
+export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId }) {
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const sz = useWidgetSize()
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
+
+  // Scope every derived stat + review list to the active board filter, like the
+  // other task widgets — so reviewing "just this Area/Context" reports that scope's
+  // completions and surfaces only its overdue/stalled items. No-op when unfiltered.
+  const filter = useOrganizerFilter(organizer)
+  const scoped = useMemo(() => applyOrganizer(tasks, filter), [tasks, filter])
 
   const [lastReviewed, setLastReviewed] = useState(() => store.loadJson(REVIEWED_KEY, null))
   const [reflections, setReflections] = useState(() => store.loadJson(REFLECT_KEY, []))
@@ -37,10 +43,10 @@ export default function ReviewWidget({ tasks: tasksCap, instanceId }) {
   // Reflections history popover, opened from the last-reflection row.
   const [histOpen, setHistOpen] = useState(false)
   const histRef = usePopover(histOpen, setHistOpen)
-  const review = useMemo(() => computeReview(tasks, new Date(), lastReviewed), [tasks, lastReviewed])
+  const review = useMemo(() => computeReview(scoped, new Date(), lastReviewed), [scoped, lastReviewed])
 
-  const overdue = useMemo(() => tasks.filter((t) => !t.done && isRealDate(t.due_date) && dueBucket(t.due_date).k === 'overdue'), [tasks])
-  const stalled = useMemo(() => selectStalled(tasks), [tasks])
+  const overdue = useMemo(() => scoped.filter((t) => !t.done && isRealDate(t.due_date) && dueBucket(t.due_date).k === 'overdue'), [scoped])
+  const stalled = useMemo(() => selectStalled(scoped), [scoped])
 
   const markReviewed = () => {
     const now = new Date().toISOString()

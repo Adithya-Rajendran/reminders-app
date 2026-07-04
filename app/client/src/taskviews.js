@@ -54,6 +54,19 @@ export const selectInbox = (tasks) => (tasks || []).filter((t) => !t.done && t.c
 // active filter unconditionally.
 export const byArea = (tasks, areaId) => (!areaId ? (tasks || []) : (tasks || []).filter((t) => t.area === areaId))
 export const byContext = (tasks, context) => (!context ? (tasks || []) : (tasks || []).filter((t) => (t.labels || []).some((l) => (l.title || l) === context)))
+// The distinct Context tags across tasks (their CATEGORIES/labels), sorted — the
+// board-scope choices for the filter bar + omnibox. Excludes the internal quick-win
+// marker so "2min" can't be picked as a context. One source for both surfaces.
+export function selectContexts(tasks) {
+  const set = new Set()
+  for (const t of (tasks || [])) {
+    for (const l of (t.labels || [])) {
+      const name = l.title || l
+      if (name && !isTwoMinName(name)) set.add(name)
+    }
+  }
+  return [...set].sort()
+}
 
 // Apply the global organizer filter { areaId?, context? } — used by every task
 // widget so filtering by an Area or Context happens once and scopes the board.

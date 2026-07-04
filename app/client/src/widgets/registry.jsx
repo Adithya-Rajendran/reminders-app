@@ -86,7 +86,7 @@ const RENDERERS = {
     render: (w, ctx) => <NotesWidget notes={ctx.notes} onOpenSettings={ctx.onOpenSettings} instanceId={w.i} />,
   },
   notepin: { icon: IconPin, render: (w, ctx) => <NotePinWidget notes={ctx.notes} instanceId={w.i} /> },
-  review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
+  review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
   triage: { icon: IconTarget, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
   daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} plan={ctx.plan} instanceId={w.i} /> },

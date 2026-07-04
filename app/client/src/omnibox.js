@@ -1,13 +1,14 @@
 // Pure ranking for the unified command palette / omnibox. The palette flattens its
-// sources — commands, navigation, live tasks, notes — into ONE list of typed
-// ENTRIES and ranks them together, so plain typing fuzzy-finds anything with no
-// mandatory mode prefix (the old `>` is now an optional command filter). Kept free
-// of React/DOM (and of the entries' side-effecting `run`/`icon` fields) so the
-// framework-free node tests exercise it (test/omnibox.test.mjs).
+// sources — commands, navigation, live tasks, notes, Areas/Projects and Contexts —
+// into ONE list of typed ENTRIES and ranks them together, so plain typing fuzzy-finds
+// anything with no mandatory mode prefix (the old `>` is now an optional command
+// filter). Kept free of React/DOM (and of the entries' side-effecting `run`/`icon`
+// fields) so the framework-free node tests exercise it (test/omnibox.test.mjs).
 //
 // Entry shape — only the fields THIS module reads:
 //   { kind, title, keys?, priority? }
-//   kind      'command' | 'nav' | 'task' | 'note'  (extensible; unknown → weight 0)
+//   kind      'command' | 'nav' | 'task' | 'note' | 'area' | 'context'
+//             (extensible; a kind with no KIND_WEIGHT entry → weight 0)
 //   title     the display string, and the default match key + highlight target
 //   keys      optional array of match strings; keys[0] is the title. An ALIAS
 //             (index > 0) can rank a row — e.g. the query "triage" finding the

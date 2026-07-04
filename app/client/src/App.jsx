@@ -282,7 +282,7 @@ export default function App() {
   const openSettings = useCallback((opts) => setSettings({ createGroup: opts && opts.createGroup ? String(opts.createGroup) : undefined }), [])
   const [dashboards, setDashboards] = useState([{ id: 'main', name: 'Dashboard' }])
   const [activeDash, setActiveDash] = useState('main')
-  const [palette, setPalette] = useState(null) // null | { mode: 'notes' | 'commands' }
+  const [palette, setPalette] = useState(null) // null | { mode: 'search' | 'commands' }
   const [capture, setCapture] = useState(false) // global quick-capture popup
   const [help, setHelp] = useState(false)       // '?' shortcut cheat sheet
   const [inboxId, setInboxId] = useState(null)  // first project (the inbox), resolved once on ready
@@ -326,7 +326,7 @@ export default function App() {
   // Capture is NOT gated on the inbox being resolved — a silently dead 'c' reads
   // as broken; the modal itself explains the no-account case (inboxReady).
   useGlobalHotkeys({
-    onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'notes' }) },
+    onQuickSwitch: () => { if (status === 'ready') setPalette({ mode: 'search' }) },
     onCommands: () => { if (status === 'ready') setPalette({ mode: 'commands' }) },
     onQuickCapture: () => { if (status === 'ready') setCapture(true) },
     onNewNote: () => { if (status === 'ready') createAndOpenNote() },
@@ -463,7 +463,7 @@ export default function App() {
             accent={accent}
             onAccent={setAccent}
             onOpenSettings={openSettings}
-            onOpenPalette={() => setPalette({ mode: 'notes' })}
+            onOpenPalette={() => setPalette({ mode: 'search' })}
           />
           <DashboardTabs
             dashboards={dashboards}
