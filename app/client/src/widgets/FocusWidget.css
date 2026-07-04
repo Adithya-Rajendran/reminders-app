@@ -1,21 +1,25 @@
 /* Focus / "what now" widget — theme-token driven (light/dark + accents). */
-.focus { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; height: 100%; min-height: 0; box-sizing: border-box; }
+.focus { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; height: 100%; min-height: 0; box-sizing: border-box; overflow-x: hidden; }
 .focus.compact { gap: 9px; padding: 10px 12px; }
 .focus.short { gap: 7px; padding: 8px 10px; }
-.focus-now { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
+.focus-now { position: relative; display: flex; gap: 12px; align-items: flex-start; min-width: 0; overflow: hidden; padding: 14px 16px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
 .focus-eyebrow { position: absolute; top: 10px; right: 12px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
-.focus-eyebrow .chip { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-eyebrow .chip { min-width: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-check { flex: 0 0 auto; width: 24px; height: 24px; margin-top: 14px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; }
 .focus-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
 .focus-now-body { flex: 1; min-width: 0; margin-top: 12px; }
 .focus-title { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); line-height: 1.3; }
-.focus-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.focus-skip { display: inline-flex; align-items: center; gap: 2px; font: inherit; font-size: 11.5px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
+.focus-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; max-width: 100%; margin-top: 8px; }
+.focus-meta .chip { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-skip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; font: inherit; font-size: 11.5px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
 .focus-skip:hover { color: var(--accent); }
 .focus.compact .focus-now { gap: 9px; padding: 12px 13px; }
 .focus.compact .focus-now-body { margin-top: 10px; }
 .focus.compact .focus-title { font-size: 15px; line-height: 1.25; }
 .focus.compact .focus-meta { gap: 5px; }
+.focus.compact .focus-eyebrow { left: 44px; right: 10px; justify-content: flex-end; overflow: hidden; white-space: nowrap; }
+.focus.compact .focus-eyebrow .focus-plan-chip { min-width: 0; max-width: 100%; }
+.focus.compact .focus-meta .cue-chip { flex: 1 1 100%; max-width: 100%; }
 .focus.short .focus-now { padding: 8px 10px; }
 .focus.short .focus-check { width: 20px; height: 20px; margin-top: 12px; }
 .focus.short .focus-title { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
