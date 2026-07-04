@@ -2,7 +2,9 @@
    scannable "am I okay today?" card. All colors come from theme tokens so
    light/dark + accents follow; meaning is never carried by color alone (every
    status also has a word and, where it matters, an icon). */
-.ov { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; height: 100%; box-sizing: border-box; }
+.ov { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; height: 100%; min-height: 0; box-sizing: border-box; }
+.ov.compact { gap: 9px; padding: 10px 12px; }
+.ov.short { gap: 7px; padding: 8px 10px; }
 
 /* Honest one-line status. The word carries the meaning; the dot/tint is a
    redundant cue, never the only one. */
@@ -12,6 +14,9 @@
 .ov-status.warn .ov-dot { background: var(--danger); }
 .ov-status-text { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
 .ov-status.warn .ov-status-text { color: var(--danger); }
+.ov.compact .ov-status-text { font-size: 15px; }
+.ov.short .ov-status { gap: 7px; }
+.ov.short .ov-dot { width: 8px; height: 8px; }
 
 /* Metric strip: OVERDUE + DUE TODAY as two glanceable counts. */
 .ov-metrics { display: flex; gap: 10px; }
@@ -20,6 +25,12 @@
 .ov-metric-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--text); }
 .ov-metric.warn .ov-metric-num { color: var(--danger); }
 .ov-metric-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+.ov.compact .ov-metrics { gap: 7px; }
+.ov.compact .ov-metric { padding: 7px 9px; }
+.ov.compact .ov-metric-num { font-size: 21px; }
+.ov-metrics-mini { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.ov-metrics-mini span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-metrics-mini .warn { color: var(--danger); }
 
 /* Section label shared by "most important" and "next event". */
 .ov-sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); display: flex; align-items: center; gap: 5px; }
@@ -34,6 +45,8 @@
 .ov-check { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 2px solid var(--line-strong); background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--panel); padding: 0; }
 .ov-check:hover { border-color: var(--accent); }
 .ov-check.on { background: var(--green); border-color: var(--green); }
+.ov.compact .ov-focus-row { padding: 7px 9px; gap: 8px; }
+.ov.short .ov-check { width: 20px; height: 20px; }
 
 /* Next calendar event today. */
 .ov-event { display: flex; flex-direction: column; gap: 5px; }
@@ -45,8 +58,13 @@
 .ov-event-task { margin-top: 4px; }
 .ov-event-task .ov-event-title { display: inline-flex; align-items: center; gap: 5px; }
 .ov-task-ic { color: var(--accent); flex: none; }
+.ov-event.compact .ov-sec-label { display: none; }
+.ov-event.compact .ov-event-row { padding: 6px 9px; }
+.ov-event.compact .ov-event-time { max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Inline quick-capture -> Inbox (clarified:false). Mirrors the .rem-add form
    used across task widgets so the whole board captures the same way. */
 .ov-add { margin-top: auto; }
+.ov.short .ov-add { margin-top: 0; }
+.ov.compact .ov-add { gap: 5px; }
 .ov-err { margin-top: 6px; }

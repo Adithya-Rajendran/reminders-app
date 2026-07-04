@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InboxWidget from '../../client/src/widgets/InboxWidget.jsx'
 import { fakeTasks } from './fakeCtx.js'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 // Minimal stand-in for the ctx.organizer capability the app injects. The Inbox
 // widget only reads areas() (async) and contexts() (sync) on mount; the filter
@@ -20,6 +21,7 @@ function fakeOrganizer({ areas = [], contexts = [] } = {}) {
 // An Inbox task is open + explicitly unclarified (clarified === false); capture
 // creates them that way, and selectInbox is what the widget filters on.
 const inboxTask = (over = {}) => ({ id: 1, title: 'Book dentist', done: false, clarified: false, labels: [], ...over })
+const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
 
 describe('InboxWidget', () => {
   it('shows the empty state when nothing needs clarifying', () => {
@@ -82,5 +84,20 @@ describe('InboxWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: /project \/ area/i }))
     await userEvent.click(await screen.findByRole('option', { name: /Home/i }))
     expect(cap.calls.update).toContainEqual([1, { area: 'area-x' }])
+  })
+
+  it('summarizes up-next items instead of rendering the whole queue when compact', () => {
+    const cap = fakeTasks([
+      inboxTask(),
+      inboxTask({ id: 2, title: 'Reply to Sam' }),
+      inboxTask({ id: 3, title: 'File receipt' }),
+    ])
+    render(sized(
+      <InboxWidget tasks={cap} organizer={fakeOrganizer()} instanceId="ib-compact" />,
+      { w: 'sm', h: 'md', name: 'standard', width: 310, height: 340 },
+    ))
+    expect(screen.getByText('Book dentist')).toBeInTheDocument()
+    expect(screen.getByText(/Up next: Reply to Sam .* \+1 more/i)).toBeInTheDocument()
+    expect(screen.queryByText('File receipt')).not.toBeInTheDocument()
   })
 })

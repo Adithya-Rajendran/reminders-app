@@ -1,12 +1,19 @@
 .notepin { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .notepin-head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 8px; border-bottom: 1px solid var(--line); }
+.notepin.compact .notepin-head { gap: 6px; padding-bottom: 6px; }
+.notepin.short .notepin-head { padding-bottom: 4px; }
 .notepin-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notepin-title svg { color: var(--accent); flex: 0 0 auto; }
+.notepin.compact .notepin-title { font-size: 13px; gap: 5px; }
+.notepin.short .notepin-title svg { display: none; }
 .notepin-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.notepin.compact .notepin-actions { gap: 0; }
 .notepin-pick { max-height: 260px; overflow-y: auto; min-width: 190px; max-width: 280px; }
 .notepin-pick .mini-item { width: 100%; }
 .notepin-pick-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The note's content, read-only, with its own scroll. pre-wrap keeps the Markdown's
    line breaks (it's a glance surface — the editor is one click away). */
 .notepin-body { flex: 1; min-height: 0; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.6; color: var(--text); padding: 10px 4px 4px; }
+.notepin.compact .notepin-body { padding-top: 7px; font-size: 12.75px; line-height: 1.55; }
+.notepin.short .notepin-body { padding-top: 5px; font-size: 12.5px; line-height: 1.45; }
 .notepin-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }

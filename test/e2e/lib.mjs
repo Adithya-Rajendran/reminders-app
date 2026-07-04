@@ -20,7 +20,21 @@ export function buildLayout(specs) {
   const layouts = {}
   for (const bp of Object.keys(COLS)) {
     let y = 0
-    layouts[bp] = widgets.map((w) => { const it = { i: w.i, x: 0, y, w: Math.min(BIG.w, COLS[bp]), h: BIG.h }; y += BIG.h; return it })
+    layouts[bp] = widgets.map((w, i) => {
+      const spec = specs[i] || {}
+      const h = Math.max(1, spec.h || spec.size?.h || BIG.h)
+      const desiredW = spec.w || spec.size?.w || BIG.w
+      const itemW = Math.max(1, Math.min(desiredW, COLS[bp]))
+      const it = {
+        i: w.i,
+        x: Math.max(0, Math.min(spec.x || 0, COLS[bp] - itemW)),
+        y,
+        w: itemW,
+        h,
+      }
+      y += h
+      return it
+    })
   }
   return { version: 1, gridV: GRID_V, widgets, layouts }
 }

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import OverviewWidget from '../../client/src/widgets/OverviewWidget.jsx'
 import { fakeTasks } from './fakeCtx.js'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 // Overview is the ENGAGE summary: an honest status line, the overdue + due-today
 // counts, the single most-important open task, the next calendar event, and an
@@ -25,6 +26,7 @@ function fakeCalendar(events = []) {
   const calls = { listEvents: [] }
   return { calls, listEvents: (s, e) => { calls.listEvents.push([s, e]); return Promise.resolve({ events }) } }
 }
+const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
 
 describe('OverviewWidget', () => {
   it('shows "Clear" and empty sections when there are no open tasks', async () => {
@@ -126,5 +128,21 @@ describe('OverviewWidget', () => {
     expect(projectId).toBe(7)
     expect(body.title).toBe('Buy milk')
     expect(body.clarified).toBe(false)
+  })
+
+  it('keeps the short compact layout focused on status, priority and capture', async () => {
+    const cap = fakeTasks([
+      { id: 1, title: 'Do the important thing', due_date: today(), done: false, priority: 0, important: true, labels: [] },
+    ])
+    render(sized(
+      <OverviewWidget tasks={cap} calendar={fakeCalendar([{ title: 'Later event', start: new Date(Date.now() + 3600000).toISOString() }])} organizer={fakeOrganizer()} />,
+      { w: 'sm', h: 'xs', name: 'mini', width: 300, height: 150 },
+    ))
+
+    expect(await screen.findByText('On track')).toBeInTheDocument()
+    expect(screen.getByLabelText(/0 overdue, 1 due today/i)).toBeInTheDocument()
+    expect(screen.getByText('Do the important thing')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/capture to inbox/i)).toBeInTheDocument()
+    expect(screen.queryByText('Next up')).not.toBeInTheDocument()
   })
 })
