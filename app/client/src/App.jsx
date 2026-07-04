@@ -478,6 +478,7 @@ export default function App() {
             dashboardId={activeDash}
             title={(dashboards.find((d) => d.id === activeDash) || {}).name}
             onOpenSettings={openSettings}
+            onCapture={() => setCapture(true)}
             metaTick={metaTick}
           />
         </div>
