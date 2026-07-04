@@ -54,14 +54,18 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
   const open = useMemo(() => scoped.filter((t) => !t.done && !t.is_goal), [scoped])
 
   // Overdue = open tasks whose real due date is strictly before today.
+  // `now` is a dependency (not read in the body) so these recompute on the minute
+  // tick as well as on edits: dueBucket() classifies against the LIVE wall clock,
+  // so re-running it just after midnight is what actually moves a task from
+  // "today" to "overdue" on an idle board (the whole point of the tick).
   const overdue = useMemo(
     () => open.filter((t) => isRealDate(t.due_date) && dueBucket(t.due_date).k === 'overdue'),
-    [open],
+    [open, now],
   )
   // Due today = open tasks whose due date falls today (overdue is counted separately).
   const dueToday = useMemo(
     () => open.filter((t) => isRealDate(t.due_date) && dueBucket(t.due_date).k === 'today'),
-    [open],
+    [open, now],
   )
 
   // Today's most important task: the top of the Eisenhower Q1 (important AND urgent)

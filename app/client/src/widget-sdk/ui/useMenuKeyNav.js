@@ -1,5 +1,5 @@
-// Roving keyboard focus for the app's mini-menu popovers (priority dots,
-// estimate chips, dread radio, group picker, context menus): ArrowUp/Down wrap,
+// Roving keyboard focus for the app's mini-menu popovers (priority menu,
+// estimate chips, group picker, context menus): ArrowUp/Down wrap,
 // Home/End jump, Left/Right alias Up/Down for radio rows, Enter/Space activate
 // via the item's native click. Generalized from NoteContextMenu's inline model
 // so every popover shares ONE implementation. Esc/outside-click dismissal and

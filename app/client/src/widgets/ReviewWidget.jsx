@@ -144,9 +144,15 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
         </div>
         <div className={`rv-delta ${deltaCls}`}>
           {!review.hasBaseline
-            // Honest label when there's no prior week to compare against: no
-            // percentage at all (a "%" here would be a lie about a 0 baseline).
-            ? (compactDelta ? 'first week' : 'first week tracked')
+            // No prior-week baseline, so no honest percentage (a "%" here would lie
+            // about a 0 baseline). Only call it a "first week" when something was
+            // actually completed this week — otherwise (thisWeek 0, e.g. an active
+            // Area/Context filter with no completions in scope) "first week tracked"
+            // would misattribute an empty scope to being early in tracking; say so
+            // plainly instead.
+            ? (review.thisWeek > 0
+                ? (compactDelta ? 'first week' : 'first week tracked')
+                : (compactDelta ? 'none yet' : 'no completions yet'))
             : review.thisWeek === review.lastWeek
               ? (compactDelta ? '=' : 'same as last week')
               : compactDelta
