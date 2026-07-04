@@ -170,12 +170,7 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
           </div>
 
           {/* (2) + (4) the two numbers that change behavior */}
-          {short ? (
-            <div className="ov-metrics-mini" aria-label={`${overdue.length} overdue, ${dueToday.length} due today`}>
-              <span className={overdue.length > 0 ? 'warn' : ''}>{overdue.length} overdue</span>
-              <span>{dueToday.length} today</span>
-            </div>
-          ) : (
+          {!short && (
             <div className="ov-metrics">
               <div className={`ov-metric${overdue.length > 0 ? ' warn' : ''}`}>
                 <span className="ov-metric-num">{overdue.length}</span>

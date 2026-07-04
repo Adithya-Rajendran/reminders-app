@@ -22,6 +22,9 @@ on:
 permissions:
   contents: read
 
+env:
+  TZ: UTC
+
 concurrency:
   group: deploy-production
   cancel-in-progress: false # never cancel a mid-flight rollout
@@ -33,9 +36,18 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
+      - uses: docker/setup-buildx-action@v3
+      - name: Resolve expected image digest
+        id: expected
+        run: |
+          digest=$(docker buildx imagetools inspect ghcr.io/${{ github.repository }}:latest --format '{{.Manifest.Digest}}')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Expected ghcr.io/${{ github.repository }}@$digest" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Roll the deployment
         env:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+          EXPECTED_DIGEST: ${{ steps.expected.outputs.digest }}
         run: |
           if [ -z "$KUBE_CONFIG_DATA" ]; then
             echo "::notice::KUBE_CONFIG_DATA secret not configured — skipping deploy (CI-only mode)."
@@ -46,13 +58,24 @@ jobs:
           export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
           kubectl rollout restart deployment/reminders-app -n reminders-app
           # Recreate strategy: wait for the replacement pod to be Running/Ready.
+          pod=""
           for i in $(seq 1 60); do
-            ready=$(kubectl get pods -n reminders-app -o jsonpath='{range .items[*]}{.status.containerStatuses[0].ready}{"\n"}{end}' 2>/dev/null | grep -c true || true)
-            total=$(kubectl get pods -n reminders-app --no-headers 2>/dev/null | wc -l)
-            [ "$ready" -ge 1 ] && [ "$total" -eq 1 ] && { echo "pod ready"; break; }
+            total=$(kubectl get pods -n reminders-app -l app=reminders-app --no-headers 2>/dev/null | wc -l)
+            pod=$(kubectl get pods -n reminders-app -l app=reminders-app -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1)
+            [ -n "$pod" ] && [ "$total" -eq 1 ] && { echo "pod ready: $pod"; break; }
             sleep 5
           done
-          kubectl get pods -n reminders-app
+          kubectl get pods -n reminders-app -l app=reminders-app
+          if [ -z "$pod" ]; then
+            echo "::error::replacement pod did not become ready"
+            exit 1
+          fi
+          image_id=$(kubectl get pod "$pod" -n reminders-app -o jsonpath='{.status.containerStatuses[0].imageID}')
+          echo "Running image: $image_id"
+          case "$image_id" in
+            *"@$EXPECTED_DIGEST") echo "digest verified: $EXPECTED_DIGEST" ;;
+            *) echo "::error::running image digest $image_id does not match expected $EXPECTED_DIGEST"; exit 1 ;;
+          esac
 
       - name: Verify the app answers
         env:
@@ -60,9 +83,13 @@ jobs:
         run: |
           if [ -z "$KUBE_CONFIG_DATA" ]; then exit 0; fi
           for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://tasks.rke.alaras.net/healthz || true)
-            [ "$code" = "200" ] && { echo "healthz 200"; exit 0; }
+            body=$(curl -fsS --max-time 5 https://tasks.rke.alaras.net/healthz || true)
+            echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"oidc":true' && { echo "healthz ok with oidc"; break; }
             sleep 5
           done
-          echo "::error::app did not answer 200 on /healthz after the rollout"
-          exit 1
+          body=$(curl -fsS --max-time 5 https://tasks.rke.alaras.net/healthz || true)
+          echo "$body" | grep -q '"ok":true' || { echo "::error::app did not answer ok on /healthz after the rollout"; exit 1; }
+          echo "$body" | grep -q '"oidc":true' || { echo "::error::OIDC is not enabled on /healthz"; exit 1; }
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 -H 'x-dev-user: deploy-check' https://tasks.rke.alaras.net/api/me || true)
+          [ "$code" = "401" ] || { echo "::error::x-dev-user returned $code on production app"; exit 1; }
+          echo "production auth verified"

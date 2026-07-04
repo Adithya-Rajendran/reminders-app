@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, seedLayout, widget, clearTasks, createTask, isoDaysAgo, isoDaysFromNow } from '../lib.mjs'
+import { gotoApp, seedLayout, widget, clearTasks, createTask, taskProjectId, isoDaysAgo, isoDaysFromNow } from '../lib.mjs'
 
 // Prioritize (v2): the "Most important" callout names the single task to do now,
 // completing it advances to the next; the Eisenhower matrix buckets by the
 // EXPLICIT importance flag × due-proximity urgency. No frog / XP / streaks / tabs.
 test.beforeEach(async ({ request }) => {
   await clearTasks(request)
-  const p = 1
+  const p = await taskProjectId(request)
   // Important + urgent (overdue) → Do first (Q1) + top of the "Most important" pile.
   await createTask(request, p, { title: 'Ship the release', important: true, due_date: isoDaysAgo(1) })
   // Important + urgent (due today) → Q1 (the next-most-important).

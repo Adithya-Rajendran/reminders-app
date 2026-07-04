@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TZ: UTC
+
 jobs:
   lint-build:
     runs-on: ubuntu-latest
@@ -122,7 +125,9 @@ jobs:
             npx playwright install --with-deps chromium
           fi
       - name: Run e2e (backends + BFF + Playwright)
-        run: bash test/e2e/run.sh
+        run: |
+          bash test/e2e/run.sh
+          (cd test/e2e && npm run e2e:report-check)
       # Upload on every non-cancelled outcome: retried-then-passed specs leave
       # flake evidence in test-results/ that `if: failure()` would discard.
       - name: Upload Playwright report
@@ -133,5 +138,6 @@ jobs:
           path: |
             test/e2e/playwright-report
             test/e2e/test-results
+            test/e2e/.artifacts
             test/e2e/.state/*.log
           retention-days: 7

@@ -1,15 +1,9 @@
 import { test, expect } from '@playwright/test'
-import { STATE, gotoApp, seedLayout, widget, clearTasks, createTask, isoDaysFromNow } from '../lib.mjs'
+import { STATE, gotoApp, seedLayout, widget, clearTasks, createTask, clearEvents, taskProjectId, isoDaysFromNow } from '../lib.mjs'
 
 const pad = (n) => String(n).padStart(2, '0')
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
-async function clearEvents(request) {
-  const from = isoDaysFromNow(-40), to = isoDaysFromNow(40)
-  const r = await request.get(`/api/calendar/events?start=${encodeURIComponent(from)}&end=${encodeURIComponent(to)}`)
-  const { events = [] } = await r.json()
-  for (const e of events) await request.delete('/api/calendar/events', { data: { accountId: e.accountId, objectUrl: e.objectUrl } })
-}
 const createEvent = (request, summary, allDay = false) =>
   request.post('/api/calendar/events', { data: { accountId: STATE.eventList.accountId, listUrl: STATE.eventList.listUrl, summary, start: isoDaysFromNow(0, 12), end: isoDaysFromNow(0, 13), allDay } })
 
@@ -19,7 +13,7 @@ test.beforeEach(async ({ request }) => {
 })
 
 test('a scheduled task appears on the calendar', async ({ page, request }) => {
-  await createTask(request, 1, { title: 'Dentist task', due_date: isoDaysFromNow(0, 10) })
+  await createTask(request, await taskProjectId(request), { title: 'Dentist task', due_date: isoDaysFromNow(0, 10) })
   await seedLayout(request, [{ type: 'calendar' }])
   await gotoApp(page)
   const frame = widget(page, 'Calendar')
@@ -27,7 +21,7 @@ test('a scheduled task appears on the calendar', async ({ page, request }) => {
 })
 
 test('complete a task from its chip popover', async ({ page, request }) => {
-  await createTask(request, 1, { title: 'Dentist task', due_date: isoDaysFromNow(0, 10) })
+  await createTask(request, await taskProjectId(request), { title: 'Dentist task', due_date: isoDaysFromNow(0, 10) })
   await seedLayout(request, [{ type: 'calendar' }])
   await gotoApp(page)
   const frame = widget(page, 'Calendar')

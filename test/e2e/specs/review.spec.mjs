@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, seedLayout, widget, clearTasks, createTask, patchTask } from '../lib.mjs'
+import { gotoApp, seedLayout, widget, clearTasks, createTask, patchTask, taskProjectId } from '../lib.mjs'
 
 // Productive flow: a weekly feedback loop — see how much got done and tick off
 // the weekly review nudge.
 test.beforeEach(async ({ request }) => {
   await clearTasks(request)
+  const pid = await taskProjectId(request)
   for (const title of ['Done one', 'Done two', 'Done three']) {
-    const t = await createTask(request, 1, { title })
+    const t = await createTask(request, pid, { title })
     await patchTask(request, t.id, { done: true })
   }
   await seedLayout(request, [{ type: 'review' }])

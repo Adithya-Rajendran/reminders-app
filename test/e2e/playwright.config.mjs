@@ -8,13 +8,16 @@ import { fileURLToPath } from 'node:url'
 // request (document + fetch/XHR) — the SPA never sends it on its own.
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ipFile = path.join(HERE, '.state', 'ip')
+const envBaseURL = process.env.BASE_URL || process.env.DEV_VISUAL_BASE_URL || ''
 // Fail fast rather than fall back to 127.0.0.1: the BFF's SSRF guard always
 // blocks loopback for its outbound CalDAV fetches, so a loopback base URL only
 // yields confusing downstream failures.
-if (!fs.existsSync(ipFile)) {
+if (!envBaseURL && !fs.existsSync(ipFile)) {
   throw new Error('test/e2e/.state/ip not found — start the harness first: bash test/e2e/run.sh (or setup-backends.sh + start-bff.sh + provision.mjs).')
 }
-const IP = fs.readFileSync(ipFile, 'utf8').trim()
+const IP = envBaseURL ? '' : fs.readFileSync(ipFile, 'utf8').trim()
+const ARTIFACTS = path.join(HERE, '.artifacts')
+const USER = process.env.E2E_USER || process.env.DEV_VISUAL_USER || 'e2e-user'
 
 export default defineConfig({
   testDir: './specs',
@@ -23,10 +26,17 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 12_000 },
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: path.join(ARTIFACTS, 'playwright-results.json') }],
+        ['junit', { outputFile: path.join(ARTIFACTS, 'playwright-junit.xml') }],
+      ]
+    : [['list'], ['json', { outputFile: path.join(ARTIFACTS, 'playwright-results.json') }]],
   use: {
-    baseURL: `http://${IP}:8080`,
-    extraHTTPHeaders: { 'x-dev-user': 'e2e-user' },
+    baseURL: envBaseURL || `http://${IP}:8080`,
+    extraHTTPHeaders: { 'x-dev-user': USER },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     // Video off — the retained traces already capture DOM snapshots per action.

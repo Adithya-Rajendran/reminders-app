@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from '../lib.mjs'
+import { gotoApp, resetDashboards } from '../lib.mjs'
 
 // Keyboard spine: '?' cheat sheet, Ctrl+K command palette (including running a
 // command from it), and Ctrl+]/[ dashboard cycling.
@@ -9,9 +9,7 @@ test.describe('Keyboard shortcuts', () => {
   test.afterEach(async ({ request }) => {
     // Restore the single default dashboard so dashboard-cycling tests don't
     // leave extra tabs that break subsequent specs.
-    await request.put('/api/dashboards', {
-      data: { dashboards: [{ id: 'main', name: 'Dashboard' }] },
-    })
+    await resetDashboards(request)
   })
 
   test('cheat sheet via ? and palette', async ({ page }) => {
