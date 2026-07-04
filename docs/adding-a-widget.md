@@ -1,13 +1,17 @@
 # Adding a dashboard widget
 
-Widgets are self-contained: the dashboard (`app/client/src/Dashboard.jsx`) is
-generic and learns about widgets only through the registry at
-`app/client/src/widgets/registry.jsx`. Adding a widget is **one component file
-plus one registry entry** — no dashboard changes.
+Widgets are self-contained: the dashboard (`app/client/src/host/Dashboard.jsx`)
+is generic and learns about widgets only through the registry at
+`app/client/src/widgets/registry.jsx`. Adding a small widget can still be one
+component file plus one registry entry. For any widget with meaningful state,
+layout tiers, drag/drop, or more than one child component, use a folder under
+`app/client/src/widgets/<widget-name>/` so multiple people can work on different
+widgets without touching the host app or each other's files.
 
 > **Read [`docs/widget-sdk.md`](./widget-sdk.md) first** — it's the authoritative
-> surface reference. In short: a widget imports **only** from `../widget-sdk`
-> (+ `react` + its own siblings), and gets all app data through `ctx` capabilities
+> surface reference. In short: a top-level widget imports **only** from
+> `../widget-sdk` (or `../../widget-sdk` from a nested widget folder) plus
+> `react` and its own siblings, and gets all app data through `ctx` capabilities
 > (`ctx.tasks`, `ctx.groups`, `ctx.notes`, `ctx.calendar`, `ctx.events`,
 > `ctx.projects`, `ctx.plan`, `ctx.onOpenSettings`) — **not** by importing
 > `api.js`, the task store, or the buses. ESLint enforces the boundary. The
@@ -15,7 +19,8 @@ plus one registry entry** — no dashboard changes.
 
 ## 1. Create the component
 
-Add `app/client/src/widgets/MyWidget.jsx`. A minimal client-only widget:
+For a small widget, add `app/client/src/widgets/MyWidget.jsx`. A minimal
+client-only widget:
 
 ```jsx
 import React, { useEffect, useState } from 'react'
@@ -30,8 +35,25 @@ export default function ClockWidget() {
 }
 ```
 
-Conventions worth reusing — **all from `../widget-sdk`** (the barrel re-exports
-the shared UI, hooks, pure helpers, icons, and per-instance storage; see
+For a larger widget, prefer:
+
+```text
+app/client/src/widgets/my-widget/
+  MyWidget.jsx
+  layout.js
+  MyWidget.css
+  ChildPart.jsx
+  README.md
+app/client/src/widgets/MyWidget.jsx  # compatibility shim if this replaces an old file
+```
+
+Point the registry loader at the folder implementation. Keep pure sizing/layout
+decisions in `.js` modules so component tests can cover them without rendering
+the whole widget.
+
+Conventions worth reusing — **all from the widget SDK path for your folder**
+(`../widget-sdk` or `../../widget-sdk`; the barrel re-exports the shared UI,
+hooks, pure helpers, icons, and per-instance storage; see
 [`docs/widget-sdk.md`](./widget-sdk.md) for the full export list):
 
 - **Loading / empty / error states** — the SDK exports `SkeletonRows`,

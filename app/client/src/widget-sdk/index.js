@@ -5,9 +5,10 @@
 // barrel — so this surface stays free of api/store/bus imports.
 //
 // The ESLint widget-boundary rule (eslint.config.js) enforces that widgets/**
-// import only `react`, `./` siblings, and `../widget-sdk`. Heavy app-level pieces
-// the Notes widget needs (the editor stack) live at src root and are re-exported
-// here so the widget itself stays decoupled.
+// import only `react`, `./` siblings, and the relative widget SDK path
+// (`../widget-sdk` from top-level widgets, `../../widget-sdk` from nested widget
+// folders). Heavy app-level pieces the Notes widget needs (the editor stack) live
+// on a separate SDK entry so the widget itself stays decoupled.
 
 // ---- shared widget UI ----
 export { SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, NoticeBar, QuickAddPreview } from './ui/parts.jsx'

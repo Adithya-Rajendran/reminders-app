@@ -1,11 +1,12 @@
 /* Prioritize widget — a "Most important" callout + the Eisenhower matrix you
    decide in. All theme-token driven so light/dark + accents follow. No motion,
    no points, no celebration: a calm decision surface. */
-.triage { position: relative; display: flex; flex-direction: column; gap: 11px; padding: 11px 13px; overflow-x: hidden; }
+.triage { position: relative; display: flex; flex-direction: column; gap: 11px; height: 100%; min-height: 0; box-sizing: border-box; padding: 11px 13px; overflow: hidden; }
 .triage.compact { gap: 9px; padding: 9px 10px; }
+.triage.short { gap: 7px; padding: 8px 9px; }
 
 /* ---- "Most important" callout (the one task to do now) ---- */
-.tri-focus { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
+.tri-focus { position: relative; flex: 0 0 auto; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
 .tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
 /* The complete button is a real button (not a bare circle) so it's keyboard- and
    screen-reader-reachable; the check icon only shows the affordance on hover. */
@@ -14,23 +15,28 @@
 .tri-focus-body { flex: 1; min-width: 0; margin-top: 10px; }
 .tri-focus-title { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
 .tri-focus-why { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.triage.compact .tri-focus { gap: 10px; padding: 12px; }
+.triage.short .tri-focus { gap: 8px; padding: 9px 10px; }
+.triage.short .tri-focus-check { width: 22px; height: 22px; margin-top: 11px; }
+.triage.short .tri-focus-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- Eisenhower matrix ---- */
-.eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; transition: background 120ms ease, border-color 120ms ease; }
-.triage.compact .eisen { grid-template-columns: 1fr; gap: 7px; }
-.triage.compact .eq { min-width: 0; min-height: 0; padding: 7px 8px; }
+.eisen { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.eisen-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.eq { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; transition: background 120ms ease, border-color 120ms ease; }
+.triage.compact .eq { padding: 7px 8px; }
+.eisen.roomy .eq { padding-block: 10px; }
 .eq-Q1 { border-left: 3px solid var(--danger); }
 .eq-Q2 { border-left: 3px solid var(--accent); }
 .eq-Q3 { border-left: 3px solid var(--warn); }
 .eq-Q4 { border-left: 3px solid var(--line-strong); }
 /* Drop-target feedback while a task is dragged over a quadrant. */
 .eq.drop-over { background: var(--accent-soft); border-color: var(--accent); }
-.eq-head { display: flex; align-items: baseline; justify-content: space-between; }
+.eq-head { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; min-width: 0; gap: 8px; }
 .eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
 .eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
-.eq-sub { font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
-.eq-list { display: flex; flex-direction: column; gap: 1px; }
+.eq-sub { flex: 0 0 auto; font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
+.eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
 /* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift
    feel; the row's own controls still work (drag only starts on the row surface). */
 .eq-drag { cursor: grab; }
@@ -44,7 +50,7 @@
 .eq-list .check-btn.on::after { left: 4px; top: 1px; width: 3.5px; height: 8px; }
 .eq-list .task .chip { font-size: 10px; padding: 0 5px; }
 .eq-more { font-size: 11px; color: var(--faint); padding: 2px 4px; }
-.eq-empty { font-size: 11.5px; color: var(--faint); }
+.eq-empty { flex: 1 1 auto; display: flex; align-items: center; font-size: 11.5px; color: var(--faint); }
 
 /* Keep the undo bar readable at the bottom of a long board. The base .undo-bar
    rule supplies position:sticky; don't override `position` here (a `relative`

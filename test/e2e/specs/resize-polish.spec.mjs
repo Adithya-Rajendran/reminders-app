@@ -10,6 +10,10 @@ import {
 const DASH = 'main'
 const SHOT_DIR = path.join(ARTIFACT_DIR, 'resize-shots')
 const RESULTS_FILE = path.join(ARTIFACT_DIR, 'resize-results.json')
+const WIDGET_FILTER = (process.env.RESIZE_WIDGET_FILTER || '').split(',').map((s) => s.trim()).filter(Boolean)
+const AUDIT_WIDGETS = WIDGET_FILTER.length
+  ? RESIZE_WIDGETS.filter((w) => WIDGET_FILTER.includes(w.type) || WIDGET_FILTER.includes(w.label))
+  : RESIZE_WIDGETS
 
 const todayAt = (h) => {
   const d = new Date()
@@ -214,7 +218,7 @@ for (const viewport of PRIMARY_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     const rows = []
 
-    for (const w of RESIZE_WIDGETS) {
+    for (const w of AUDIT_WIDGETS) {
       for (const scenario of w.scenarios) {
         const scenarioName = `${scenario.name}-${scenario.size.w}x${scenario.size.h}`
         await seedLayout(request, [{ type: w.type, w: scenario.size.w, h: scenario.size.h }], DASH)

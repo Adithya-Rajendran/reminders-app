@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import TriageWidget from '../../client/src/widgets/TriageWidget.jsx'
+import TriageWidget from '../../client/src/widgets/triage/TriageWidget.jsx'
+import { getTriageLayout } from '../../client/src/widgets/triage/layout.js'
 import { fakeTasks } from './fakeCtx.js'
 import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
@@ -36,6 +37,20 @@ function drop(sourceEl, targetEl, id) {
 }
 
 describe('TriageWidget (Prioritize)', () => {
+  it('keeps sizing decisions in a pure layout helper', () => {
+    expect(getTriageLayout({ w: 'sm', h: 'md', width: 280, height: 420 })).toMatchObject({
+      compact: true,
+      matrixMode: 'stack',
+      rowCap: 3,
+    })
+    expect(getTriageLayout({ w: 'md', h: 'lg', width: 430, height: 620 })).toMatchObject({
+      compact: false,
+      matrixMode: 'grid',
+      roomy: true,
+      rowCap: 12,
+    })
+  })
+
   it('shows the nothing-flagged state when no task is important', () => {
     const cap = fakeTasks([{ id: 1, title: 'Loose task', important: false, done: false, labels: [] }])
     render(<TriageWidget tasks={cap} instanceId="tri-empty" />)
@@ -82,8 +97,25 @@ describe('TriageWidget (Prioritize)', () => {
     ))
 
     expect(container.querySelector('.triage.compact')).not.toBeNull()
+    expect(container.querySelector('.eisen-stack')).not.toBeNull()
     expect(screen.getByText('Most important', { selector: '.tri-focus-eyebrow' })).toBeInTheDocument()
     expect(screen.getByText('Do first', { selector: '.eq-label' })).toBeInTheDocument()
+  })
+
+  it('marks the matrix as proportional and roomy when the widget is tall', () => {
+    const cap = fakeTasks([
+      { id: 1, title: 'Ship release', priority: 4, important: true, due_date: overdue(), done: false, labels: [] },
+      { id: 2, title: 'Minor important', priority: 1, important: true, done: false, labels: [] },
+    ])
+    const { container } = render(sized(
+      <TriageWidget tasks={cap} instanceId="tri-tall" />,
+      { w: 'md', h: 'lg', name: 'standard', width: 440, height: 640 },
+    ))
+
+    const matrix = container.querySelector('.eisen')
+    expect(matrix).toHaveAttribute('data-cell-scale', 'proportional')
+    expect(matrix).toHaveClass('eisen-grid')
+    expect(matrix).toHaveClass('roomy')
   })
 
   it('completing the callout task delegates the completion to the capability', async () => {
