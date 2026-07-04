@@ -36,14 +36,15 @@ export default [
   },
   {
     // Widget boundary: a widget may import only `react`, its own sibling files
-    // (./…), and the widget SDK (../widget-sdk). All app data arrives through the
+    // (./…), and the widget SDK (../widget-sdk from top-level widget files,
+    // ../../widget-sdk from nested widget folders). All app data arrives through
     // ctx capabilities the host/SDK provide — never via direct store/api/bus imports.
     files: ['client/src/widgets/**/*.{js,jsx}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: ['../*', '../../*', '../../../*', '!../widget-sdk', '!../widget-sdk/**'],
-          message: 'Widgets may import only react, sibling files (./), and the widget SDK (../widget-sdk). Reach app data through ctx capabilities, not direct imports.',
+          regex: '^(?:\\.\\./(?!widget-sdk(?:/|$)|\\.\\./)|\\.\\./\\.\\./(?!widget-sdk(?:/|$)|\\.\\./)|\\.\\./\\.\\./\\.\\./)',
+          message: 'Widgets may import only react, sibling files (./), and the widget SDK (../widget-sdk or ../../widget-sdk). Reach app data through ctx capabilities, not direct imports.',
         }],
       }],
     },

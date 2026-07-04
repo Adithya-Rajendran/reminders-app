@@ -23,7 +23,7 @@ export const LOADERS = {
   notepin: () => import('./NotePinWidget.jsx'),
   review: () => import('./ReviewWidget.jsx'),
   cues: () => import('./CuesWidget.jsx'),
-  triage: () => import('./TriageWidget.jsx'),
+  triage: () => import('./triage/TriageWidget.jsx'),
   daily: () => import('./DailyWidget.jsx'),
   focus: () => import('./FocusWidget.jsx'),
 }
