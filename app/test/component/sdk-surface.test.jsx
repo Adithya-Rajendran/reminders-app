@@ -7,7 +7,7 @@ import * as notes from '../../client/src/widget-sdk/notes'
 // surface change must be reflected here on purpose. Keeps the contract honest.
 const MAIN_SURFACE = [
   // UI primitives
-  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'NoticeBar', 'QuickAddPreview', 'TaskRow', 'PriorityDot', 'EstimateControl', 'DreadControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
+  'SkeletonRows', 'EmptyState', 'ErrorState', 'UndoBar', 'NoticeBar', 'QuickAddPreview', 'TaskRow', 'PriorityDot', 'EstimateControl', 'fmtEst', 'DateTimePicker', 'GroupPicker', 'GroupList',
   // announcements + notices (UX polish round 2)
   'announce', 'LiveAnnouncer', 'emitNotice', 'onNotice',
   // hooks
@@ -17,11 +17,11 @@ const MAIN_SURFACE = [
   // task list + storage
   'useTaskList', 'widgetStore', 'loadJson', 'saveJson', 'loadStringSet', 'saveStringSet',
   // pure domain (sampled across the re-exported modules)
-  'selectUpcoming', 'selectFrog', 'selectFlowSource', 'selectHabits', 'dueBucket',
+  'selectUpcoming', 'selectMostImportant', 'selectFlowSource', 'selectHabits', 'dueBucket',
   'computeReview', 'computeHabitStats', 'buildTree', 'sortNotes', 'ancestorsOf', 'pushRecent',
   'dueChip', 'timeLabel', 'pdotClass', 'PRIORITIES', 'parseQuickAdd', 'ZERO_DATE', 'isRealDate',
   // icons (sampled)
-  'IconBell', 'IconCalendar', 'IconNote', 'IconCue', 'IconFrog',
+  'IconBell', 'IconCalendar', 'IconNote', 'IconCue', 'IconTarget',
 ]
 
 describe('widget-sdk public surface', () => {

@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { IconBell, IconClock, IconCalendar, IconNote, IconPin, IconChart, IconCue, IconTrophy, IconSun, IconTarget, IconInbox } from '../widget-sdk'
+import { IconBell, IconClock, IconCalendar, IconNote, IconPin, IconChart, IconCue, IconSun, IconTarget, IconInbox } from '../widget-sdk'
 import { NotesFolderPanel } from '../widget-sdk/panels'
 import { WIDGET_MANIFEST, WIDGET_MANIFEST_BY_TYPE, DEFAULT_BOARD, resolveWidgetConfig } from './manifest.js'
 
@@ -88,7 +88,7 @@ const RENDERERS = {
   notepin: { icon: IconPin, render: (w, ctx) => <NotePinWidget notes={ctx.notes} instanceId={w.i} /> },
   review: { icon: IconChart, render: (w, ctx) => <ReviewWidget tasks={ctx.tasks} instanceId={w.i} /> },
   cues: { icon: IconCue, render: (w, ctx) => <CuesWidget tasks={ctx.tasks} groups={ctx.groups} group={w.group || ''} /> },
-  triage: { icon: IconTrophy, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
+  triage: { icon: IconTarget, render: (w, ctx) => <TriageWidget tasks={ctx.tasks} organizer={ctx.organizer} instanceId={w.i} /> },
   daily: { icon: IconSun, render: (w, ctx) => <DailyWidget tasks={ctx.tasks} projects={ctx.projects} plan={ctx.plan} instanceId={w.i} /> },
   focus: { icon: IconTarget, render: (w, ctx) => <FocusWidget tasks={ctx.tasks} events={ctx.events} plan={ctx.plan} instanceId={w.i} /> },
 }

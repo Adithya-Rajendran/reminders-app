@@ -9,7 +9,7 @@ import { createAndOpenNote } from './noteactions.js'
 import { getTasks, subscribe as subscribeTasks } from './taskstore.js'
 import { getOrganizerFilter, setOrganizerFilter } from './organizerfilter.js'
 import { emitRevealTask } from './revealbus.js'
-import { getBoard, flashWidget, emitAddWidget } from './boardbus.js'
+import { getBoard, onBoard, flashWidget, emitAddWidget } from './boardbus.js'
 import { WIDGET_MANIFEST } from './widgets/manifest.js'
 import { dueChip } from './tasklib.js'
 import { IconSearch, IconNote, IconPlus, IconFolder, IconList, IconX, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
@@ -86,7 +86,10 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
   // The current board, for type-aware navigation. A surface already on the board
   // gets "Go to" (scroll + flash); one that isn't gets "Add" (drop it in). Either
   // way the aliases make a renamed surface reachable by its old name.
-  const board = useMemo(() => getBoard(), [])
+  // Live board contents — subscribe so nav "Go to/Add" verbs stay correct if a widget
+  // is added/removed while the palette is open (a one-shot snapshot would go stale).
+  const [board, setBoard] = useState(() => getBoard())
+  useEffect(() => onBoard(setBoard), [])
 
   // Flatten every source into one typed, rankable entry list. Rebuilt only when a
   // source actually changes (not per keystroke); ranking runs on `term` below.

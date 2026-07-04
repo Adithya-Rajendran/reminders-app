@@ -12,7 +12,7 @@
 import { WIDGET_MANIFEST } from '../client/src/widgets/manifest.js'
 import { parseQuickAdd, cueTriggerOf, isRealDate } from '../client/src/tasklib.js'
 import {
-  selectUpcoming, selectStalled, selectTriagedThisWeek, selectFrogScored, selectCued,
+  selectUpcoming, selectStalled, selectTriagedThisWeek, selectCued,
   groupEisenhower, dueBucket, UPCOMING_ORDER, byImportanceThenDue, orderPlanFirst, needsTriage, labelGroup,
 } from '../client/src/taskviews.js'
 import { computeReview } from '../client/src/reviewstats.js'
@@ -38,7 +38,7 @@ function brief(t) {
     id: t.id, project_id: t.project_id, title: t.title,
     description: t.description ? String(t.description).slice(0, 280) : '',
     done: !!t.done, due_date: iso(t.due_date), done_at: iso(t.done_at),
-    priority: t.priority || 0, time_estimate: t.time_estimate || 0, dread: t.dread || 0,
+    priority: t.priority || 0, time_estimate: t.time_estimate || 0, important: !!t.important,
     labels: (t.labels || []).map((l) => l.title),
     cue: t.cue || '', repeat_after: t.repeat_after || 0,
     reminders: (t.reminders || []).map((r) => r.reminder),
@@ -69,7 +69,7 @@ const S = {
   isoDate: { type: 'string', minLength: 4, maxLength: 40 },
   limit: { type: 'integer', minimum: 1, maximum: 250 },
   priority: { type: 'integer', minimum: 0, maximum: 5 },
-  dread: { type: 'integer', minimum: 0, maximum: 5 },
+  important: { type: 'boolean' },
 }
 const obj = (properties, required = []) => ({ type: 'object', properties, required, additionalProperties: false })
 
@@ -81,7 +81,7 @@ const TASK_FIELDS = {
   priority: S.priority,
   labels: { type: 'array', items: { type: 'string' }, maxItems: 10 },
   time_estimate: { type: 'integer', minimum: 0, maximum: 6000 },
-  dread: S.dread,
+  important: S.important,
   cue: { type: 'string', maxLength: 500 },
   repeat_after: { type: 'integer', minimum: 0, maximum: 3650 },
   repeat_mode: { type: 'integer', minimum: 0, maximum: 2 },
@@ -374,15 +374,6 @@ export const MCP_TOOLS = [
     },
   },
   {
-    name: 'triage_frog', widget: 'triage',
-    description: 'Today’s frog: the most important + most dreaded open task (eat it first). Live score — the widget may pin a per-day pick locally.',
-    inputSchema: obj({}),
-    async handler({ sub }) {
-      const frog = selectFrogScored(openTasks(await allTasks(sub)))
-      return { frog: frog ? brief(frog) : null }
-    },
-  },
-  {
     name: 'triage_matrix', widget: 'triage',
     description: 'Open tasks grouped into the Eisenhower matrix: q1 urgent+important, q2 important, q3 urgent, q4 neither.',
     inputSchema: obj({}),
@@ -395,11 +386,11 @@ export const MCP_TOOLS = [
   },
   {
     name: 'triage_set', widget: 'triage',
-    description: 'Make triage decisions on a task: time_estimate (minutes), due_date (ISO), priority 0-5, dread 0-5. Estimate + a real date removes it from the triage queue.',
-    inputSchema: obj({ task_id: S.taskId, time_estimate: { type: 'integer', minimum: 0, maximum: 6000 }, due_date: { type: 'string', maxLength: 40 }, priority: S.priority, dread: S.dread }, ['task_id']),
+    description: 'Make prioritization decisions on a task: mark it important (the Prioritize matrix’s importance axis), set a due_date (ISO — its urgency), time_estimate (minutes), priority 0-5. Estimate + a real date removes it from the triage queue.',
+    inputSchema: obj({ task_id: S.taskId, important: S.important, time_estimate: { type: 'integer', minimum: 0, maximum: 6000 }, due_date: { type: 'string', maxLength: 40 }, priority: S.priority }, ['task_id']),
     async handler({ sub }, args) {
       const { task_id, ...patch } = args
-      if (Object.keys(patch).length === 0) throw err('nothing to set — pass time_estimate, due_date, priority and/or dread', 400)
+      if (Object.keys(patch).length === 0) throw err('nothing to set — pass important, time_estimate, due_date and/or priority', 400)
       const task = await patchTaskCore(sub, task_id, patch)
       return { task: brief(task) }
     },
@@ -460,13 +451,13 @@ export const MCP_TOOLS = [
   // ============ focus ============
   {
     name: 'focus_next', widget: 'focus',
-    description: 'What to work on now: due-soon tasks by importance, then the rest by priority+dread — with today’s planned tasks first (the Focus widget’s ranking).',
+    description: 'What to work on now: due-soon tasks by importance, then the rest by priority — with today’s planned tasks first (the Focus widget’s ranking).',
     inputSchema: obj({ count: { type: 'integer', minimum: 1, maximum: 25 } }),
     async handler({ sub }, args) {
       const open = openTasks(await allTasks(sub))
       const soon = open.filter((t) => isRealDate(t.due_date) && ['overdue', 'today'].includes(dueBucket(t.due_date).k)).sort(byImportanceThenDue)
       const soonSet = new Set(soon)
-      const rest = open.filter((t) => !soonSet.has(t)).sort((a, b) => ((b.priority || 0) + (b.dread || 0)) - ((a.priority || 0) + (a.dread || 0)))
+      const rest = open.filter((t) => !soonSet.has(t)).sort((a, b) => (b.priority || 0) - (a.priority || 0))
       const planIds = (await getPlan(sub, todayYmd())).ids
       const ranked = orderPlanFirst([...soon, ...rest], planIds)
       const planSet = new Set(planIds)

@@ -1594,16 +1594,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .est-chip { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
 .est-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
 
-/* dread chip + 1–5 dot picker (shared widget-sdk control; used by TaskRow + Triage) */
-.dread-chip { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 34%, transparent); cursor: pointer; }
-.dread-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
-/* top offset: hug the chip so the picker can't read as the next row's control. */
-.dread-menu { display: flex; align-items: center; gap: 8px; min-width: 0; top: calc(100% + 2px); }
-.dread-dots { display: inline-flex; gap: 5px; padding: 2px; }
-.dread-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: transparent; cursor: pointer; padding: 0; }
-.dread-dot.on { background: var(--warn); border-color: var(--warn); }
-.dread-clear { padding: 4px 7px; font-size: 12px; }
-
 /* Habits widget — streak / consistency dots / automaticity bar */
 .habit { display: flex; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
 .habit:last-child { border-bottom: none; }
@@ -1691,19 +1681,16 @@ button.rem-head:hover .g-title { color: var(--accent); }
    to already know about); hover/focus-within below raise to full strength. */
 .task .cue-chip.empty,
 .task .est-chip.empty,
-.task .dread-chip.empty,
 .task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
 .task:hover .cue-chip.empty,
 .task:hover .est-chip.empty,
-.task:hover .dread-chip.empty,
 .task:hover .subtask-chip.empty,
 .task:focus-within .cue-chip.empty,
 .task:focus-within .est-chip.empty,
-.task:focus-within .dread-chip.empty,
 .task:focus-within .subtask-chip.empty { opacity: 1; }
 @media (hover: none) {
   .task .cue-chip.empty, .task .est-chip.empty,
-  .task .dread-chip.empty, .task .subtask-chip.empty { opacity: 1; }
+  .task .subtask-chip.empty { opacity: 1; }
 }
 
 /* === Reconnect banner: stale-list-visible on a sync blip (vs full ErrorState) === */
@@ -1760,7 +1747,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
    with negative margins so layout/spacing is unchanged. */
 .check-btn { padding: 3px; margin: -3px; box-sizing: content-box; }
 .pri-dot-btn { padding: 8px; margin: -5px; }
-.dread-dot { padding: 5px; margin: -5px; box-sizing: content-box; }
 
 /* === Settings → MCP access section === */
 .mcp-master-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; cursor: pointer; user-select: none; }
