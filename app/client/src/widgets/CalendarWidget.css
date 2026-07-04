@@ -101,6 +101,28 @@
 .cal-compact .fc-toolbar-title { font-size: 14px; }
 .cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
 .cal-compact .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; gap: 4px; }
+.cal-compact .fc .fc-list-table { width: 100% !important; table-layout: fixed; }
+.cal-compact .fc .fc-list-day-cushion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.cal-compact .fc .fc-list-day-text,
+.cal-compact .fc .fc-list-day-side-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-compact .fc .fc-list-event-time { width: 58px; }
+.cal-compact .fc .fc-list-event-graphic { width: 18px; }
+.cal-compact .fc .fc-list-event-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Calendar task chips: dragging is their one interaction — show it. */
 .cal-task { cursor: grab; }
