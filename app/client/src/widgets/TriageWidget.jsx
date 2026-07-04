@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   useTaskList, useWidgetSize, atLeastW, atLeastH,
-  groupEisenhower, byImportanceThenDue, isRealDate, dueChip, applyOrganizer, useOrganizerFilter,
+  groupEisenhower, selectMostImportant, isRealDate, dueChip, applyOrganizer, useOrganizerFilter,
   TaskRow, EmptyState, ErrorState, SkeletonRows, UndoBar,
   IconTarget, IconCheck,
 } from '../widget-sdk'
@@ -50,16 +50,13 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
   // Which quadrant is under a drag right now — only for the drop-target highlight.
   const [dragOver, setDragOver] = useState(null)
 
-  const quads = useMemo(() => groupEisenhower(applyOrganizer(tasks, filter), new Date()), [tasks, filter])
+  const scoped = useMemo(() => applyOrganizer(tasks, filter), [tasks, filter])
+  const quads = useMemo(() => groupEisenhower(scoped, new Date()), [scoped])
 
-  // "Most important" = the single task to do now: the top of the important+urgent
-  // pile, else the top important-but-not-urgent one. byImportanceThenDue orders by
-  // priority then nearest due within a quadrant. No frog/dread/points framing — it
-  // is simply the most pressing important thing.
-  const mostImportant = useMemo(() => {
-    const pool = quads.Q1.length ? quads.Q1 : quads.Q2
-    return pool.slice().sort(byImportanceThenDue)[0] || null
-  }, [quads])
+  // "Most important" = the single task to do now (shared selector — see taskviews).
+  // Strict here (no all-tasks fallback): when nothing is flagged important, the
+  // callout shows the "Nothing flagged" prompt rather than picking an unflagged task.
+  const mostImportant = useMemo(() => selectMostImportant(scoped, new Date()), [scoped])
 
   // Show YOUR WORK: name the concrete signals that made this the pick (importance
   // flag, urgency, priority) instead of an unexplained assertion.

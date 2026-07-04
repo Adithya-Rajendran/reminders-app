@@ -1,6 +1,6 @@
 // Pure task-view selectors shared by the Reminders/Upcoming widgets (they read
 // from the single client task store). Run with: node test/taskviews.test.mjs
-import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectFrog, selectFrogScored, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource, orderPlanFirst, selectTriagedThisWeek, selectInbox, byArea, byContext, applyOrganizer } from '../client/src/taskviews.js'
+import { selectReminders, selectUpcoming, selectStalled, dueBucket, nextRemind, UPCOMING_ORDER, selectCued, hasCue, selectHabits, isRecurringTask, selectMostImportant, byImportanceThenDue, eisenhowerQuadrant, groupEisenhower, selectQuickWins, isQuickWin, isTwoMinName, selectFlowSource, orderPlanFirst, selectTriagedThisWeek, selectInbox, byArea, byContext, applyOrganizer } from '../client/src/taskviews.js'
 import { ZERO_DATE } from '../client/src/tasklib.js'
 
 let pass = 0, fail = 0
@@ -75,29 +75,25 @@ const habitTasks = [
 ok(isRecurringTask({ repeat_after: 86400 }) === true && isRecurringTask({ repeat_after: 0 }) === false, 'isRecurringTask: repeat_after > 0')
 ok(selectHabits(habitTasks).map((t) => t.id).join() === 'h1,h2,h3', 'selectHabits: open recurring tasks only')
 
-// ---- selectFrog ----
-const frogTasks = [
-  { id: 'a', done: false, priority: 3, due_date: iso(2 * DAY) },
-  { id: 'b', done: false, priority: 5, due_date: iso(3 * DAY) }, // top priority, later due
-  { id: 'c', done: false, priority: 5, due_date: iso(1 * DAY) }, // top priority, nearer due -> frog
-  { id: 'd', done: true, priority: 5, due_date: iso(0) },        // done -> excluded
-  { id: 'e', is_goal: true, priority: 5 },                       // goal -> excluded
-]
-ok(selectFrog(frogTasks).id === 'c', 'selectFrog: highest priority, then nearest due')
-ok(selectFrog([]) === null, 'selectFrog: empty -> null')
-ok(selectFrog([{ id: 'z', done: true, priority: 5 }]) === null, 'selectFrog: all done -> null')
-ok(selectFrog([{ id: 'x', done: false, priority: 2 }, { id: 'y', done: false, priority: 4 }]).id === 'y', 'selectFrog: no due dates -> highest priority wins')
-
-// ---- selectFrogScored (priority + dread) ----
+// ---- selectMostImportant (shared "the one task to do now": importance × urgency) ----
 {
+  const now = new Date('2026-07-04T12:00:00Z')
+  const dueIn = (h) => new Date(now.getTime() + h * 3600e3).toISOString()
   const t = [
-    { id: 'a', done: false, priority: 4, dread: 0, due_date: iso(1 * DAY) }, // score 4
-    { id: 'b', done: false, priority: 3, dread: 3, due_date: iso(2 * DAY) }, // score 6 -> frog
-    { id: 'c', done: false, priority: 5, dread: 0, due_date: iso(3 * DAY) }, // score 5
+    { id: 'q1', done: false, important: true, priority: 2, due_date: dueIn(5) },    // important + urgent -> Q1
+    { id: 'q2', done: false, important: true, priority: 5, due_date: dueIn(240) },  // important, not urgent -> Q2
+    { id: 'loud', done: false, important: false, priority: 5, due_date: dueIn(1) }, // urgent but NOT important -> Q3
   ]
-  ok(selectFrogScored(t).id === 'b', 'selectFrogScored: dread lifts an important-but-avoided task to the top')
-  ok(selectFrogScored([]) === null, 'selectFrogScored: empty -> null')
-  ok(selectFrogScored(frogTasks).id === selectFrog(frogTasks).id, 'selectFrogScored reduces to selectFrog when no dread present')
+  ok(selectMostImportant(t, now).id === 'q1', 'selectMostImportant: picks the important+urgent (Q1) task, not the loud unimportant one')
+  const noQ1 = [
+    { id: 'imp', done: false, important: true, priority: 2, due_date: dueIn(240) }, // important, not urgent -> Q2
+    { id: 'loud', done: false, important: false, priority: 5, due_date: dueIn(1) },
+  ]
+  ok(selectMostImportant(noQ1, now).id === 'imp', 'selectMostImportant: falls to the top important-not-urgent (Q2) when nothing is Q1')
+  const noneFlagged = [{ id: 'a', done: false, priority: 2 }, { id: 'b', done: false, priority: 5 }]
+  ok(selectMostImportant(noneFlagged, now) === null, 'selectMostImportant: strict (no fallback) -> null so the widget can prompt "nothing flagged"')
+  ok(selectMostImportant(noneFlagged, now, { fallbackToAll: true }).id === 'b', 'selectMostImportant: fallbackToAll picks the top open task by priority')
+  ok(selectMostImportant([], now) === null, 'selectMostImportant: empty -> null')
 }
 
 // ---- byImportanceThenDue (anti-urgency sort) ----

@@ -4,6 +4,7 @@ import { api, tk, reminderGroups, notesApi } from './api.js'
 import { subscribe, getTasks, getState, refresh, ensureLoaded, patchTask, removeTask, replaceTasks, insertTask } from './taskstore.js'
 import { getOrganizerFilter, setOrganizerFilter, subscribeOrganizerFilter } from './organizerfilter.js'
 import { updateTask, createTask, deleteTask, attachLabels, isRealDate } from './tasklib.js'
+import { selectContexts } from './taskviews.js'
 import { emitTasksChanged, onTasksChanged } from './tasksbus.js'
 import { onOpenNote, emitOpenNote, hasOpenNoteListener } from './notesbus.js'
 import { WIDGETS, WIDGET_TYPES, DEFAULT_BOARD } from './widgets/registry.jsx'
@@ -375,7 +376,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
     createArea: (body) => api('/api/areas', { method: 'POST', body: JSON.stringify(body) }),
     updateArea: (id, body) => api('/api/areas/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
     removeArea: (id) => api('/api/areas/' + encodeURIComponent(id), { method: 'DELETE' }),
-    contexts: () => [...new Set(getTasks().flatMap((t) => (t.labels || []).map((l) => l.title || l)).filter(Boolean))].sort(),
+    contexts: () => selectContexts(getTasks()),
     getFilter: getOrganizerFilter, setFilter: setOrganizerFilter, subscribe: subscribeOrganizerFilter,
   }), [])
 

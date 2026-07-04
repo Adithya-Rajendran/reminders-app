@@ -9,7 +9,8 @@ const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')
 
 // "What to work on now" + a focus session. Surfaces a SINGLE clear next action
 // (flow needs a clear goal and minimal ambiguity — Csikszentmihalyi), ranked by
-// urgency-then-importance with dread factored in. The timer length is adjustable
+// urgency-then-importance (due-soon by importance, then the rest by priority — the
+// same ranking the focus_next MCP tool returns). The timer length is adjustable
 // (no hard 25/5 "science" claim — that interval is convention, not evidence). A
 // quiet "reminders parked" count keeps routine interrupts from breaking focus
 // (pull over push — Mark et al. 2016), and a parking note offloads loose ends to
@@ -47,7 +48,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
   const ranked = useMemo(() => {
     const soon = open.filter((t) => isRealDate(t.due_date) && ['overdue', 'today'].includes(dueBucket(t.due_date).k)).sort(byImportanceThenDue)
     const soonSet = new Set(soon)
-    const rest = open.filter((t) => !soonSet.has(t)).sort((a, b) => ((b.priority || 0) + (b.dread || 0)) - ((a.priority || 0) + (a.dread || 0)))
+    const rest = open.filter((t) => !soonSet.has(t)).sort((a, b) => (b.priority || 0) - (a.priority || 0))
     return orderPlanFirst([...soon, ...rest], todayPlanIds)
   }, [open, todayPlanIds])
   const [skip, setSkip] = useState(0)

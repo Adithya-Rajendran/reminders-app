@@ -54,6 +54,19 @@ export const selectInbox = (tasks) => (tasks || []).filter((t) => !t.done && t.c
 // active filter unconditionally.
 export const byArea = (tasks, areaId) => (!areaId ? (tasks || []) : (tasks || []).filter((t) => t.area === areaId))
 export const byContext = (tasks, context) => (!context ? (tasks || []) : (tasks || []).filter((t) => (t.labels || []).some((l) => (l.title || l) === context)))
+// The distinct Context tags across tasks (their CATEGORIES/labels), sorted — the
+// board-scope choices for the filter bar + omnibox. Excludes the internal quick-win
+// marker so "2min" can't be picked as a context. One source for both surfaces.
+export function selectContexts(tasks) {
+  const set = new Set()
+  for (const t of (tasks || [])) {
+    for (const l of (t.labels || [])) {
+      const name = l.title || l
+      if (name && !isTwoMinName(name)) set.add(name)
+    }
+  }
+  return [...set].sort()
+}
 
 // Apply the global organizer filter { areaId?, context? } — used by every task
 // widget so filtering by an Area or Context happens once and scopes the board.
@@ -101,23 +114,17 @@ export function byImportanceThenDue(a, b) {
   return (b.priority || 0) - (a.priority || 0) || dueMs(a) - dueMs(b)
 }
 
-// The one task to start with: highest PRIORITY, then nearest DUE. Goals and done
-// tasks are excluded. Returns null when nothing is open.
-export function selectFrog(tasks) {
-  const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
-  if (!open.length) return null
-  return open.slice().sort(byImportanceThenDue)[0]
-}
-
-// Frog selection that also weighs DREAD (the optional avoidance score): an
-// important-but-dreaded task surfaces ahead of an equally-important easy one, so
-// the day's frog is the thing you'd otherwise put off (KC & Staats 2020). Ties
-// fall back to nearest due. Reduces to selectFrog when no task carries dread.
-export function selectFrogScored(tasks) {
-  const open = (tasks || []).filter((t) => !t.done && !t.is_goal)
-  if (!open.length) return null
-  const score = (t) => (t.priority || 0) + (t.dread || 0)
-  return open.slice().sort((a, b) => score(b) - score(a) || dueMs(a) - dueMs(b))[0]
+// The single most important task to do now: the top of the important+urgent (Q1)
+// pile, else the top important-but-not-urgent (Q2) one — importance is the explicit
+// flag, urgency is due-proximity (see eisenhowerQuadrant). One source of truth for
+// the Prioritize callout AND the Overview summary. `fallbackToAll` (Overview) means
+// "always answer" — when nothing is flagged, pick the top open task by priority;
+// without it (Prioritize) it returns null so the widget can prompt "nothing flagged".
+export function selectMostImportant(tasks, now = new Date(), { fallbackToAll = false } = {}) {
+  const q = groupEisenhower(tasks, now)
+  let pool = q.Q1.length ? q.Q1 : q.Q2
+  if (!pool.length && fallbackToAll) pool = (tasks || []).filter((t) => !t.done && !t.is_goal)
+  return pool.slice().sort(byImportanceThenDue)[0] || null
 }
 
 const URGENT_MS = 48 * 3600e3 // "urgent" = due within 48h (or already overdue)

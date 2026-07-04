@@ -46,7 +46,7 @@ Claude Desktop (`mcpServers` in its config):
 | Notes | `notes_list` · `notes_search` · `notes_read` · `notes_create` · `notes_update` · `notes_append` · `notes_backlinks` · `notes_trash` |
 | Weekly Review | `review_stats` |
 | Cues | `cues_list` · `cues_set` |
-| Triage | `triage_queue` · `triage_frog` · `triage_matrix` · `triage_set` |
+| Prioritize | `triage_queue` · `triage_matrix` · `triage_set` |
 | Daily Plan | `daily_get_plan` · `daily_set_plan` · `daily_plan_add` · `daily_plan_remove` · `daily_suggestions` |
 | Focus | `focus_next` |
 

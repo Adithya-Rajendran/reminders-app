@@ -33,7 +33,7 @@ Any other parent import (`../api.js`, `../taskstore.js`, `../tasksbus.js`,
 - **sizing**: `atLeastW`, `atMostW`, `atLeastH`, `atMostH`, `DEFAULT_WIDGET_SIZE`
 - **storage**: `widgetStore(instanceId)` (per-instance — preferred), plus the raw
   `loadJson`/`saveJson`/`loadStringSet`/`saveStringSet`
-- **pure domain helpers**: task views/selectors (`selectUpcoming`, `selectFrog`,
+- **pure domain helpers**: task views/selectors (`selectUpcoming`, `selectMostImportant`,
   `selectFlowSource`, `selectHabits`, `dueBucket`, …), `tasklib` helpers
   (`dueChip`, `timeLabel`, `pdotClass`, `PRIORITIES`, `parseQuickAdd`, `ZERO_DATE`,
   `isRealDate`), `habitstats`, `reviewstats`, note helpers (`buildTree`,

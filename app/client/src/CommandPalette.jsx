@@ -4,12 +4,13 @@ import { useModalRef } from './useModalRef.js'
 import { emitOpenNote } from './notesbus.js'
 import { notesApi, api } from './api.js'
 import { rankEntries } from './omnibox.js'
+import { selectContexts } from './taskviews.js'
 import { aliasesForType } from './palettecmds.js'
 import { createAndOpenNote } from './noteactions.js'
 import { getTasks, subscribe as subscribeTasks } from './taskstore.js'
 import { getOrganizerFilter, setOrganizerFilter } from './organizerfilter.js'
 import { emitRevealTask } from './revealbus.js'
-import { getBoard, flashWidget, emitAddWidget } from './boardbus.js'
+import { getBoard, onBoard, flashWidget, emitAddWidget } from './boardbus.js'
 import { WIDGET_MANIFEST } from './widgets/manifest.js'
 import { dueChip } from './tasklib.js'
 import { IconSearch, IconNote, IconPlus, IconFolder, IconList, IconX, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from './icons.jsx'
@@ -42,7 +43,7 @@ const optionId = (item) => 'cmdk-opt-' + item.id
 // renamed "Prioritize"), your live tasks, and your notes — with a type tag per row.
 // Typing `>` is now an OPTIONAL filter to commands + navigation only. Fully
 // keyboard-driven; every row carries a `run`, so activating it just closes + runs.
-export default function CommandPalette({ initialMode = 'notes', commands = [], onClose }) {
+export default function CommandPalette({ initialMode = 'search', commands = [], onClose }) {
   const [raw, setRaw] = useState(initialMode === 'commands' ? '>' : '')
   const [notes, setNotes] = useState(null) // null = loading | [] | [...]
   const [sel, setSel] = useState(0)
@@ -81,12 +82,15 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     api('/api/areas').then((a) => { if (alive) setAreas(Array.isArray(a) ? a : []) }).catch(() => {})
     return () => { alive = false }
   }, [])
-  const contexts = useMemo(() => [...new Set(tasks.flatMap((t) => (t.labels || []).map((l) => l.title || l)).filter(Boolean))].sort(), [tasks])
+  const contexts = useMemo(() => selectContexts(tasks), [tasks])
 
   // The current board, for type-aware navigation. A surface already on the board
   // gets "Go to" (scroll + flash); one that isn't gets "Add" (drop it in). Either
   // way the aliases make a renamed surface reachable by its old name.
-  const board = useMemo(() => getBoard(), [])
+  // Live board contents — subscribe so nav "Go to/Add" verbs stay correct if a widget
+  // is added/removed while the palette is open (a one-shot snapshot would go stale).
+  const [board, setBoard] = useState(() => getBoard())
+  useEffect(() => onBoard(setBoard), [])
 
   // Flatten every source into one typed, rankable entry list. Rebuilt only when a
   // source actually changes (not per keystroke); ranking runs on `term` below.
@@ -118,11 +122,13 @@ export default function CommandPalette({ initialMode = 'notes', commands = [], o
     }
 
     // Areas/Projects and Contexts — selecting one SCOPES the whole board to it (the
-    // board filter bar then shows the active scope + a Clear). Not a dead-end now
-    // that every browse widget honours the organizer filter.
+    // board filter bar then shows the active scope + a Clear). Not a dead-end: the
+    // task-list widgets (Overview, Reminders, Upcoming, Prioritize, Review) all honour
+    // the filter; the Inbox is the deliberate exception — it clarifies every capture
+    // regardless of scope, since captures have no Area/Context until you clarify them.
     for (const a of areas) {
       const kind = a.kind === 'project' ? 'Project' : 'Area'
-      out.push({ kind: 'area', id: 'area-' + a.id, title: a.name, subtitle: `Scope the board to this ${kind.toLowerCase()}`, tag: kind, keys: [a.name], run: () => setOrganizerFilter({ areaId: a.id, context: null }) })
+      out.push({ kind: 'area', id: a.id, title: a.name, subtitle: `Scope the board to this ${kind.toLowerCase()}`, tag: kind, keys: [a.name], run: () => setOrganizerFilter({ areaId: a.id, context: null }) })
     }
     for (const c of contexts) {
       out.push({ kind: 'context', id: 'ctx-' + c, title: '@' + c, subtitle: 'Scope the board to this context', tag: 'Context', keys: [c, '@' + c], run: () => setOrganizerFilter({ areaId: null, context: c }) })

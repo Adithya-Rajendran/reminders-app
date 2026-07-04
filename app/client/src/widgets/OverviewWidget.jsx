@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  useTaskList, applyOrganizer, useOrganizerFilter, groupEisenhower, byImportanceThenDue, dueBucket,
+  useTaskList, applyOrganizer, useOrganizerFilter, selectMostImportant, dueBucket,
   isRealDate, dueChip, timeLabel, parseQuickAdd, IconCheck, IconTarget, IconCalendar, IconPlus,
   SkeletonRows, ErrorState, ReconnectBanner, UndoBar,
 } from '../widget-sdk'
@@ -29,7 +29,7 @@ function eventTime(iso, allDay) {
 // completion here updates the board at once. Respects the global organizer filter so
 // when the user scopes the board to an Area/Context, this summary scopes with it.
 export default function OverviewWidget({ tasks: tasksCap, calendar, organizer }) {
-  // Select every task; the day-math (overdue/today/frog) is done here so the
+  // Select every task; the day-math (overdue/today/most-important) is done here so the
   // selector stays a stable identity (a new array each render would thrash useMemo
   // in useTaskList). Filtering to open tasks happens below.
   const selector = useCallback((all) => all, [])
@@ -40,32 +40,41 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
   const filter = useOrganizerFilter(organizer)
   const scoped = useMemo(() => applyOrganizer(tasks, filter), [tasks, filter])
 
-  // A single "now" per render pass so overdue/urgent/frog all agree on the instant.
-  const now = useMemo(() => new Date(), [tasks, filter])
+  // A single "now" all the day-math agrees on, refreshed every minute so overdue /
+  // due-today stay honest on an idle board (deriving it only from [tasks, filter]
+  // left it frozen until the next edit).
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const now = useMemo(() => new Date(), [tasks, filter, nowTick])
 
   // Open, actionable tasks (goals aren't "do it now" items).
   const open = useMemo(() => scoped.filter((t) => !t.done && !t.is_goal), [scoped])
 
   // Overdue = open tasks whose real due date is strictly before today.
+  // `now` is a dependency (not read in the body) so these recompute on the minute
+  // tick as well as on edits: dueBucket() classifies against the LIVE wall clock,
+  // so re-running it just after midnight is what actually moves a task from
+  // "today" to "overdue" on an idle board (the whole point of the tick).
   const overdue = useMemo(
     () => open.filter((t) => isRealDate(t.due_date) && dueBucket(t.due_date).k === 'overdue'),
-    [open],
+    [open, now],
   )
   // Due today = open tasks whose due date falls today (overdue is counted separately).
   const dueToday = useMemo(
     () => open.filter((t) => isRealDate(t.due_date) && dueBucket(t.due_date).k === 'today'),
-    [open],
+    [open, now],
   )
 
   // Today's most important task: the top of the Eisenhower Q1 (important AND urgent)
   // if any, else the importance-then-due ranking over all open tasks. This honors
   // the explicit importance axis first (groupEisenhower reads task.important), then
   // falls back so there's always a pick while nothing is flagged yet.
-  const frog = useMemo(() => {
-    const q1 = groupEisenhower(open, now).Q1
-    if (q1.length) return q1.slice().sort(byImportanceThenDue)[0]
-    return open.length ? open.slice().sort(byImportanceThenDue)[0] : null
-  }, [open, now])
+  // Shared with the Prioritize widget (see taskviews.selectMostImportant); Overview
+  // always answers, so it falls back to the top open task when nothing is flagged.
+  const mostImportant = useMemo(() => selectMostImportant(open, now, { fallbackToAll: true }), [open, now])
 
   // Honest status line. Overdue is the only thing that turns it "warn": a pile of
   // past-due items is the one state where "on track" would be a lie. Otherwise, if
@@ -168,25 +177,25 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
           </div>
 
           {/* (3) today's most important, with a real complete checkbox */}
-          <div className="ov-frog">
+          <div className="ov-focus">
             <div className="ov-sec-label"><IconTarget size={12} /> Most important</div>
-            {frog ? (
-              <div className="ov-frog-row">
+            {mostImportant ? (
+              <div className="ov-focus-row">
                 <button
                   type="button"
                   className="ov-check"
                   role="checkbox"
                   aria-checked="false"
-                  aria-label={`Complete: ${frog.title}`}
+                  aria-label={`Complete: ${mostImportant.title}`}
                   title="Complete"
-                  onClick={() => onToggle(frog)}
+                  onClick={() => onToggle(mostImportant)}
                 >
                   <IconCheck size={14} />
                 </button>
-                <span className="ov-frog-title">{frog.title}</span>
+                <span className="ov-focus-title">{mostImportant.title}</span>
               </div>
             ) : (
-              <div className="ov-frog-none">Nothing to do — enjoy the clear deck.</div>
+              <div className="ov-focus-none">Nothing to do — enjoy the clear deck.</div>
             )}
           </div>
 

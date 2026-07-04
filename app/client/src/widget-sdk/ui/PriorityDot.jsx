@@ -3,8 +3,10 @@ import { pdotClass, PRIORITIES } from '../../tasklib.js'
 // Priority conveyed by BAR HEIGHT *and* colour — never colour alone (WCAG 1.4.1,
 // use-of-colour). Three ascending bars light up from the left as priority rises, so
 // a colour-blind user reads the level from the glyph's SHAPE while the hue reinforces
-// it. This is the design-system fix for the old flat `.pdot` (a coloured circle whose
-// only signal was its fill colour).
+// it. This replaced the old priority-DOT (a `.pdot` coloured circle whose only signal
+// was its fill). Note `.pdot` itself lives on as a generic colour-swatch primitive —
+// the priority-picker MENU items and the Area/Group dots still use it — so it's not
+// dead; only its use as the standalone priority indicator moved to `.pbars` here.
 //
 // Decorative by default: the enclosing control already carries the accessible label
 // (e.g. TaskRow's "Priority: High" menu button), so the glyph is aria-hidden and adds

@@ -71,10 +71,10 @@ describe('OverviewWidget', () => {
     render(
       <OverviewWidget tasks={cap} calendar={fakeCalendar([])} organizer={fakeOrganizer()} instanceId="ov-frog" />,
     )
-    const frogRow = (await screen.findByText('The real priority')).closest('.ov-frog-row')
-    expect(frogRow).not.toBeNull()
-    expect(frogRow).toHaveTextContent('The real priority')
-    expect(frogRow).not.toHaveTextContent('Loud but unimportant')
+    const focusRow = (await screen.findByText('The real priority')).closest('.ov-focus-row')
+    expect(focusRow).not.toBeNull()
+    expect(focusRow).toHaveTextContent('The real priority')
+    expect(focusRow).not.toHaveTextContent('Loud but unimportant')
 
     // Its checkbox completes the task via the tasks capability.
     await userEvent.click(screen.getByRole('checkbox', { name: /complete: the real priority/i }))

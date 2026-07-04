@@ -23,6 +23,12 @@ function doneOnWeek(weekOffset, dayInWeek = 1) {
 }
 const task = (id, doneAtISO) => ({ id, title: `t-${id}`, done: true, done_at: doneAtISO, labels: [] })
 
+// A no-op organizer (pass-through) or one pinned to a filter, matching the shape
+// widgets consume via useOrganizerFilter (subscribe + getFilter).
+function fakeOrganizer(filter = null) {
+  return { subscribe: () => () => {}, getFilter: () => filter, setFilter() {} }
+}
+
 describe('ReviewWidget trend', () => {
   it('renders a multi-week trend (one bar per tracked week) with the current week emphasized', () => {
     // Completions spread across three distinct weeks so the trend has shape and
@@ -77,6 +83,25 @@ describe('ReviewWidget trend', () => {
     expect(delta.textContent).toMatch(/first week/i)
     // …with the real absolute count still shown as the headline.
     expect(container.querySelector('.rv-big').textContent).toBe('3')
+  })
+
+  it('scopes its stats to the active organizer filter and never mislabels an empty scope as a "first week"', () => {
+    // A completion this week in "work", plus an open task in "home". Global stats
+    // would read "1 done this week"; scoped to the (completion-free) "home" area it
+    // must read 0 — and must NOT claim "first week tracked" (there IS history, just
+    // none in this scope) but say plainly there are no completions yet.
+    const cap = fakeTasks([
+      { id: 'w', title: 'done in work', done: true, done_at: doneOnWeek(0, 2), area: 'area-work', labels: [] },
+      { id: 'h', title: 'open in home', done: false, area: 'area-home', labels: [] },
+    ])
+    const { container } = render(
+      <ReviewWidget tasks={cap} organizer={fakeOrganizer({ areaId: 'area-home' })} instanceId="rv-scoped" />,
+    )
+    // The work completion is out of scope -> headline is 0, not 1.
+    expect(container.querySelector('.rv-big').textContent).toBe('0')
+    const delta = container.querySelector('.rv-delta')
+    expect(delta.textContent).not.toMatch(/first week/i)
+    expect(delta.textContent).toMatch(/no completions/i)
   })
 
   it('renders the guided-review entry alongside the trend (review flow preserved)', () => {
