@@ -13,7 +13,7 @@
 export { SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, NoticeBar, QuickAddPreview } from './ui/parts.jsx'
 export { announce, LiveAnnouncer } from './ui/announcer.jsx'
 export { useMenuKeyNav } from './ui/useMenuKeyNav.js'
-export { emitNotice, onNotice } from '../notices.js'
+export { emitNotice, onNotice } from '../domain/notices.js'
 export { default as TaskRow, EstimateControl, fmtEst } from './ui/TaskRow.jsx'
 export { default as TaskPopover } from './ui/TaskPopover.jsx'
 export { PriorityDot } from './ui/PriorityDot.jsx'
@@ -27,37 +27,37 @@ export { default as ImportanceControl } from './ui/ImportanceControl.jsx'
 // — import them from '../widget-sdk/notes' — so this barrel stays light.
 
 // ---- hooks ----
-export { WidgetSizeContext, useWidgetSize, useElementSize } from '../useWidgetSize.js'
-export { usePopover } from '../usePopover.js'
-export { useModalRef } from '../useModalRef.js'
+export { WidgetSizeContext, useWidgetSize, useElementSize } from './useWidgetSize.js'
+export { usePopover } from './usePopover.js'
+export { useModalRef } from './useModalRef.js'
 export { useOrganizerFilter } from './ui/useOrganizerFilter.js'
 
 // ---- size classification (pure) ----
-export { atLeastW, atMostW, atLeastH, atMostH, DEFAULT_WIDGET_SIZE } from '../widgetsize.js'
+export { atLeastW, atMostW, atLeastH, atMostH, DEFAULT_WIDGET_SIZE } from '../domain/widgetsize.js'
 
 // ---- icons ----
-export * from '../icons.jsx'
+export * from './icons.jsx'
 
 // ---- pure domain helpers ----
-export * from '../taskviews.js'
-export * from '../notiftier.js'
-export { ZERO_DATE, isRealDate, parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, PRIORITIES, pdotClass } from '../tasklib.js'
-export { tasksToCalendarEvents } from '../calevents.js'
-export { NODE_W, NODE_H, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, nodeIn, edgeBetween, dropBase, dragTo, uidFromPoint } from '../flowgeom.js'
-export * from '../habitstats.js'
-export * from '../reviewstats.js'
-export * from '../notetree.js'
-export * from '../notesort.js'
-export * from '../notepaths.js'
-export * from '../noterecent.js'
+export * from '../domain/taskviews.js'
+export * from '../domain/notiftier.js'
+export { ZERO_DATE, isRealDate, parseQuickAdd, cueTriggerOf, dueChip, timeLabel, absDate, isTimedDue, PRIORITIES, pdotClass } from '../domain/tasklib.js'
+export { tasksToCalendarEvents } from '../domain/calevents.js'
+export { NODE_W, NODE_H, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, nodeIn, edgeBetween, dropBase, dragTo, uidFromPoint } from '../domain/flowgeom.js'
+export * from '../domain/habitstats.js'
+export * from '../domain/reviewstats.js'
+export * from '../domain/notetree.js'
+export * from '../domain/notesort.js'
+export * from '../domain/notepaths.js'
+export * from '../domain/noterecent.js'
 
 // ---- task-list hook ----
 // P1 signature is useTaskList(selector); P2 rebinds it to useTaskList(ctx.tasks,
 // selector) once tasks are delivered through the connection layer.
-export { useTaskList } from '../useTasks.js'
+export { useTaskList } from '../data/useTasks.js'
 
 // ---- device-local storage ----
 // widgetStore(instanceId) is the per-instance surface widgets should use; the raw
 // helpers remain for non-instance-scoped state (e.g. a global app preference).
-export { loadJson, saveJson, loadStringSet, saveStringSet } from '../storage.js'
+export { loadJson, saveJson, loadStringSet, saveStringSet } from './storage.js'
 export { widgetStore, appSharedStore } from './widgetStore.js'

@@ -1,8 +1,8 @@
 import { createRoot } from 'react-dom/client'
-import App from './App.jsx'
+import App from './host/App.jsx'
 import './styles.css'
-import { applyAccent, DEFAULT_ACCENT } from './accents.js'
-import { effectiveTheme, normalizeThemePref } from './theme.js'
+import { applyAccent, DEFAULT_ACCENT } from './host/accents.js'
+import { effectiveTheme, normalizeThemePref } from './host/theme.js'
 
 // Apply persisted theme + accent before first paint to avoid a flash. The stored
 // preference may be 'system', which resolves to the OS's current scheme here.

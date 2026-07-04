@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ZERO_DATE, isRealDate } from '../../tasklib.js'
-import { IconBell, IconClock } from '../../icons.jsx'
+import { ZERO_DATE, isRealDate } from '../../domain/tasklib.js'
+import { IconBell, IconClock } from '../icons.jsx'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']

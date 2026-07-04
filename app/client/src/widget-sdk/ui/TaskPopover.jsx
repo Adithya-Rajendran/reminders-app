@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DateTimePicker from './DateTimePicker.jsx'
 import { PriorityDot } from './PriorityDot.jsx'
-import { dueChip, timeLabel, absDate } from '../../tasklib.js'
-import { IconCheck, IconClock } from '../../icons.jsx'
+import { dueChip, timeLabel, absDate } from '../../domain/tasklib.js'
+import { IconCheck, IconClock } from '../icons.jsx'
 
 // Quick-actions popover for a task (Complete / Reschedule). Shared SDK primitive:
 // the calendar opens it from an event chip, and a task row opens it from its title

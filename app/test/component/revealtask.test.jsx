@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // revealtask.js reaches the board (flash a widget) and the announcer; mock both so
 // each branch is observable. The reveal-a-present-row branch uses the real DOM.
-vi.mock('../../client/src/boardbus.js', () => ({ getBoard: vi.fn(() => []), flashWidget: vi.fn() }))
+vi.mock('../../client/src/data/boardbus.js', () => ({ getBoard: vi.fn(() => []), flashWidget: vi.fn() }))
 vi.mock('../../client/src/widget-sdk', () => ({ announce: vi.fn() }))
 
 import { revealTaskInDom } from '../../client/src/revealtask.js'
-import { getBoard, flashWidget } from '../../client/src/boardbus.js'
+import { getBoard, flashWidget } from '../../client/src/data/boardbus.js'
 import { announce } from '../../client/src/widget-sdk'
 
 describe('revealTaskInDom', () => {

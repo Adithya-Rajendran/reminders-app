@@ -22,7 +22,7 @@ globalThis.fetch = async () => {
 // --- fresh boot warm: subscribe within the window reuses it (the cold-load duplicate) ---
 {
   fetchCalls = 0
-  const store = await import('../client/src/taskstore.js?fresh')
+  const store = await import('../client/src/data/taskstore.js?fresh')
   await store.refresh() // the Dashboard boot warm
   ok(fetchCalls === 1, 'boot warm fetches once')
   store.subscribe(() => {})
@@ -34,7 +34,7 @@ globalThis.fetch = async () => {
 // --- no boot warm: the first subscriber still loads the list ---
 {
   fetchCalls = 0
-  const store = await import('../client/src/taskstore.js?cold')
+  const store = await import('../client/src/data/taskstore.js?cold')
   store.subscribe(() => {})
   await tick()
   ok(fetchCalls === 1, 'with no prior load the first subscriber fetches')
@@ -43,7 +43,7 @@ globalThis.fetch = async () => {
 // --- stale boot warm: subscribe past the window refetches ---
 {
   fetchCalls = 0
-  const store = await import('../client/src/taskstore.js?stale')
+  const store = await import('../client/src/data/taskstore.js?stale')
   await store.refresh()
   const realNow = Date.now
   Date.now = () => realNow() + 6000 // past the 5s freshness window
@@ -56,7 +56,7 @@ globalThis.fetch = async () => {
 
 // --- failed boot warm: subscribe retries ---
 {
-  const store = await import('../client/src/taskstore.js?err')
+  const store = await import('../client/src/data/taskstore.js?err')
   const good = globalThis.fetch
   globalThis.fetch = async () => { throw new Error('down') }
   await store.refresh()

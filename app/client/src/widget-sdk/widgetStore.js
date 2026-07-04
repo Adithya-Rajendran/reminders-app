@@ -1,4 +1,4 @@
-import { loadJson, saveJson, loadStringSet, saveStringSet } from '../storage.js'
+import { loadJson, saveJson, loadStringSet, saveStringSet } from './storage.js'
 
 // Per-widget-instance device-local storage. UI state (collapsed sections, the
 // pinned frog, recent notes, sort) is namespaced under the widget instance id, so

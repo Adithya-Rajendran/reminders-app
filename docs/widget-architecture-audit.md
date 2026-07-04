@@ -6,8 +6,8 @@ phased plan to finish separating the two. This is the companion to
 the decoupling) and [adding-a-widget.md](adding-a-widget.md) (the current
 author-facing contract).
 
-**Status:** audit + roadmap. No production code changes here — each work item is
-tracked as a GitHub issue (see [Roadmap](#roadmap) and the umbrella issue).
+**Status:** audit + implementation roadmap. The physical tier split now exists;
+legacy root modules remain as compatibility shims while import sites migrate.
 
 ## Why this exists
 
@@ -111,6 +111,10 @@ data/         shared single-fetch stores + buses + HTTP client (api, taskstore, 
 connections.js  the boundary contract (stays; pure, node-tested)
 widgets/<name>/  WidgetX.jsx + widgetx.css + WidgetX.test.jsx, co-located
 ```
+
+As of 2026-07-04, the `host/`, `widget-sdk/`, `domain/`, and `data/` tiers are
+present in source. Root-level module paths are compatibility shims that preserve
+existing exports for tests and external import sites during the transition.
 
 ### Module classification
 
