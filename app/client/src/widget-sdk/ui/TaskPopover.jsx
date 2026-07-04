@@ -1,19 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { DateTimePicker, dueChip, timeLabel, absDate, PriorityDot, IconCheck, IconClock } from '../widget-sdk'
+import DateTimePicker from './DateTimePicker.jsx'
+import { PriorityDot } from './PriorityDot.jsx'
+import { dueChip, timeLabel, absDate } from '../../tasklib.js'
+import { IconCheck, IconClock } from '../../icons.jsx'
 
-// Quick-actions popover for a task chip on the calendar (Complete / Reschedule).
-// Task chips used to be click-dead-ends there ("manage them in a task widget").
+// Quick-actions popover for a task (Complete / Reschedule). Shared SDK primitive:
+// the calendar opens it from an event chip, and a task row opens it from its title
+// — both were click-dead-ends before. Imports specific SDK modules (not the barrel)
+// so TaskRow can use it without an import cycle (the barrel re-exports TaskRow).
 //
-// Anchoring: the chip is a FullCalendar-owned element that can be torn down and
-// re-rendered under us at any moment (any event-source refetch), so we anchor to
-// the RECT captured at click time — plain numbers, no element reference. A portal
-// with position:fixed keeps the popover out of react-grid-layout's CSS-transformed
-// grid item (same containing-block trap the event modal documents).
+// Anchoring: callers pass the RECT captured at click time (plain numbers, no element
+// reference) — the chip is a FullCalendar-owned element that can be torn down and
+// re-rendered on any refetch. A portal with position:fixed keeps the popover out of
+// react-grid-layout's CSS-transformed grid item (same containing-block trap the
+// event modal documents).
 //
 // The parent resolves the LIVE task from the shared store each render and closes
 // this popover when it disappears; Complete/Reschedule delegate to useTaskList
-// handlers so the chip gets the exact same recurring-aware completion + Undo
+// handlers so the action gets the exact same recurring-aware completion + Undo
 // semantics as the task-row widgets.
 export default function TaskPopover({ task, anchorRect, onComplete, onSchedule, onClose }) {
   const popRef = useRef(null)
@@ -21,7 +26,7 @@ export default function TaskPopover({ task, anchorRect, onComplete, onSchedule, 
   const [pos, setPos] = useState(null)
   const [pickOpen, setPickOpen] = useState(false)
 
-  // Place below the chip, flip above when out of room, clamp into the viewport
+  // Place below the anchor, flip above when out of room, clamp into the viewport
   // (same placement idiom as the SDK's AnchoredPopover / DateTimePicker).
   useLayoutEffect(() => {
     const W = 264

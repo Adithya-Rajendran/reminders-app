@@ -52,12 +52,13 @@
   --glow-strength: 1;
   --density: 1;
 
-  /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). Capped so
-     the board centers (via the auto margins on those rules) instead of stretching
-     edge-to-edge on a 3000px+ ultrawide. The breakpoint ladder in dashlayout.js
-     still adds columns up to this width; past it the canvas centers. Set to `none`
-     to let it fill the display again. */
-  --canvas-max: 2600px;
+  /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). `none` lets
+     the board fill the display: the breakpoint ladder in dashlayout.js turns extra
+     width into more COLUMNS (scaleItems/fitWidthToContract keep each widget inside
+     its aspect band — cohesion over fill) instead of stretching a few wide widgets,
+     so a 5K2K ultrawide is used rather than centering a 2600px island in a sea of
+     gutter. Set a px value (e.g. 2600px) to re-cap + center on very wide displays. */
+  --canvas-max: none;
   /* Readable line-length cap for list/text widget bodies (~66ch ≈ WCAG 1.4.8).
      Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it
      keeps content left-aligned at a readable measure instead of 150-char lines. */
@@ -529,15 +530,19 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 18px 24px 8px;
+  padding: 10px 24px 8px;
 }
+/* Title + date sit on ONE line (they used to stack) — the active dashboard tab
+   already names the board, so this heading stays small and reclaims ~30px of the
+   scarce vertical budget on a 14" laptop. */
+.toolbar-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .toolbar h1 {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
 }
-.toolbar .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.toolbar .sub { font-size: 13px; color: var(--muted); }
 .toolbar-spacer { flex: 1; }
 
 /* Active organizer-filter strip (Area/Context scope) below the toolbar. Matches the
@@ -550,7 +555,7 @@ body {
 .board-filter-clear:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Dashboard grid ---------- */
-.grid-wrap { padding: 8px 24px 40px; flex: 1; }
+.grid-wrap { padding: 8px 24px 28px; flex: 1; }
 .grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -682,6 +687,11 @@ body {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
 }
 .task.checked .task-title .t { color: var(--faint); text-decoration: line-through; }
+/* Title is a button (opens the shared quick-actions popover) when the row can act
+   on the task — hint interactivity on hover/focus without shouting. */
+.task .task-title .t.t-actions { cursor: pointer; border-radius: 4px; }
+.task .task-title .t.t-actions:hover { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--line-strong); }
+.task .task-title .t.t-actions:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .task .task-sub { display: flex; align-items: center; gap: 7px; margin-top: 5px; flex-wrap: wrap; }
 .task-meta { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
 .task .task-del { align-self: center; flex: 0 0 auto; opacity: 0; transition: opacity 120ms ease; }
@@ -885,6 +895,17 @@ body {
 }
 .modal-head .ic { color: var(--accent); }
 .modal-head h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+/* Settings section tabs — sit under the head, above the scrolling body, so switching
+   sections keeps each view short instead of one long scroll. */
+.settings-tabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; }
+.settings-tab {
+  appearance: none; background: none; border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; padding: 9px 10px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--muted); cursor: pointer; transition: color .15s, border-color .15s;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.settings-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .modal-head .sub { font-size: 12.5px; color: var(--muted); }
 .modal-body { padding: 16px 20px; overflow-y: auto; }
 .modal-foot { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; }

@@ -15,7 +15,7 @@ import { MobileShell } from './MobileShell.jsx'
 import { SkeletonRows, UndoBar } from './widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
+  scaleLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
   applyCollapsed, restoreCollapsedHeights,
   stripDerivedTiers, boardSignature,
 } from './dashlayout.js'
@@ -82,10 +82,30 @@ function scrollFlash(id) {
   setTimeout(() => node.classList.remove('widget--added'), 1200)
 }
 
-// A clean default dashboard (DEFAULT_BOARD in the registry), placed left to right.
+// The fresh board's base (lg, 30-col) placement: a 2-row tile hand-fitted so all
+// four default widgets sit in ~15 rows and clear a 1512×982 laptop viewport WITHOUT
+// scrolling. (The old x%cols placement overlapped, so react-grid-layout untangled
+// them into a taller staircase with a dead top-right hole.) Each w/h stays inside
+// the widget's manifest aspect band + max — widget-contract invariants, checked by
+// buildDefault-shape assumptions below. Row 1: overview + upcoming (h7); row 2:
+// daily + calendar (h8).
+const DEFAULT_BOARD_LG = {
+  overview: { x: 0, y: 0, w: 16, h: 7 },
+  upcoming: { x: 16, y: 0, w: 10, h: 7 },
+  daily: { x: 0, y: 7, w: 8, h: 8 },
+  calendar: { x: 8, y: 7, w: 11, h: 8 },
+}
+// A clean default dashboard (DEFAULT_BOARD in the registry). The curated lg base is
+// the only authored tier; every other breakpoint is DERIVED by fillBreakpoints —
+// wider tiers (xl…xxxxl) scale to FILL the width (so a fresh 5K2K board uses the
+// display, clamped to each widget's aspect band), narrower tiers repack — exactly
+// as a loaded board is rebuilt on every load.
 function buildDefault() {
   const def = DEFAULT_BOARD.map((type) => ({ i: newId(), type }))
-  return { widgets: def, layouts: defaultLayouts(def, sizeFor) }
+  const lg = def.map((w) => ({ i: w.i, ...(DEFAULT_BOARD_LG[w.type] || { x: 0, y: 0, ...sizeFor(w.type) }) }))
+  const byId = new Map(def.map((w) => [w.i, w.type]))
+  const layouts = fillBreakpoints({ lg }, (id) => constraintsFor(byId.get(id)))
+  return { widgets: def, layouts }
 }
 
 export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'main', title, metaTick = 0 }) {
@@ -624,9 +644,9 @@ function Toolbar({ projects, onAdd, onReset, onNewGroup, title }) {
   const dateLabel = `${DOW_FULL[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
   return (
     <div className="toolbar">
-      <div>
+      <div className="toolbar-title">
         <h1>{title || 'Dashboard'}</h1>
-        <div className="sub">{dateLabel}</div>
+        <span className="sub">{dateLabel}</span>
       </div>
       <div className="toolbar-spacer" />
       <AddWidgetMenu projects={projects} onAdd={onAdd} onReset={onReset} onNewGroup={onNewGroup} />
