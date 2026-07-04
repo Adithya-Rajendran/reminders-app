@@ -3,12 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DailyWidget from '../../client/src/widgets/DailyWidget.jsx'
 import { fakeTasks, fakePlan } from './fakeCtx.js'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 // Smoke + optimistic-revert test for DailyWidget.
 // The plan (ctx.plan) is a tiny id list: the widget applies it locally and
 // reverts on a rejected plan.set call.
 
 describe('DailyWidget', () => {
+  const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
+
   it('shows the plan section heading and suggestions heading', async () => {
     render(
       <DailyWidget
@@ -62,5 +65,24 @@ describe('DailyWidget', () => {
         'Could not save today’s plan',
       ),
     )
+  })
+
+  it('uses a short layout that preserves today focus and summarizes suggestions', async () => {
+    const dueToday = new Date()
+    dueToday.setHours(10, 0, 0, 0)
+    const tasks = fakeTasks([
+      { id: 'task-1', title: 'Write report', done: false, priority: 0, labels: [],
+        due_date: dueToday.toISOString(), time_estimate: 0, dread: 0, is_goal: false },
+    ])
+
+    render(sized(
+      <DailyWidget tasks={tasks} projects={[{ id: 1 }]} plan={fakePlan([])} instanceId="dw-short" />,
+      { w: 'sm', h: 'xs', name: 'mini', width: 320, height: 150 },
+    ))
+
+    expect(await screen.findByText(/today’s focus/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 suggestion ready when you expand/i)).toBeInTheDocument()
+    expect(screen.queryByText('Suggestions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Write report')).not.toBeInTheDocument()
   })
 })

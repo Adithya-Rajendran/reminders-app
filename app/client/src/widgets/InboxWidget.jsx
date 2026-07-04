@@ -5,6 +5,7 @@ import {
   EmptyState, ErrorState, SkeletonRows, UndoBar, announce,
   dueChip, timeLabel, isRealDate,
   IconInbox, IconTrash, IconMoon, IconClock, IconCheck,
+  useWidgetSize, atMostW, atMostH,
 } from '../widget-sdk'
 import './InboxWidget.css'
 
@@ -33,6 +34,9 @@ const asLabels = (titles) => titles.map((t) => ({ title: t }))
 const contextsOf = (task) => labelTitles(task).filter((t) => t !== SOMEDAY_LABEL)
 
 export default function InboxWidget({ tasks: tasksCap, organizer }) {
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm') || atMostH(sz, 'sm')
+  const short = atMostH(sz, 'xs')
   const { tasks, state, load, onPatch, onSchedule, onDelete, undo, dismissUndo } = useTaskList(tasksCap, selectInbox)
 
   // Organizer options for the pickers. areas() is async (CalDAV-backed); contexts()
@@ -85,7 +89,7 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
 
   if (!focused) {
     return (
-      <div className="inbox">
+      <div className={`inbox${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
         <EmptyState icon={IconInbox} title="Inbox zero — nothing to clarify." sub="New captures land here for a quick decide." />
         {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
       </div>
@@ -97,13 +101,13 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
   const focusContexts = contextsOf(focused)
 
   return (
-    <div className="inbox">
+    <div className={`inbox${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
       {/* Count of what's left to clarify — the whole point of the surface is to
           drive this to zero, so it leads. */}
-      <div className="ib-head">
+      {!short && <div className="ib-head">
         <span className="ib-title"><IconInbox size={15} /> Inbox</span>
         <span className="ib-count" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
-      </div>
+      </div>}
 
       {/* The focused item + its four clarify controls, all in reach. */}
       <div className="ib-card">
@@ -169,15 +173,23 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
 
       {/* A tight peek at what's next — enough to gauge the pile without inviting
           out-of-order editing (only the focused item is actionable). */}
-      {upNext.length > 0 && (
+      {upNext.length > 0 && !short && (
         <div className="ib-upnext">
-          <div className="ib-upnext-head">Up next</div>
-          <ul className="ib-upnext-list">
-            {upNext.map((t) => (
-              <li key={t.id} className="ib-upnext-item">{t.title}</li>
-            ))}
-          </ul>
-          {tasks.length > 5 && <div className="ib-upnext-more">+{tasks.length - 5} more</div>}
+          {compact ? (
+            <div className="ib-upnext-compact" aria-label={`${tasks.length - 1} more inbox items`}>
+              Up next: {upNext[0].title}{tasks.length > 2 ? ` · +${tasks.length - 2} more` : ''}
+            </div>
+          ) : (
+            <>
+              <div className="ib-upnext-head">Up next</div>
+              <ul className="ib-upnext-list">
+                {upNext.map((t) => (
+                  <li key={t.id} className="ib-upnext-item">{t.title}</li>
+                ))}
+              </ul>
+              {tasks.length > 5 && <div className="ib-upnext-more">+{tasks.length - 5} more</div>}
+            </>
+          )}
         </div>
       )}
 

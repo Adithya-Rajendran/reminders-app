@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, PriorityDot, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, PriorityDot, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, useWidgetSize, atMostW, atMostH, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -16,6 +16,9 @@ const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')
 // (pull over push — Mark et al. 2016), and a parking note offloads loose ends to
 // cut attention residue (Leroy 2009) when switching in.
 export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId }) {
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm') || atMostH(sz, 'sm')
+  const short = atMostH(sz, 'xs')
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, undo, dismissUndo } = useTaskList(tasksCap, selector)
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
@@ -143,25 +146,25 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
   const done = remaining === 0 && !running
 
   return (
-    <div className="focus">
+    <div className={`focus${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
       {nowTask ? (
         <div className="focus-now">
           <div className="focus-eyebrow">
-            <IconTarget size={14} /> Focus on
-            {nowIsFromPlan && (
+            <IconTarget size={14} /> {compact ? 'Focus' : 'Focus on'}
+            {nowIsFromPlan && !short && (
               <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
             )}
           </div>
           <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={completeNow} />
           <div className="focus-now-body">
             <div className="focus-title">{nowTask.title}</div>
-            <div className="focus-meta">
+            {!short && <div className="focus-meta">
               <PriorityDot value={nowTask.priority || 0} />
               <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
               {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
               {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}
               {ranked.length > 1 && <button className="focus-skip" title="Show another task" onClick={() => setSkip((s) => s + 1)}>skip <IconChevR size={11} /></button>}
-            </div>
+            </div>}
           </div>
         </div>
       ) : (
@@ -177,7 +180,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
         {/* The ticking clock stays aria-live="off"; completion is announced once via
             this separate polite region (empty until done, so SRs read it on change). */}
         <span className="sr-only" role="status" aria-live="polite">{done ? 'Focus session complete' : ''}</span>
-        {!running && (
+        {!running && !short && (
           <div className="focus-dur">
             <button className="iconbtn sm" aria-label="Less time" onClick={() => setDur(durationMin - 5)}>−</button>
             <span className="focus-dur-val">{durationMin}m</span>
@@ -217,7 +220,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
         )
       })()}
 
-      <div className="focus-brain">
+      {!short && <div className="focus-brain">
         <div className="focus-brain-row">
           <button type="button" className="focus-brain-head" aria-label={`Park a thought${!parkOpen && park.trim() ? ' (has saved text)' : ''}`} aria-expanded={parkOpen} onClick={() => setParkOpen((o) => !o)}>
             <IconChevR size={12} className={`rem-chev${parkOpen ? ' open' : ''}`} /> Park a thought{!parkOpen && park.trim() ? ' ·' : ''}
@@ -227,7 +230,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
         {parkOpen && (
           <textarea className="input focus-park" aria-label="Park a thought" value={park} onChange={(e) => savePark(e.target.value)} placeholder="Dump loose ends here so they don’t pull at your attention…" />
         )}
-      </div>
+      </div>}
 
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   usePopover, widgetStore, announce, SkeletonRows, EmptyState, ErrorState,
+  useWidgetSize, atMostW, atMostH,
   IconNote, IconPin, IconChevDown, IconRefresh, IconLink,
 } from '../widget-sdk'
 import './NotePinWidget.css'
@@ -14,6 +15,9 @@ const PATH_KEY = 'notepin-path'
 // chosen note is remembered per widget instance. Content is shown as-is (Markdown is
 // legible) — this is a glance surface, not the editor.
 export default function NotePinWidget({ notes, instanceId }) {
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm') || atMostH(sz, 'sm')
+  const short = atMostH(sz, 'xs')
   const store = useMemo(() => widgetStore(instanceId), [instanceId])
   const [list, setList] = useState(null) // null = loading | [] | [...]
   const [configured, setConfigured] = useState(true)
@@ -66,7 +70,7 @@ export default function NotePinWidget({ notes, instanceId }) {
   const title = note?.title || (list || []).find((n) => n.path === path)?.title || 'Note'
 
   return (
-    <div className="notepin">
+    <div className={`notepin${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
       <div className="notepin-head">
         <span className="notepin-title" title={title}><IconPin size={13} /> {title}</span>
         <span className="notepin-actions">
@@ -84,7 +88,7 @@ export default function NotePinWidget({ notes, instanceId }) {
               </div>
             )}
           </span>
-          <button className="iconbtn sm" aria-label="Refresh note" title="Refresh" onClick={refresh}><IconRefresh size={14} /></button>
+          {!short && <button className="iconbtn sm" aria-label="Refresh note" title="Refresh" onClick={refresh}><IconRefresh size={14} /></button>}
           {path && notes.emitOpenNote && (
             // Opening the full editor needs a Notes widget on the board to receive the
             // event; if none is listening, say so rather than doing nothing.

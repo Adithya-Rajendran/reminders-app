@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import NotePinWidget from '../../client/src/widgets/NotePinWidget.jsx'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 const NOTES = [
   { path: 'n/Recent.md', title: 'Recent note', folder: 'n', updated: '2026-07-03' },
@@ -18,6 +19,7 @@ function makeNotes(overrides = {}) {
 }
 let seq = 0
 const freshId = () => 'w-notepin-' + (++seq)
+const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
 
 describe('NotePinWidget', () => {
   beforeEach(() => { localStorage.clear() })
@@ -47,5 +49,15 @@ describe('NotePinWidget', () => {
   it('prompts to connect Nextcloud when notes are not configured', async () => {
     render(<NotePinWidget notes={makeNotes({ list: vi.fn(async () => ({ configured: false })) })} instanceId={freshId()} />)
     expect(await screen.findByText(/aren’t connected/i)).toBeTruthy()
+  })
+
+  it('trims nonessential chrome in the short pinned-note layout', async () => {
+    render(sized(
+      <NotePinWidget notes={makeNotes()} instanceId={freshId()} />,
+      { w: 'xs', h: 'xs', name: 'mini', width: 210, height: 140 },
+    ))
+    expect(await screen.findByText('Recent body text')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /choose which note to pin/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /refresh note/i })).not.toBeInTheDocument()
   })
 })

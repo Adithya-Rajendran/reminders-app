@@ -3,6 +3,7 @@ import {
   useTaskList, applyOrganizer, useOrganizerFilter, selectMostImportant, dueBucket,
   isRealDate, dueChip, timeLabel, parseQuickAdd, IconCheck, IconTarget, IconCalendar, IconPlus,
   SkeletonRows, ErrorState, ReconnectBanner, UndoBar,
+  useWidgetSize, atMostW, atMostH, atLeastH,
 } from '../widget-sdk'
 import './OverviewWidget.css'
 
@@ -29,6 +30,10 @@ function eventTime(iso, allDay) {
 // completion here updates the board at once. Respects the global organizer filter so
 // when the user scopes the board to an Area/Context, this summary scopes with it.
 export default function OverviewWidget({ tasks: tasksCap, calendar, organizer }) {
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm') || atMostH(sz, 'sm')
+  const short = atMostH(sz, 'xs')
+  const roomy = atLeastH(sz, 'md')
   // Select every task; the day-math (overdue/today/most-important) is done here so the
   // selector stays a stable identity (a new array each render would thrash useMemo
   // in useTaskList). Filtering to open tasks happens below.
@@ -151,7 +156,7 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
   }
 
   return (
-    <div className="ov">
+    <div className={`ov${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
       {state === 'loading' && <SkeletonRows />}
       {state === 'error' && tasks.length === 0 && <ErrorState onRetry={load} />}
       {state === 'error' && tasks.length > 0 && <ReconnectBanner onRetry={load} />}
@@ -165,16 +170,23 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
           </div>
 
           {/* (2) + (4) the two numbers that change behavior */}
-          <div className="ov-metrics">
-            <div className={`ov-metric${overdue.length > 0 ? ' warn' : ''}`}>
-              <span className="ov-metric-num">{overdue.length}</span>
-              <span className="ov-metric-lbl">Overdue</span>
+          {short ? (
+            <div className="ov-metrics-mini" aria-label={`${overdue.length} overdue, ${dueToday.length} due today`}>
+              <span className={overdue.length > 0 ? 'warn' : ''}>{overdue.length} overdue</span>
+              <span>{dueToday.length} today</span>
             </div>
-            <div className="ov-metric">
-              <span className="ov-metric-num">{dueToday.length}</span>
-              <span className="ov-metric-lbl">Due today</span>
+          ) : (
+            <div className="ov-metrics">
+              <div className={`ov-metric${overdue.length > 0 ? ' warn' : ''}`}>
+                <span className="ov-metric-num">{overdue.length}</span>
+                <span className="ov-metric-lbl">Overdue</span>
+              </div>
+              <div className="ov-metric">
+                <span className="ov-metric-num">{dueToday.length}</span>
+                <span className="ov-metric-lbl">Due today</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* (3) today's most important, with a real complete checkbox */}
           <div className="ov-focus">
@@ -201,9 +213,10 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
 
           {/* (5) next up — the next calendar event AND the next dated task, so this
               honestly reflects both meetings and remaining work. */}
-          <div className="ov-event">
+          {!short && (
+          <div className={`ov-event${compact ? ' compact' : ''}`}>
             <div className="ov-sec-label"><IconCalendar size={12} /> Next up</div>
-            {nextEvent && (
+            {nextEvent && roomy && (
               <div className="ov-event-row">
                 <span className="ov-event-time">{eventTime(nextEvent.start, nextEvent.allDay)}</span>
                 <span className="ov-event-title">{nextEvent.title || '(untitled event)'}</span>
@@ -215,8 +228,9 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
                 <span className="ov-event-title"><IconCheck size={11} className="ov-task-ic" /> {nextTask.title}</span>
               </div>
             )}
-            {!nextEvent && !nextTask && <div className="ov-event-none">Nothing scheduled today.</div>}
+            {!nextEvent && !nextTask && !compact && <div className="ov-event-none">Nothing scheduled today.</div>}
           </div>
+          )}
 
           {/* (6) inline quick-capture -> Inbox */}
           <form className="add-row qa rem-add ov-add" onSubmit={capture}>
@@ -225,7 +239,7 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
               className="rem-text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Capture a thought…  (lands in your Inbox)"
+              placeholder={compact ? 'Capture to Inbox…' : 'Capture a thought…  (lands in your Inbox)'}
               aria-label="Capture a task to the Inbox"
             />
             <button type="submit" className="iconbtn sm" aria-label="Capture" title="Capture"><IconPlus size={16} /></button>

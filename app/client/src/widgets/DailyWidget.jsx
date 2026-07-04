@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
+import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, useWidgetSize, atMostW, atMostH, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
 import './DailyWidget.css'
 
 const NOTE_KEY = 'daily-note' // { date, text }
@@ -18,6 +18,9 @@ const fmtMin = (m) => { m = Math.round(m || 0); if (m < 60) return m + 'm'; cons
 // readable by integrations; the shutdown note stays device-local (widgetStore);
 // the tasks themselves stay in CalDAV.
 export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceId }) {
+  const sz = useWidgetSize()
+  const compact = atMostW(sz, 'sm') || atMostH(sz, 'sm')
+  const short = atMostH(sz, 'xs')
   const inboxId = projects?.[0]?.id
   const selector = useCallback((all) => all, [])
   const { tasks, state, load, onToggle, onDelete, onSchedule, onSetPriority, onSetCue, onPatch, undo, dismissUndo } = useTaskList(tasksCap, selector)
@@ -111,10 +114,11 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
       <button className={`daily-seg${mode === 'shutdown' ? ' on' : ''}`} role="tab" aria-selected={mode === 'shutdown'} onClick={() => setMode('shutdown')}><IconMoon size={14} /> Shutdown</button>
     </div>
   )
-  const taskRow = (t) => <TaskRow task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} />
+  const taskRow = (t) => <TaskRow task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} dense={compact} />
+  const visibleSuggestions = compact ? suggestions.slice(0, short ? 0 : 3) : suggestions
 
   return (
-    <div className="tasklist daily">
+    <div className={`tasklist daily${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
       {toggle}
 
       {mode === 'plan' ? (
@@ -127,7 +131,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
             </form>
           )}
           {err && <div role="alert" className="rem-err">{err}</div>}
-          {inboxId && <QuickAddPreview text={draft} />}
+          {inboxId && !short && <QuickAddPreview text={draft} />}
 
           <div className="group-head daily-secline">
             <span className="g-title">Today’s focus</span>
@@ -144,10 +148,12 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
               </div>
             ))}</div>}
 
-          <div className="group-head daily-secline"><span className="g-title">Suggestions</span><span className="g-count">{suggestions.length}</span></div>
+          {!short && <div className="group-head daily-secline"><span className="g-title">Suggestions</span><span className="g-count">{suggestions.length}</span></div>}
           {suggestions.length === 0
             ? <div className="daily-empty">Nothing overdue or unscheduled — you’re on top of it.</div>
-            : <div className="daily-suggest">{suggestions.map((t) => {
+            : short
+              ? <div className="daily-suggest-compact">{suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'} ready when you expand.</div>
+              : <div className="daily-suggest">{visibleSuggestions.map((t) => {
               const b = isRealDate(t.due_date) ? dueBucket(t.due_date) : null
               return (
                 <button key={t.id} type="button" className="daily-sg" onClick={() => addToToday(t)} title="Add to today">
@@ -156,7 +162,9 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
                   {b && <span className={`chip ${b.k === 'overdue' ? 'overdue' : 'due-soon'}`}>{b.label}</span>}
                 </button>
               )
-            })}</div>}
+            })}{compact && suggestions.length > visibleSuggestions.length && (
+              <div className="daily-suggest-compact">+{suggestions.length - visibleSuggestions.length} more suggestions hidden until there is more room.</div>
+            )}</div>}
         </>
       ) : (
         <>
@@ -173,8 +181,12 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
             ))}</div>}
           {planIds.length > 0 && <button className="btn ghost sm daily-clear" onClick={() => savePlan([])}>Clear today’s plan</button>}
 
-          <div className="group-head daily-secline"><span className="g-title">Note to tomorrow</span></div>
-          <textarea className="input daily-note" value={note} onChange={(e) => saveNote(e.target.value)} placeholder="Where did you leave off? What’s first tomorrow?" />
+          {!short && (
+            <>
+              <div className="group-head daily-secline"><span className="g-title">Note to tomorrow</span></div>
+              <textarea className="input daily-note" value={note} onChange={(e) => saveNote(e.target.value)} placeholder="Where did you leave off? What’s first tomorrow?" />
+            </>
+          )}
         </>
       )}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
