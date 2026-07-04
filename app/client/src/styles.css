@@ -461,6 +461,27 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Mobile shell (bottom-tab single-view spine; ≤ 680px) ---------- */
+/* Pin the app to the viewport so the shell can fill it and the tab bar sits at the
+   bottom (the widget view scrolls internally instead of the whole page). The
+   multi-dashboard tab strip is desktop chrome — reclaim its height on mobile
+   (dashboards stay switchable from the omnibox). */
+@media (max-width: 680px) {
+  .app { height: 100dvh; }
+  .dash-tabs { display: none; }
+}
+.mobile-shell { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.mobile-view { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 10px 12px; }
+/* A single widget fills the view height (widgets expect a sized parent, as in a grid cell). */
+.mobile-view > * { min-height: 100%; }
+.mobile-tabbar { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 5px 6px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--panel-solid); border-top: 1px solid var(--line); }
+.mobile-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px; border: none; background: transparent; color: var(--muted); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
+.mobile-tab.on { color: var(--accent); background: var(--accent-soft); }
+.mobile-tab:active { background: var(--panel2); }
+.mobile-tab-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+.mobile-fab { position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 52px; height: 52px; border-radius: 50%; border: none; color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 68%, #000)); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.mobile-fab:active { transform: scale(0.94); }
+
 /* ---------- Top bar ---------- */
 .topbar {
   position: sticky;

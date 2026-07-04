@@ -21,7 +21,8 @@ import { usePopover } from './usePopover.js'
 import WidgetBoundary from './widgets/WidgetBoundary.jsx'
 import { GroupList } from './widget-sdk'
 import { recentGroups, pushRecentGroup } from './groups.js'
-import { saveJson } from './storage.js'
+import { saveJson, loadJson } from './storage.js'
+import { useMediaQuery } from './useMediaQuery.js'
 import { publishBoard, onGoToWidget, onAddWidget } from './boardbus.js'
 import {
   IconPlus, IconChevDown, IconChevR, IconChevL,
@@ -88,7 +89,10 @@ function buildDefault() {
   return { widgets: def, layouts: defaultLayouts(def, sizeFor) }
 }
 
-export default function Dashboard({ onOpenSettings, dashboardId = 'main', title, metaTick = 0 }) {
+export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'main', title, metaTick = 0 }) {
+  // Below a phone-ish width, swap the composable grid for a single-view bottom-tab
+  // shell — a widget stack is unusable on a 390px screen (the persona ask).
+  const isMobile = useMediaQuery('(max-width: 680px)')
   const [projects, setProjects] = useState([])
   const [caldavAccounts, setCaldavAccounts] = useState(null) // null until loaded
   const [widgets, setWidgets] = useState([])
@@ -424,17 +428,21 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
   }, [widgets])
 
   // Publish the board contents for the palette's "Go to <widget>" commands, and
-  // honor go-to requests with the same scroll+flash the add-widget path uses.
+  // honor go-to / add-widget requests with the same scroll+flash. GATED to the grid:
+  // on mobile there is no grid (MobileShell owns nav), so publishing the hidden grid
+  // or letting "Go to"/"Add" flash/mutate an unmounted board would silently dead-end
+  // (a no-op flash) or invisibly persist a layout change — MobileShell handles these.
   useEffect(() => {
+    if (isMobile) return undefined
     // Include `type` so the palette can build type-aware nav (aliases per surface,
     // and "Add <surface>" for a type not on this board).
     publishBoard(widgets.map((w) => ({ i: w.i, title: titleFor(w), type: w.type })))
     return () => publishBoard([])
-  }, [widgets])
-  useEffect(() => onGoToWidget(scrollFlash), [])
+  }, [widgets, isMobile])
+  useEffect(() => (isMobile ? undefined : onGoToWidget(scrollFlash)), [isMobile])
   // The omnibox's "Add <surface>" nav entries add a widget by type (same path as
   // the toolbar's Add-widget menu, so it scroll-flashes into view once rendered).
-  useEffect(() => onAddWidget((type) => addWidget(type)), [addWidget])
+  useEffect(() => (isMobile ? undefined : onAddWidget((type) => addWidget(type))), [addWidget, isMobile])
 
   // Settings closed (metaTick bumped): accounts/projects may have changed —
   // re-check the onboarding meta so a freshly connected account lifts the gate
@@ -494,6 +502,22 @@ export default function Dashboard({ onOpenSettings, dashboardId = 'main', title,
         <Toolbar projects={projects} onAdd={addWidget} onNewGroup={onNewGroup} title={title} />
         <OnboardingCard onOpenSettings={onOpenSettings} />
       </>
+    )
+  }
+
+  // Mobile: a bottom-tab single-view shell across the spine (Today · Inbox ·
+  // Calendar · Notes · Review) + a capture FAB, instead of a scrolling widget stack.
+  if (isMobile) {
+    return (
+      <MobileShell
+        appCtx={appCtx}
+        slots={slots}
+        available={available}
+        organizerCap={organizerCap}
+        onOpenSettings={onOpenSettings}
+        onCapture={onCapture}
+        dashboardId={dashboardId}
+      />
     )
   }
 
@@ -631,6 +655,78 @@ function WidgetRequirement({ title, reqs, onOpenSettings }) {
 }
 
 /* ---------- Toolbar ---------- */
+// The mobile spine: one surface per tab, in the workflow order.
+const MOBILE_TABS = [
+  { key: 'today', type: 'overview', label: 'Today' },
+  { key: 'inbox', type: 'inbox', label: 'Inbox' },
+  { key: 'calendar', type: 'calendar', label: 'Calendar' },
+  { key: 'notes', type: 'notes', label: 'Notes' },
+  { key: 'review', type: 'review', label: 'Review' },
+]
+
+// The mobile shell: one spine surface at a time with a bottom tab bar and a capture
+// FAB (capture-first), reusing the EXACT widget render + connection machinery — each
+// tab is a full-height canonical widget, connected to the same app slots as on the
+// grid. Desktop keeps the composable grid; this only renders below the breakpoint.
+function MobileShell({ appCtx, slots, available, organizerCap, onOpenSettings, onCapture, dashboardId }) {
+  const [tab, setTab] = useState(() => loadJson('reminders-mtab-' + dashboardId, 'today'))
+  const pick = useCallback((k) => { setTab(k); saveJson('reminders-mtab-' + dashboardId, k) }, [dashboardId])
+  const [viewRef, size] = useElementSize()
+
+  // Own the omnibox nav on mobile: publish the spine tabs as the "board" (so the
+  // palette reflects THIS view, not the hidden grid), and route "Go to <surface>"
+  // (flashWidget 'm-<type>') and "Add <surface>" (emitAddWidget '<type>') to switch
+  // the active TAB. Non-spine types have no mobile surface and no-op (rather than
+  // silently mutating/persisting the unmounted desktop grid).
+  const goToType = useCallback((idOrType) => {
+    const t = MOBILE_TABS.find((x) => x.type === idOrType || 'm-' + x.type === idOrType)
+    if (t) pick(t.key)
+  }, [pick])
+  useEffect(() => {
+    publishBoard(MOBILE_TABS.map((t) => ({ i: 'm-' + t.type, title: t.label, type: t.type })))
+    return () => publishBoard([])
+  }, [])
+  useEffect(() => onGoToWidget(goToType), [goToType])
+  useEffect(() => onAddWidget(goToType), [goToType])
+  const active = MOBILE_TABS.find((t) => t.key === tab) || MOBILE_TABS[0]
+  const spec = WIDGET_TYPES.get(active.type)
+  const { connections } = resolveConnections(spec?.plugs, slots)
+  const ctx = selectCtx(appCtx, connections)
+  const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
+  const w = { i: 'm-' + active.type, type: active.type }
+  return (
+    <div className="mobile-shell">
+      <BoardFilterBar organizer={organizerCap} />
+      <div className="mobile-view" ref={viewRef} data-wsize={size.w} data-hsize={size.h}>
+        <WidgetSizeContext.Provider value={size}>
+          <WidgetBoundary key={active.type}>
+            <Suspense fallback={<SkeletonRows n={6} />}>
+              {spec && (unmet.length
+                ? <WidgetRequirement title={spec.label} reqs={unmet} onOpenSettings={onOpenSettings} />
+                : <WidgetMount spec={spec} w={w} ctx={ctx}>{spec.render(w, ctx)}</WidgetMount>)}
+            </Suspense>
+          </WidgetBoundary>
+        </WidgetSizeContext.Provider>
+      </div>
+      <button className="mobile-fab" aria-label="Capture a task" title="Capture a task" onClick={() => onCapture?.()}>
+        <IconPlus size={24} />
+      </button>
+      <nav className="mobile-tabbar" aria-label="Views">
+        {MOBILE_TABS.map((t) => {
+          const Ic = WIDGET_TYPES.get(t.type)?.icon || IconList
+          const on = t.key === tab
+          return (
+            <button key={t.key} type="button" className={`mobile-tab${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => pick(t.key)}>
+              <Ic size={20} />
+              <span className="mobile-tab-label">{t.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
+
 // The active-filter strip: when the board is scoped to an Area/Context (from the
 // omnibox or a widget), show what it's scoped to with a one-click Clear, so a
 // filtered board is never a silent dead-end ("where did my other tasks go?").
