@@ -559,17 +559,12 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => {
-              const spec = WIDGET_TYPES.get(w.type)
-              // Auto-connect the widget's declared plugs to the app slots, then
-              // hand it ONLY the connected interfaces (least privilege).
-              const { connections } = resolveConnections(spec?.plugs, slots)
-              const ctx = selectCtx(appCtx, connections)
-              // Gate on declared capability requirements the host can determine.
-              const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
               // A per-instance config schema (manifest `config`) surfaces a gear on
               // the widget head; resolveWidgetConfig fills the form with the merged,
-              // validated current values (defaults <- saved).
-              const configSchema = spec?.config
+              // validated current values (defaults <- saved). The connection wiring
+              // + requirement gate + render live in ConnectedWidget (shared with the
+              // mobile shell); the frame owns only the head/collapse/remove/config.
+              const configSchema = WIDGET_TYPES.get(w.type)?.config
               return (
                 // data-wid lets addWidget's effect find this node to scroll/flash it.
                 <div key={w.i} data-wid={w.i}>
@@ -584,9 +579,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
                     configValues={configSchema ? resolveWidgetConfig(configSchema, w.config) : null}
                     onConfigure={configSchema ? (next) => configureWidget(w.i, next) : undefined}
                   >
-                    <WidgetMount spec={spec} w={w} ctx={ctx}>
-                      {unmet.length ? <WidgetRequirement title={titleFor(w)} reqs={unmet} onOpenSettings={onOpenSettings} /> : spec?.render(w, ctx)}
-                    </WidgetMount>
+                    <ConnectedWidget w={w} appCtx={appCtx} slots={slots} available={available} onOpenSettings={onOpenSettings} />
                   </WidgetFrame>
                 </div>
               )
@@ -655,6 +648,28 @@ function WidgetRequirement({ title, reqs, onOpenSettings }) {
   )
 }
 
+/* ---------- A widget wired to the app (connections + requirement gate) ---------- */
+// Auto-connect a widget's declared plugs to the app slots, hand it ONLY the connected
+// interfaces (least privilege), and render its body — or the "connect it in Settings"
+// placeholder when a host-knowable requirement is unmet. This is the ONE place the
+// resolve→ctx→gate→render pipeline lives; the desktop grid and the mobile shell differ
+// only in the CHROME around it (a draggable WidgetFrame vs the full-height mobile view),
+// which stays with each caller. Both wrap this in their own WidgetBoundary + Suspense +
+// WidgetSizeContext, so this component is chrome-agnostic on purpose.
+function ConnectedWidget({ w, appCtx, slots, available, onOpenSettings }) {
+  const spec = WIDGET_TYPES.get(w.type)
+  const { connections } = resolveConnections(spec?.plugs, slots)
+  const ctx = selectCtx(appCtx, connections)
+  const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
+  return (
+    <WidgetMount spec={spec} w={w} ctx={ctx}>
+      {unmet.length
+        ? <WidgetRequirement title={titleFor(w)} reqs={unmet} onOpenSettings={onOpenSettings} />
+        : spec?.render(w, ctx)}
+    </WidgetMount>
+  )
+}
+
 /* ---------- Toolbar ---------- */
 // The mobile spine: one surface per tab, in the workflow order.
 const MOBILE_TABS = [
@@ -690,10 +705,8 @@ function MobileShell({ appCtx, slots, available, organizerCap, onOpenSettings, o
   useEffect(() => onGoToWidget(goToType), [goToType])
   useEffect(() => onAddWidget(goToType), [goToType])
   const active = MOBILE_TABS.find((t) => t.key === tab) || MOBILE_TABS[0]
-  const spec = WIDGET_TYPES.get(active.type)
-  const { connections } = resolveConnections(spec?.plugs, slots)
-  const ctx = selectCtx(appCtx, connections)
-  const unmet = (spec?.requires || []).filter((r) => KNOWABLE_REQUIREMENTS.has(r) && !available.has(r))
+  // Each tab is a full-height canonical widget (no group/config), wired to the same
+  // app slots as on the grid via the shared ConnectedWidget.
   const w = { i: 'm-' + active.type, type: active.type }
   return (
     <div className="mobile-shell">
@@ -702,9 +715,7 @@ function MobileShell({ appCtx, slots, available, organizerCap, onOpenSettings, o
         <WidgetSizeContext.Provider value={size}>
           <WidgetBoundary key={active.type}>
             <Suspense fallback={<SkeletonRows n={6} />}>
-              {spec && (unmet.length
-                ? <WidgetRequirement title={spec.label} reqs={unmet} onOpenSettings={onOpenSettings} />
-                : <WidgetMount spec={spec} w={w} ctx={ctx}>{spec.render(w, ctx)}</WidgetMount>)}
+              <ConnectedWidget w={w} appCtx={appCtx} slots={slots} available={available} onOpenSettings={onOpenSettings} />
             </Suspense>
           </WidgetBoundary>
         </WidgetSizeContext.Provider>
