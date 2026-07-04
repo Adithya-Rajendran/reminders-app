@@ -6,8 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, useModalRef, useTaskList, UndoBar, tasksToCalendarEvents, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
-import TaskPopover from './TaskPopover.jsx'
+import { useWidgetSize, atMostW, atLeastW, useModalRef, useTaskList, UndoBar, tasksToCalendarEvents, TaskPopover, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 
 // Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
 // events, so they must never appear in — let alone default — the create picker.

@@ -75,6 +75,10 @@
 .cal-wrap .fc .fc-event .fc-event-main,
 .cal-wrap .fc .fc-event .fc-event-time,
 .cal-wrap .fc .fc-event .fc-event-title { color: inherit; }
+/* Clip long titles with an ellipsis instead of a hard mid-word cut ("7:00 Gy…"
+   not "7:00 Gy"); the full title stays in the tooltip (eventDidMount) and the
+   day's native "+N more" popover. */
+.cal-wrap .fc .fc-event .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-wrap .fc .cal-event { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, transparent); color: var(--accent); }
 .cal-wrap .fc .cal-task { cursor: default; }
 .cal-wrap .fc .cal-task-local { background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 50%, transparent); color: var(--green); }

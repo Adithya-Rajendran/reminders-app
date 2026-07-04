@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import TaskPopover from '../../client/src/widgets/TaskPopover.jsx'
+import TaskPopover from '../../client/src/widget-sdk/ui/TaskPopover.jsx'
 
 // The calendar task-chip popover renders from a plain task + a captured anchor
 // rect (no FullCalendar needed). Complete/Reschedule delegate to the handlers

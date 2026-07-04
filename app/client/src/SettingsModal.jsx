@@ -22,6 +22,7 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
   const [delError, setDelError] = useState(null) // visible error if a delete fails
 
   const [mode, setMode] = useState('list') // list | pick | form | discover
+  const [tab, setTab] = useState('accounts') // list-mode section: accounts | mcp | dev
   const [provider, setProvider] = useState(null)
   const [form, setForm] = useState({})
   const [connecting, setConnecting] = useState(false)
@@ -184,9 +185,22 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
           <button className="iconbtn" aria-label="Close settings" onClick={onClose}><IconX size={18} /></button>
         </div>
 
+        {/* Section tabs (list mode only) — splitting the sections keeps each view short
+            so the modal stops filling ~94% of a 14" laptop and scrolling internally. */}
+        {mode === 'list' && (
+          <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+            {[{ id: 'accounts', label: 'Accounts' }, { id: 'mcp', label: 'Automation' }, ...(import.meta.env.DEV ? [{ id: 'dev', label: 'Diagnostics' }] : [])].map((t) => (
+              <button
+                key={t.id} type="button" role="tab" aria-selected={tab === t.id}
+                className={`settings-tab${tab === t.id ? ' on' : ''}`} onClick={() => setTab(t.id)}
+              >{t.label}</button>
+            ))}
+          </div>
+        )}
+
         <div className="modal-body">
-          {/* ---- account list ---- */}
-          {mode === 'list' && (
+          {/* ---- account list (Accounts tab) ---- */}
+          {mode === 'list' && tab === 'accounts' && (
             loading ? (
               <div className="state">
                 <div className="state-ic"><IconSpinner size={20} /></div>
@@ -268,15 +282,16 @@ export default function SettingsModal({ onClose, initialCreateGroup }) {
                   return <Panel key={wg.type} accounts={accounts} />
                 })}
                 {accounts.length > 0 && <ReminderGroupsSection initialCreate={initialCreateGroup} />}
-                {/* MCP access section — not gated on accounts, since MCP is independent
-                    of CalDAV. Sits between groups and the dev-only panel. */}
-                <McpSection />
-                {/* Widget-wiring inspector is a dev-only diagnostic (the F7 panel). Vite
-                    statically strips this in production builds via import.meta.env.DEV. */}
-                {import.meta.env.DEV && <ConnectionsSection />}
               </div>
             )
           )}
+          {/* MCP access lives in its own tab — the widget-access list is the tallest
+              section, and isolating it is what stops the modal filling a laptop. MCP is
+              independent of CalDAV, so it's not gated on having accounts. */}
+          {mode === 'list' && tab === 'mcp' && <McpSection />}
+          {/* Widget-wiring inspector — a dev-only diagnostic (the F7 panel). Vite
+              statically strips this from production builds via import.meta.env.DEV. */}
+          {mode === 'list' && tab === 'dev' && import.meta.env.DEV && <ConnectionsSection />}
 
           {/* ---- provider picker ---- */}
           {mode === 'pick' && (

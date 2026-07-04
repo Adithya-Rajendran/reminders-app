@@ -9,6 +9,7 @@ import { useWidgetSize } from '../../useWidgetSize.js'
 import { atMostW } from '../../widgetsize.js'
 import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
+import TaskPopover from './TaskPopover.jsx'
 
 const HABIT_DOTS = 14
 
@@ -63,6 +64,14 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
   const [burst, setBurst] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [subDraft, setSubDraft] = useState('')
+  // Title click opens the shared quick-actions popover (Complete / Reschedule) — the
+  // same one calendar chips use — so the title stops being a dead target. Only wired
+  // when the row can actually reschedule (onSchedule present); otherwise the title
+  // stays plain text (no regression for read-only rows).
+  const [pop, setPop] = useState(null) // { rect } while the popover is open
+  const titleRef = useRef(null)
+  const canQuickActions = !!onSchedule
+  const openPop = () => setPop({ rect: titleRef.current.getBoundingClientRect() })
   // In a very narrow column there's no room for the full control strip, so keep
   // the title + the due/schedule chip and drop the rest (priority, cue, labels,
   // quick-win, subtasks) — the row stays tappable and legible instead of wrapping.
@@ -111,7 +120,16 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             {/* Importance is a first-class axis — surface it on EVERY row (a shape, not
                 colour alone); urgency is carried by the due chip's colour below. */}
             {task.important && <span className="imp-star" title="Important" aria-label="Important">★</span>}
-            <span className="t">{task.title}</span>
+            <span
+              className={`t${canQuickActions ? ' t-actions' : ''}`}
+              ref={titleRef}
+              {...(canQuickActions ? {
+                role: 'button',
+                tabIndex: 0,
+                onClick: openPop,
+                onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPop() } },
+              } : {})}
+            >{task.title}</span>
             {repeats && <span className="repeat-badge" title="Repeating task">↻</span>}
           </div>
           <div className="task-sub">
@@ -155,6 +173,15 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             <button type="submit" className="iconbtn sm" aria-label="Add subtask" title="Add subtask"><IconPlus size={15} /></button>
           </form>
         </div>
+      )}
+      {pop && (
+        <TaskPopover
+          task={task}
+          anchorRect={pop.rect}
+          onComplete={() => { setPop(null); toggle() }}
+          onSchedule={(t, payload) => { setPop(null); onSchedule(t, payload) }}
+          onClose={() => setPop(null)}
+        />
       )}
     </div>
   )
