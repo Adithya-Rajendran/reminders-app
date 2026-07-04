@@ -40,9 +40,10 @@ jobs:
       - name: Resolve expected image digest
         id: expected
         run: |
-          digest=$(docker buildx imagetools inspect ghcr.io/${{ github.repository }}:latest --format '{{.Manifest.Digest}}')
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          digest=$(docker buildx imagetools inspect "$image:latest" --format '{{.Manifest.Digest}}')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Expected ghcr.io/${{ github.repository }}@$digest" >> "$GITHUB_STEP_SUMMARY"
+          echo "Expected $image@$digest" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Roll the deployment
         env:
