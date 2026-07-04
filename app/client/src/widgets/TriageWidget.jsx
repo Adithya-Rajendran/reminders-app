@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
-  useTaskList, useWidgetSize, atLeastW, atLeastH,
+  useTaskList, useWidgetSize, atMostW, atLeastW, atLeastH,
   groupEisenhower, selectMostImportant, isRealDate, dueChip, applyOrganizer, useOrganizerFilter,
   TaskRow, EmptyState, ErrorState, SkeletonRows, UndoBar,
   IconTarget, IconCheck,
@@ -45,6 +45,7 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
   const filter = useOrganizerFilter(organizer)
 
   const wide = atLeastW(sz, 'lg')
+  const compact = atMostW(sz, 'sm')
   const showWhy = atLeastH(sz, 'sm')
 
   // Which quadrant is under a drag right now — only for the drop-target highlight.
@@ -95,10 +96,10 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
   if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
 
-  const rowCap = wide ? 12 : 8
+  const rowCap = wide ? 12 : compact ? 3 : 8
 
   return (
-    <div className="triage">
+    <div className={`triage${compact ? ' compact' : ''}`}>
       {/* Most important callout — the one task to do now (no points). */}
       {mostImportant ? (
         <div className="tri-focus">

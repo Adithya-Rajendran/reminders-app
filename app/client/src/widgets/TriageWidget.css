@@ -1,7 +1,8 @@
 /* Prioritize widget — a "Most important" callout + the Eisenhower matrix you
    decide in. All theme-token driven so light/dark + accents follow. No motion,
    no points, no celebration: a calm decision surface. */
-.triage { position: relative; display: flex; flex-direction: column; gap: 11px; padding: 11px 13px; }
+.triage { position: relative; display: flex; flex-direction: column; gap: 11px; padding: 11px 13px; overflow-x: hidden; }
+.triage.compact { gap: 9px; padding: 9px 10px; }
 
 /* ---- "Most important" callout (the one task to do now) ---- */
 .tri-focus { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
@@ -17,6 +18,8 @@
 /* ---- Eisenhower matrix ---- */
 .eisen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .eq { border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; min-height: 72px; transition: background 120ms ease, border-color 120ms ease; }
+.triage.compact .eisen { grid-template-columns: 1fr; gap: 7px; }
+.triage.compact .eq { min-width: 0; min-height: 0; padding: 7px 8px; }
 .eq-Q1 { border-left: 3px solid var(--danger); }
 .eq-Q2 { border-left: 3px solid var(--accent); }
 .eq-Q3 { border-left: 3px solid var(--warn); }
@@ -34,7 +37,7 @@
 .eq-drag:active { cursor: grabbing; }
 /* Quadrant rows are real (dense) TaskRows — scope tighter metrics here so a full
    interactive row still fits a quadrant's scale without touching global .task. */
-.eq-list .task { padding: 3px 4px; gap: 7px; border-radius: 8px; align-items: center; }
+.eq-list .task { min-width: 0; padding: 3px 4px; gap: 7px; border-radius: 8px; align-items: center; }
 .eq-list .task .task-title { font-size: 12px; line-height: 1.3; }
 .eq-list .task .task-sub { margin-top: 1px; gap: 5px; }
 .eq-list .check-btn { width: 15px; height: 15px; margin-top: 0; }

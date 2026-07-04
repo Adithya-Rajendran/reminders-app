@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TriageWidget from '../../client/src/widgets/TriageWidget.jsx'
 import { fakeTasks } from './fakeCtx.js'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 // The Prioritize widget renders purely from the injected ctx.tasks capability.
 // It's the Eisenhower matrix (bucketed by the EXPLICIT task.important flag ×
@@ -17,6 +18,7 @@ const overdue = () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setH
 // TaskRow's own "Schedule" chip, so scope those to the label element.
 const quadCell = (label) => screen.getByText(label, { selector: '.eq-label' }).closest('.eq')
 const gridRow = (title) => screen.getAllByText(title).map((el) => el.closest('.eq-drag')).find(Boolean)
+const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
 
 // jsdom's userEvent has no drag-and-drop; fire the native DnD events directly with
 // a minimal dataTransfer stand-in so we can assert the drop persists via onPatch.
@@ -67,6 +69,21 @@ describe('TriageWidget (Prioritize)', () => {
     render(<TriageWidget tasks={cap} instanceId="tri-focus" />)
     const focus = screen.getByText('Most important', { selector: '.tri-focus-eyebrow' }).closest('.tri-focus')
     expect(focus).toHaveTextContent('Ship release') // Q1 top by priority
+  })
+
+  it('uses compact sizing for the narrow matrix layout', () => {
+    const cap = fakeTasks([
+      { id: 1, title: 'Ship release', priority: 4, important: true, due_date: overdue(), done: false, labels: [] },
+      { id: 2, title: 'Minor important', priority: 1, important: true, done: false, labels: [] },
+    ])
+    const { container } = render(sized(
+      <TriageWidget tasks={cap} instanceId="tri-compact" />,
+      { w: 'sm', h: 'md', name: 'tall', width: 260, height: 420 },
+    ))
+
+    expect(container.querySelector('.triage.compact')).not.toBeNull()
+    expect(screen.getByText('Most important', { selector: '.tri-focus-eyebrow' })).toBeInTheDocument()
+    expect(screen.getByText('Do first', { selector: '.eq-label' })).toBeInTheDocument()
   })
 
   it('completing the callout task delegates the completion to the capability', async () => {

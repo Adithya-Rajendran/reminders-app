@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import CuesWidget from '../../client/src/widgets/CuesWidget.jsx'
 import { fakeTasks, fakeGroups } from './fakeCtx.js'
+import { WidgetSizeContext } from '../../client/src/widget-sdk'
 
 // Cues renders a flow board from the same shared store via ctx.tasks + ctx.groups.
 // The two smoke tests below prove it mounts and reflects the capability; the
@@ -18,6 +19,7 @@ const ptr = (type, { x = 0, y = 0 } = {}) =>
   new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y })
 
 const flush = () => act(async () => { await Promise.resolve() })
+const sized = (ui, value) => <WidgetSizeContext.Provider value={value}>{ui}</WidgetSizeContext.Provider>
 
 // jsdom has no elementFromPoint, so vi.spyOn can't wrap it — the drop hit-test's
 // input is assigned directly and cleared after each test.
@@ -35,6 +37,22 @@ describe('CuesWidget', () => {
     ])
     render(<CuesWidget tasks={cap} groups={fakeGroups()} group="" />)
     expect(await screen.findByText('Stretch')).toBeInTheDocument()
+  })
+
+  it('uses the compact list layout when the measured widget is too narrow for the board', async () => {
+    const cap = fakeTasks([
+      { id: 1, uid: 'u1', title: 'Stretch', done: false, cue: 'after coffee', flow: { x: 390, y: 125, to: [] } },
+      { id: 2, uid: 'u2', title: 'Refill water', done: false, cue: 'after standup' },
+    ])
+    const { container } = render(sized(
+      <CuesWidget tasks={cap} groups={fakeGroups()} group="" />,
+      { w: 'md', h: 'md', name: 'standard', width: 540, height: 420 },
+    ))
+
+    expect(await screen.findByText(/Placed · 1/i)).toBeInTheDocument()
+    expect(screen.getByText(/Queue · 1/i)).toBeInTheDocument()
+    expect(container.querySelector('.flow-compact-list')).not.toBeNull()
+    expect(container.querySelector('.flow-canvas')).toBeNull()
   })
 
   it('dragging a placed node persists its rounded flow.{x,y} via the tasks capability', async () => {
