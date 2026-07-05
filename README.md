@@ -1,6 +1,6 @@
 # Reminders
 
-A self-hosted, customizable **task + calendar dashboard** — a personal "command center" you actually own. Drag-and-drop resizable widgets backed by **CalDAV** (Nextcloud / Apple iCloud / generic) — your tasks, reminders and events live in your own server — with a multi-view calendar, **OIDC single sign-on**, and a light/dark theme, all running on your own infrastructure.
+A self-hosted, customizable **task + calendar dashboard** — a personal "command center" you actually own. Drag-and-drop resizable widgets backed by **CalDAV** (Nextcloud / Apple iCloud / generic) — your tasks, reminders and events live in your own server — with a multi-view calendar, **OIDC single sign-on**, and a light/dark theme, all running on your own infrastructure. Heavily relied on AI for the code generation.
 
 > 📖 **Full documentation is in the [project wiki](https://github.com/Adithya-Rajendran/reminders-app/wiki)** — architecture, deployment (Kubernetes / Docker), configuration, OIDC, CalDAV, and development.
 
