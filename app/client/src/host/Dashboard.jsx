@@ -15,7 +15,7 @@ import { MobileShell } from './MobileShell.jsx'
 import { SkeletonRows, UndoBar } from '../widget-sdk'
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE,
-  scaleLayouts, appendToLayouts, fillBreakpoints, applyConstraints, clampAspect,
+  scaleLayouts, appendToLayouts, fillBreakpoints, applyConstraints, snapAspectDrag,
   applyCollapsed, restoreCollapsedHeights,
   stripDerivedTiers, boardSignature,
 } from '../domain/dashlayout.js'
@@ -481,22 +481,33 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
     return () => { alive = false }
   }, [metaTick])
 
-  // Enforce a widget's aspect band live during AND after a resize. RGL has already
-  // clamped to the item's minW/maxW before calling us; we layer the aspect band on
-  // top, then re-clamp into [min,max] so the ratio can't push the widget past its own
-  // ceiling/floor. Mutating newItem + placeholder in place updates BOTH the committed
-  // size and the live ghost preview (.react-grid-placeholder), so the widget snaps to
-  // its shape as you drag. onResizeStop repeats it so the persisted size is exact.
+  // Aspect enforcement is split by resize phase. During drag, RGL's raw item tracks
+  // the pointer while the placeholder previews the committed shape. On release, the
+  // item itself is snapped and persists exactly. Neighbors can reflow against the
+  // unclamped drag size mid-drag, then settle to the placeholder shape on release.
   const typeOf = useMemo(() => new Map(widgets.map((w) => [w.i, w.type])), [widgets])
-  const enforceAspect = useCallback((_layout, _oldItem, newItem, placeholder) => {
+  const aspectSize = useCallback((oldItem, newItem) => {
     const aspect = constraintsFor(typeOf.get(newItem.i)).aspect
-    if (!aspect) return
-    const snapped = clampAspect(newItem.w, newItem.h, aspect)
+    if (!aspect) return null
+    const snapped = snapAspectDrag(oldItem || newItem, newItem, aspect)
     const w = clamp(snapped.w, newItem.minW || 1, newItem.maxW || Infinity)
     const h = clamp(snapped.h, newItem.minH || 1, newItem.maxH || Infinity)
+    return { w, h }
+  }, [typeOf])
+  const previewAspect = useCallback((_layout, oldItem, newItem, placeholder) => {
+    if (!placeholder || !newItem) return
+    const snapped = aspectSize(oldItem, newItem)
+    if (!snapped) return
+    placeholder.w = snapped.w; placeholder.h = snapped.h
+  }, [aspectSize])
+  const commitAspect = useCallback((_layout, oldItem, newItem, placeholder) => {
+    if (!newItem) return
+    const snapped = aspectSize(oldItem, newItem)
+    if (!snapped) return
+    const { w, h } = snapped
     newItem.w = w; newItem.h = h
     if (placeholder) { placeholder.w = w; placeholder.h = h }
-  }, [typeOf])
+  }, [aspectSize])
 
   if (!loaded) {
     // Widget-shaped skeletons (not a text card): the board appears to assemble
@@ -572,8 +583,8 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
             draggableHandle=".widget-head"
             draggableCancel="button,.iconbtn,.widget-head-actions"
             resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
-            onResize={enforceAspect}
-            onResizeStop={enforceAspect}
+            onResize={previewAspect}
+            onResizeStop={commitAspect}
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => {
@@ -676,7 +687,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
         <IconPlus size={16} /> Add widget <IconChevDown size={14} style={{ marginLeft: -2, opacity: 0.85 }} />
       </button>
       {open && (
-        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}>
           {!sub ? (
             <>
               <div className="menu-label">Add a widget</div>
@@ -809,7 +820,7 @@ function WidgetConfigButton({ title, schema, values, onSave }) {
         <IconGear size={15} />
       </button>
       {open && (
-        <div className="menu widget-cfg-pop" role="dialog" aria-label={`${title} settings`} style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', padding: 12, minWidth: 240, animation: 'menuIn 150ms ease' }}>
+        <div className="menu widget-cfg-pop" role="dialog" aria-label={`${title} settings`} style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', padding: 12, minWidth: 240 }}>
           <WidgetConfigForm schema={schema} values={values} onSave={(next) => { onSave(next); setOpen(false) }} />
         </div>
       )}

@@ -1,11 +1,13 @@
 /* Weekly Review widget — co-located with the widget (moved out of styles.css).
    All theme-token driven so light/dark + accents follow. */
 .review { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; }
-.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
-.rv-stat { display: flex; flex-direction: column; line-height: 1.05; }
+.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-width: 0; }
+.rv-stat { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
 .rv-big { font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-.rv-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-.rv-delta { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; }
+.widget-body[data-wsize="xs"] .rv-big { font-size: 24px; }
+.widget-body[data-wsize="sm"] .rv-big { font-size: 30px; }
+.rv-label { min-width: 0; font-size: 12.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-delta { min-width: 0; font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-delta.rv-up { color: var(--green); }
 .rv-delta.rv-down { color: var(--danger); }
 .rv-spark { display: flex; align-items: flex-end; gap: 6px; height: 88px; }

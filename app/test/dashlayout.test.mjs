@@ -3,7 +3,7 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE, DERIVED_TIERS,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, fitWidthToContract, nextSlot,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, snapAspectDrag, fitWidthToContract, nextSlot,
   stripDerivedTiers, boardSignature, applyCollapsed, restoreCollapsedHeights,
 } from '../client/src/dashlayout.js'
 
@@ -168,6 +168,21 @@ ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interio
   // no aspect -> identity (still floors a degenerate size to >= 1)
   ok(eq(clampAspect(7, 4, null), 7, 4), 'no aspect -> identity')
   ok(eq(clampAspect(0, 0, null), 1, 1), 'degenerate size floors to 1')
+}
+
+// --- snapAspectDrag (direction-aware aspect snap for resize drags) ---
+{
+  const aspect = { min: 1, max: 2 }
+  const old = { w: 8, h: 5 }
+  const eq = (got, w, h) => got.w === w && got.h === h
+  ok(eq(snapAspectDrag(old, { w: 20, h: 5 }, aspect), 20, 10), 'horizontal drag past max derives height from width')
+  ok(eq(snapAspectDrag(old, { w: 4, h: 5 }, aspect), 4, 4), 'horizontal drag past min derives height from width')
+  ok(eq(snapAspectDrag(old, { w: 9, h: 5 }, aspect), 9, 5), 'horizontal drag inside the band is identity')
+  ok(JSON.stringify(snapAspectDrag(old, { w: 8, h: 10 }, aspect)) === JSON.stringify(clampAspect(8, 10, aspect)), 'vertical drag matches clampAspect exactly')
+  ok(JSON.stringify(snapAspectDrag(old, { w: 20, h: 6 }, aspect)) === JSON.stringify(clampAspect(20, 6, aspect)), 'corner drag matches clampAspect exactly')
+  ok(eq(snapAspectDrag(old, { w: 0, h: 0 }, null), 1, 1), 'no aspect floors degenerate sizes to integer cells')
+  const rounded = snapAspectDrag(old, { w: 9.4, h: 5.2 }, aspect)
+  ok(Number.isInteger(rounded.w) && Number.isInteger(rounded.h) && rounded.w >= 1 && rounded.h >= 1, 'snapAspectDrag returns integer cells >= 1')
 }
 
 // --- stripDerivedTiers (never persist the rebuilt-on-load ultrawide tiers) ---

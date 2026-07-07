@@ -273,6 +273,26 @@ export function clampAspect(w, h, aspect) {
   return { w: Math.max(1, Math.round(hh * edge)), h: hh }
 }
 
+// Direction-aware aspect snap for live resize commit/preview. Pure horizontal
+// drags anchor width, because re-deriving width from height fights the pointer.
+// Vertical and corner drags keep clampAspect's height-anchored behavior.
+export function snapAspectDrag(oldItem, next, aspect) {
+  const ww = Math.max(1, Math.round(next.w))
+  const hh = Math.max(1, Math.round(next.h))
+  if (!aspect) return { w: ww, h: hh }
+  const oldW = Math.max(1, Math.round(oldItem.w))
+  const oldH = Math.max(1, Math.round(oldItem.h))
+  const wMoved = ww !== oldW
+  const hMoved = hh !== oldH
+  if (wMoved && !hMoved) {
+    const r = ww / hh
+    if (r >= aspect.min && r <= aspect.max) return { w: ww, h: hh }
+    const edge = r < aspect.min ? aspect.min : aspect.max
+    return { w: ww, h: Math.max(1, Math.round(ww / edge)) }
+  }
+  return clampAspect(ww, hh, aspect)
+}
+
 // Shelf-pack `items` into `cols` columns at their existing size. Walk them in
 // reading order (top rows first, then left-to-right) and lay each on the current
 // shelf; once the next item won't fit, start a new shelf below the tallest item

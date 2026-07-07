@@ -23,6 +23,7 @@
 /* ---- Eisenhower matrix ---- */
 .eisen { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
 .eisen-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.widget-body[data-wsize="xs"] .eisen { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 7px; }
 .eq { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; transition: background 120ms ease, border-color 120ms ease; }
 .triage.compact .eq { padding: 7px 8px; }
 .eisen.roomy .eq { padding-block: 10px; }
@@ -36,7 +37,7 @@
 .eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
 .eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
 .eq-sub { flex: 0 0 auto; font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
-.eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+.eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; padding-right: 2px; }
 /* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift
    feel; the row's own controls still work (drag only starts on the row surface). */
 .eq-drag { cursor: grab; }
