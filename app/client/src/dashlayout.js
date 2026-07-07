@@ -14,11 +14,19 @@
 //     styles.css) canvas turns extra width into more columns instead of stretching
 //     widgets: each tier keeps the design's ~40px column-pitch floor (width ÷ cols
 //     ≈ 40 at the breakpoint), so pitch stays in a comfortable ~40–60px band up to
-//     5120px and only stretches gently beyond (≈80px at 10240px). Breakpoints are
-//     matched against the measured container width (screen minus padding), not the
-//     raw screen width, so the exact tier boundary is approximate by design.
+//     5120px and only stretches gently beyond (≈80px at 10240px). The pitch-floor
+//     math above (and the tier names) are anchored to the NOMINAL screen widths —
+//     1200/30, 1800/45, 2560/64, 3840/96, 5120/128 — but BREAKPOINTS is matched
+//     against the MEASURED .grid-wrap width, i.e. the viewport minus ~48px of
+//     horizontal padding and any scrollbar, not the raw screen width. A monitor
+//     sitting at exactly one of the real wide sizes (2560/3840/5120 — unlike the
+//     sub-2560 tiers, these are actual panel widths people own) would otherwise
+//     measure just under its nominal width and fall a tier short. So the three
+//     wide breakpoints are offset 64px below nominal — enough to absorb the 48px
+//     padding plus a scrollbar — so a viewport at exactly the nominal width still
+//     lands in its own named tier, with 16px minus the scrollbar to spare.
 export const COLS = { xxxxl: 128, xxxl: 96, xxl: 64, xl: 45, lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
-export const BREAKPOINTS = { xxxxl: 5120, xxxl: 3840, xxl: 2560, xl: 1800, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
+export const BREAKPOINTS = { xxxxl: 5056, xxxl: 3776, xxl: 2496, xl: 1800, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
 export const GRID_V = 5
 // Multiply a saved layout's x/w by this to reach the current grid, keyed by the
 // layout's stored gridV (1 = old 12-col, 2 = 24-col, 3+ = current 30-col base).

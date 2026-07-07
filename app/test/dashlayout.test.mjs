@@ -30,6 +30,14 @@ for (const bp of byWidth) {
   const pitch = BREAKPOINTS[bp] / COLS[bp]
   ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
 }
+// The wide tiers name real monitor widths (2560/3840/5120) but are matched against
+// the MEASURED .grid-wrap width (viewport minus ~48px padding, before any
+// scrollbar) — so a viewport sitting at exactly the nominal width must still clear
+// the threshold, i.e. the breakpoint must be at or below nominal-48.
+const nominalWide = { xxl: 2560, xxxl: 3840, xxxxl: 5120 }
+for (const [bp, nominal] of Object.entries(nominalWide)) {
+  ok(BREAKPOINTS[bp] <= nominal - 48, `${bp}: breakpoint (${BREAKPOINTS[bp]}) clears a viewport at the nominal ${nominal}px minus padding`)
+}
 
 // --- fillBreakpoints (scale-to-fill on WIDER tiers; constant-size repack on narrower) ---
 const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
