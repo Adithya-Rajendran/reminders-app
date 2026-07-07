@@ -33,6 +33,17 @@
   --danger-soft: rgba(244, 87, 122, 0.15);
   --warn-soft: rgba(251, 191, 36, 0.15);
 
+  /* Identity/categorical colors for account swatches (e.g. CalDAV account
+     discs) — aliases semantic tokens where a match exists, so swatches
+     follow the theme instead of hardcoding hex. NOT for status meaning. */
+  --swatch-1: var(--accent);
+  --swatch-2: var(--green);
+  --swatch-3: var(--accent2);
+  --swatch-4: var(--warn);
+  --swatch-5: var(--danger);
+  --swatch-6: #22d3ee;
+  --swatch-7: #fb923c;
+
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
   --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
 
@@ -89,6 +100,13 @@
   --green-soft: rgba(22, 165, 113, 0.12);
   --danger-soft: rgba(226, 58, 96, 0.10);
   --warn-soft: rgba(217, 148, 19, 0.12);
+
+  /* --swatch-1..5 alias semantic tokens above, so they already adapt.
+     These two have no semantic counterpart — eyeball-derived (darkened/
+     desaturated for contrast on light bg, same treatment as --green/
+     --danger/--warn above) and screenshot-reviewed. */
+  --swatch-6: #0891b2;
+  --swatch-7: #ea580c;
 
   --shadow: 0 10px 40px rgba(40, 44, 90, 0.14);
   --shadow-sm: 0 4px 16px rgba(40, 44, 90, 0.10);
@@ -1179,7 +1197,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rem-chev.open { transform: rotate(90deg); }
 
 /* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
-.up-overdue > .up-head .g-title { color: var(--danger, #e5484d); }
+.up-overdue > .up-head .g-title { color: var(--danger); }
 .rem-sortbar { display: flex; justify-content: flex-end; padding: 2px 8px 0; }
 .rem-sortbar .chip { cursor: pointer; }
 /* a widget whose lazy chunk failed to load (e.g. a stale tab after a deploy) */

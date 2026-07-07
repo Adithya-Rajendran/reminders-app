@@ -38,12 +38,14 @@ export const PROVIDER_PRESETS = {
   },
 }
 
-const SWATCH_COLORS = ['#6d6cf7', '#34d399', '#a855f7', '#fbbf24', '#f4577a', '#22d3ee', '#fb923c']
+/* Identity swatches for account discs — CSS custom props (defined in
+   styles.css) so they follow the active theme instead of hardcoding hex. */
+const SWATCHES = ['--swatch-1', '--swatch-2', '--swatch-3', '--swatch-4', '--swatch-5', '--swatch-6', '--swatch-7']
 export function swatchFor(key) {
   const s = String(key || '')
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return SWATCH_COLORS[h % SWATCH_COLORS.length]
+  return `var(${SWATCHES[h % SWATCHES.length]})`
 }
 
 function hostOf(url) {
