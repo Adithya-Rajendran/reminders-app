@@ -1,0 +1,12 @@
+{
+  "name": "reminders-app-shots",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Screenshot/visual-diff harness for reminders-app (see the plan doc's Wave-1 'Verification backbone'). Fully standalone from test/e2e/ (own package.json/lockfile) and NOT wired into CI — run manually via run.sh. playwright-core is pinned to the exact version test/e2e/package-lock.json currently resolves to, because run.sh derives the mcr.microsoft.com/playwright image TAG from that same lockfile at runtime; if that version is bumped, regenerate this package's lockfile too (see README.md) so the two stay in lockstep.",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "1.61.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0"
+  }
+}
