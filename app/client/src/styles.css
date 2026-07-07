@@ -33,6 +33,17 @@
   --danger-soft: rgba(244, 87, 122, 0.15);
   --warn-soft: rgba(251, 191, 36, 0.15);
 
+  /* Identity/categorical colors for account swatches (swatchFor in
+     host/settings/providers.jsx) — aliases semantic tokens where a match
+     exists so swatches follow theme; these carry NO status meaning. */
+  --swatch-1: var(--accent);
+  --swatch-2: var(--green);
+  --swatch-3: var(--accent2);
+  --swatch-4: var(--warn);
+  --swatch-5: var(--danger);
+  --swatch-6: #22d3ee;
+  --swatch-7: #fb923c;
+
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
   --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
 
@@ -91,6 +102,12 @@
   --green-soft: rgba(22, 165, 113, 0.12);
   --danger-soft: rgba(226, 58, 96, 0.10);
   --warn-soft: rgba(217, 148, 19, 0.12);
+
+  /* --swatch-1..5 alias the semantic tokens above, so they follow this block's
+     overrides automatically. --swatch-6/7 are literals (no semantic token to
+     alias) — eyeball-derived, screenshot-reviewed darkenings for legibility. */
+  --swatch-6: #0891b2;
+  --swatch-7: #ea580c;
 
   --shadow: 0 10px 40px rgba(40, 44, 90, 0.14);
   --shadow-sm: 0 4px 16px rgba(40, 44, 90, 0.10);
@@ -1218,7 +1235,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rem-chev.open { transform: rotate(90deg); }
 
 /* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
-.up-overdue > .up-head .g-title { color: var(--danger, #e5484d); }
+.up-overdue > .up-head .g-title { color: var(--danger); }
 /* a widget whose lazy chunk failed to load (e.g. a stale tab after a deploy) */
 .widget-load-err { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 100%; min-height: 100px; padding: 20px; text-align: center; }
 

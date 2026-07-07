@@ -38,12 +38,17 @@ export const PROVIDER_PRESETS = {
   },
 }
 
-const SWATCH_COLORS = ['#6d6cf7', '#34d399', '#a855f7', '#fbbf24', '#f4577a', '#22d3ee', '#fb923c']
+// Identity/categorical colors for account swatches — CSS custom properties
+// (styles.css, --swatch-1..7) so they follow the active theme. Previously a
+// hardcoded hex array that happened to byte-match the dark theme's
+// --accent/--green/--accent2/--warn/--danger, so the light theme silently
+// showed dark-theme colors.
+const SWATCH_COUNT = 7
 export function swatchFor(key) {
   const s = String(key || '')
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return SWATCH_COLORS[h % SWATCH_COLORS.length]
+  return `var(--swatch-${(h % SWATCH_COUNT) + 1})`
 }
 
 function hostOf(url) {
