@@ -687,7 +687,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
         <IconPlus size={16} /> Add widget <IconChevDown size={14} style={{ marginLeft: -2, opacity: 0.85 }} />
       </button>
       {open && (
-        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}>
           {!sub ? (
             <>
               <div className="menu-label">Add a widget</div>
@@ -820,7 +820,7 @@ function WidgetConfigButton({ title, schema, values, onSave }) {
         <IconGear size={15} />
       </button>
       {open && (
-        <div className="menu widget-cfg-pop" role="dialog" aria-label={`${title} settings`} style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', padding: 12, minWidth: 240, animation: 'menuIn 150ms ease' }}>
+        <div className="menu widget-cfg-pop" role="dialog" aria-label={`${title} settings`} style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', padding: 12, minWidth: 240 }}>
           <WidgetConfigForm schema={schema} values={values} onSave={(next) => { onSave(next); setOpen(false) }} />
         </div>
       )}

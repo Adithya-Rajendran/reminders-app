@@ -95,7 +95,7 @@ function AccentPicker({ accent, onPick }) {
         <IconPalette size={18} />
       </button>
       {open && (
-        <div className="menu accent-pop" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+        <div className="menu accent-pop" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}>
           <div className="menu-label">Accent color</div>
           <div className="accent-grid">
             {ACCENTS.map((a) => (
@@ -172,7 +172,7 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, 
             <div
               className="menu"
               role="menu"
-              style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}
+              style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}
             >
               <div className="menu-label">{email}</div>
               <button className="menu-item" role="menuitem" onClick={() => onToggleTheme()}>

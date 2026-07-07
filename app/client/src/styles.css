@@ -24,6 +24,7 @@
   --accent2: #a855f7;
   --accent-soft: rgba(109, 108, 247, 0.16);
   --accent-grad: linear-gradient(135deg, var(--accent), var(--accent2));
+  --scrim: rgba(6, 7, 16, 0.62);
 
   --green: #34d399;
   --danger: #f4577a;
@@ -43,9 +44,18 @@
 
   /* radii */
   --r-card: 16px;
+  --r-sm: 10px;
   --r-btn: 10px;
   --r-chip: 8px;
   --r-menu: 14px;
+
+  /* motion */
+  --dur-1: 100ms;
+  --dur-2: 150ms;
+  --dur-3: 220ms;
+  --dur-snap: 120ms;
+  --dur-settle: 180ms;
+  --ease-out: cubic-bezier(.2,.7,.3,1);
 
   /* glass tuning (tweakable) */
   --glass-blur: 12px;
@@ -99,7 +109,11 @@
   --glow2: rgba(168, 85, 247, 0.10);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
 
 html, body {
   margin: 0;
@@ -391,6 +405,7 @@ body {
   padding: 6px;
   min-width: 200px;
   z-index: 60;
+  animation: menuIn var(--dur-2) var(--ease-out);
 }
 .menu-item {
   display: flex;
@@ -402,7 +417,7 @@ body {
   font-size: 13px;
   color: var(--text);
   padding: 9px 10px;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -673,7 +688,7 @@ body {
   align-items: flex-start;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   transition: background 120ms ease;
 }
 .task:hover { background: var(--panel2); }
@@ -701,7 +716,7 @@ body {
 .add-row {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   color: var(--muted);
   cursor: text;
   border: 1px dashed transparent;
@@ -731,7 +746,7 @@ body {
 .feed-item {
   display: flex; gap: 11px;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   animation: feedIn 360ms cubic-bezier(.2,.7,.3,1);
 }
 .feed-item:hover { background: var(--panel2); }
@@ -869,12 +884,12 @@ body {
 /* ---------- Modal ---------- */
 .overlay {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(6, 7, 16, 0.62);
+  background: var(--scrim);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
   display: grid; place-items: center;
   padding: 24px;
-  animation: fadeIn 200ms ease;
+  animation: fadeIn var(--dur-3) ease;
 }
 .modal {
   width: 100%;
@@ -885,7 +900,7 @@ body {
   border: 1px solid var(--line-strong);
   border-radius: var(--r-card);
   box-shadow: var(--shadow);
-  animation: modalIn 200ms cubic-bezier(.2,.7,.3,1);
+  animation: modalIn var(--dur-3) var(--ease-out);
   overflow: hidden;
 }
 .modal-head {
@@ -901,7 +916,7 @@ body {
 .settings-tab {
   appearance: none; background: none; border: none; border-bottom: 2px solid transparent;
   margin-bottom: -1px; padding: 9px 10px; font: inherit; font-size: 13px; font-weight: 600;
-  color: var(--muted); cursor: pointer; transition: color .15s, border-color .15s;
+  color: var(--muted); cursor: pointer; transition: color var(--dur-2), border-color var(--dur-2);
 }
 .settings-tab:hover { color: var(--text); }
 .settings-tab.on { color: var(--text); border-bottom-color: var(--accent); }
@@ -983,7 +998,7 @@ body {
   box-shadow: var(--shadow);
   padding: 36px 32px 28px;
   text-align: center;
-  animation: modalIn 360ms cubic-bezier(.2,.7,.3,1);
+  animation: modalIn var(--dur-3) var(--ease-out);
 }
 .login-logo {
   width: 58px; height: 58px; border-radius: 16px;
@@ -1031,18 +1046,18 @@ body {
    The live dashboard uses react-grid-layout instead of the
    design's CSS grid. A widget fills its grid item via height:100%.
    ============================================================ */
-.react-grid-layout { position: relative; transition: height 180ms cubic-bezier(.2,.7,.3,1); }
-.react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; box-sizing: border-box; }
+.react-grid-layout { position: relative; transition: height var(--dur-settle) var(--ease-out); }
+.react-grid-item { transition: all var(--dur-3) ease; transition-property: left, top, width, height; box-sizing: border-box; }
 .react-grid-item img { pointer-events: none; user-select: none; }
 .react-grid-item.cssTransforms { transition-property: transform, width, height; }
-.react-grid-item.resizing { z-index: 3; will-change: width, height, transform; transition: transform 100ms ease-out; }
+.react-grid-item.resizing { z-index: 3; will-change: width, height, transform; transition: transform var(--dur-1) var(--ease-out); }
 .react-grid-item.react-draggable-dragging { transition: none; z-index: 4; will-change: transform; }
 .react-grid-item.react-grid-placeholder {
   background: var(--accent-soft);
   border: 1.5px dashed var(--accent);
   opacity: .85;
   border-radius: var(--r-card);
-  transition: transform 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+  transition: transform var(--dur-snap) var(--ease-out), width var(--dur-snap) var(--ease-out), height var(--dur-snap) var(--ease-out);
   z-index: 2;
   user-select: none;
 }
@@ -1071,7 +1086,7 @@ body {
   height: 7px;
   border-color: var(--muted);
   opacity: 0;
-  transition: opacity 100ms ease-out;
+  transition: opacity var(--dur-1) var(--ease-out);
 }
 .react-grid-item > .react-resizable-handle-ne::after {
   top: 4px;
@@ -1127,7 +1142,7 @@ body {
 .check-btn {
   appearance: none; width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px;
   border-radius: 6px; border: 1.75px solid var(--line-strong); background: transparent;
-  cursor: pointer; position: relative; transition: background .15s, border-color .15s, transform .1s;
+  cursor: pointer; position: relative; transition: background var(--dur-2), border-color var(--dur-2), transform var(--dur-1);
 }
 .check-btn:hover { border-color: var(--accent); }
 .check-btn.on { background: var(--accent-grad); border-color: transparent; }
@@ -1164,7 +1179,7 @@ body {
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 70;
   background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 12px;
-  box-shadow: var(--shadow); padding: 5px; min-width: 150px; animation: menuIn 120ms ease;
+  box-shadow: var(--shadow); padding: 5px; min-width: 150px; animation: menuIn var(--dur-snap) var(--ease-out);
 }
 .mini-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); padding: 7px 9px; border: 0; background: transparent; border-radius: 8px; cursor: pointer; }
 .mini-item:hover, .mini-item.active { background: var(--accent-soft); }
@@ -1195,7 +1210,7 @@ body {
 .accent-swatch {
   width: 26px; height: 26px; border-radius: 8px; border: 0; cursor: pointer;
   box-shadow: var(--shadow-sm); outline: 2px solid transparent; outline-offset: 2px;
-  transition: transform .1s ease, outline-color .15s ease;
+  transition: transform var(--dur-1) ease, outline-color var(--dur-2) ease;
 }
 .accent-swatch:hover { transform: scale(1.1); }
 .accent-swatch.active { outline-color: var(--text); }
@@ -1206,7 +1221,7 @@ body {
 [data-theme="light"] { color-scheme: light; }
 .dtpick {
   z-index: 80; background: var(--panel-solid); border: 1px solid var(--line-strong);
-  border-radius: 14px; box-shadow: var(--shadow); padding: 10px; animation: menuIn 120ms ease;
+  border-radius: 14px; box-shadow: var(--shadow); padding: 10px; animation: menuIn var(--dur-snap) var(--ease-out);
   max-height: calc(100vh - 16px); overflow-y: auto; /* keep the Set/Clear row reachable on short viewports */
 }
 .dt-presets { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -1271,21 +1286,22 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* ---------- Dashboard switcher (multiple dashboards) ---------- */
 .dash-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; max-width: var(--canvas-max); margin: 0 auto; padding: 14px 24px 0; box-sizing: border-box; }
 .dash-tab { display: inline-flex; align-items: center; }
-.dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: color var(--dur-2), background var(--dur-2), border-color var(--dur-2); }
 .dash-tab-btn:hover { color: var(--text); }
-.dash-tab.on .dash-tab-btn { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
+.dash-tab.on .dash-tab-btn { color: #fff; background: var(--accent-grad); border-color: transparent; }
 .dash-tab-x { margin-left: -4px; background: none; border: none; color: rgba(255, 255, 255, .85); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 8px 0 2px; }
 .dash-tab-x:hover { color: #fff; }
 .dash-tab-edit { background: var(--panel); border: 1px solid var(--accent); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text); width: 150px; outline: none; }
-.dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 18px; line-height: 1; cursor: pointer; transition: color .15s, border-color .15s; }
+.dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; width: 30px; height: 30px; font-size: 18px; line-height: 1; cursor: pointer; transition: color var(--dur-2), border-color var(--dur-2); }
 .dash-tab-add:hover { color: var(--text); border-color: var(--accent); }
+.dash-tab-btn:focus-visible, .dash-tab-x:focus-visible, .dash-tab-add:focus-visible { border-radius: 999px; }
 @media (max-width: 720px) {
   /* Scroll the tab strip sideways instead of wrapping into stacked rows that
      push the board down. Thin/hidden scrollbar keeps the row visually clean. */
   .dash-tabs {
     padding-left: 16px; padding-right: 16px;
     flex-wrap: nowrap; overflow-x: auto;
-    scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch;
   }
   .dash-tabs::-webkit-scrollbar { height: 0; }
   /* Tabs/add button must not shrink — they keep their size and scroll instead. */
@@ -1297,12 +1313,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
    in widgets/NotesWidget.css. .tree-chev stays here — Backlinks.jsx uses it too. */
 .tree-chev { flex: none; opacity: .65; transition: transform .12s; }
 .tree-chev.open { transform: rotate(90deg); }
-.note-ctx-menu { min-width: 190px; animation: menuIn 140ms ease; }
+.note-ctx-menu { min-width: 190px; }
 .note-ctx-title { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 700; color: var(--text); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 
 /* New-from-template dropdown + Trash entry */
 .note-tpl { position: relative; display: inline-flex; }
-.note-tpl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; animation: menuIn 150ms ease; }
+.note-tpl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; }
 
 /* Trash view (main pane) */
 .trash-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -1341,7 +1357,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-folder-in:focus { border-color: var(--accent); }
 .note-tags-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px 8px; }
 .note-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--accent-soft); color: var(--accent); border: none; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; line-height: 1.6; }
-.note-tag.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.note-tag.on { background: var(--accent-grad); color: #fff; }
 .note-tag-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 10px; padding: 0 0 0 2px; opacity: .8; }
 .note-tag-x:hover { opacity: 1; }
 .note-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
@@ -1397,7 +1413,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .gp-empty { font-size: 12px; color: var(--muted); padding: 8px 9px; }
 
 .note-overlay { align-items: stretch; }
-.note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }
+.note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn var(--dur-2) var(--ease-out); }
 .note-edit-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .note-title-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 18px; font-weight: 700; padding: 4px 2px; }
 .note-save-state { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -1417,7 +1433,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Sort menu (sidebar) + editor info bar */
 .note-sort { position: relative; display: inline-flex; }
-.note-sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 160px; animation: menuIn 150ms ease; }
+.note-sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 160px; }
 .note-info-bar { display: flex; flex-wrap: wrap; align-items: center; padding: 6px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
 .note-pane .note-info-bar { padding: 7px 2px 2px; }
 .note-info-bar span { display: inline-flex; align-items: center; }
@@ -1433,7 +1449,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Themed prompt dialog (replaces window.prompt). */
 .prompt-overlay { align-items: center; justify-content: center; }
-.prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn 140ms ease; }
+.prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn var(--dur-2) var(--ease-out); }
 .prompt-title { font-size: 15px; font-weight: 700; color: var(--text); }
 .prompt-label { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
 .prompt-input { width: 100%; font-size: 14px; padding: 8px 10px; margin-top: 12px; }
@@ -1445,7 +1461,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cmdk-inner {
   background: var(--panel-solid); border: 1px solid var(--line-strong);
   border-radius: var(--r-card); box-shadow: var(--shadow); overflow: hidden;
-  display: flex; flex-direction: column; animation: modalIn 140ms ease;
+  display: flex; flex-direction: column; animation: modalIn var(--dur-2) var(--ease-out);
 }
 .cmdk-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
 .cmdk-search-ic { color: var(--faint); flex: none; }
