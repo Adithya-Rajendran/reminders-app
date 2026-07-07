@@ -101,18 +101,20 @@ widgets/<viewport>-<theme>-triage-matrix.png # Triage's Matrix tab, extra crop
 Each page load also prints a diagnostic line:
 
 ```
-viewport=2560x1440 measured=2512px tier=xl cols=45 actualCols≈45
+viewport=2560x1440 measured=2512px tier=xxl cols=64 actualCols≈64
 ```
 
 `measured` is `.grid-wrap`'s real `clientWidth`; `tier`/`cols` are what the
 app's *own* `BREAKPOINTS`/`COLS` (imported from the mounted `dashlayout.js`)
 say that width should resolve to; `actualCols` is a cheap real-world check
 (derived from the Reminders widget's actual rendered pixel width against its
-grid `w` in the currently-saved layout). **On `main` today, 2560 and 5120
-resolve one tier short of their nominal breakpoint** (`.grid-wrap`'s ~48px
-padding pushes the measured width just under the boundary) — that's a known,
-expected bug this harness is designed to catch, fixed in a later PR. Don't
-"fix" it by editing anything in this directory.
+grid `w` in the currently-saved layout). 2560 and 5120 used to resolve one
+tier short of their nominal breakpoint (`.grid-wrap`'s ~48px padding pushes
+the measured width just under the boundary) — the bug this harness was built
+to catch, since fixed by offsetting the wide breakpoints 64px below their
+nominal monitor widths (`dashlayout.js`). If the diagnostic ever shows a
+2560/5120 viewport a tier short again, that's a regression — fix it in the
+app's breakpoints, not by editing anything in this directory.
 
 ### Boards
 

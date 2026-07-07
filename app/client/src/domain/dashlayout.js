@@ -12,13 +12,17 @@
 //     saved layouts, so the single-factor migration never touches them and adding
 //     them needs no GRID_V bump. They exist so the (uncapped, see --canvas-max in
 //     styles.css) canvas turns extra width into more columns instead of stretching
-//     widgets: each tier keeps the design's ~40px column-pitch floor (width ÷ cols
-//     ≈ 40 at the breakpoint), so pitch stays in a comfortable ~40–60px band up to
-//     5120px and only stretches gently beyond (≈80px at 10240px). Breakpoints are
-//     matched against the measured container width (screen minus padding), not the
-//     raw screen width, so the exact tier boundary is approximate by design.
+//     widgets: each tier keeps the design's ~40px column-pitch floor (nominal
+//     monitor width ÷ cols ≈ 40), so pitch stays in a comfortable ~40–60px band up
+//     to 5120px and only stretches gently beyond (≈80px at 10240px). The wide
+//     breakpoints sit 64px BELOW their nominal monitor widths (2560/3840/5120):
+//     they're matched against the MEASURED grid width — the viewport minus
+//     .grid-wrap's 48px horizontal padding (styles.css) and any classic scrollbar
+//     — so a display at exactly the nominal width would otherwise land one tier
+//     short. −64 covers the padding with 16px (minus the scrollbar) to spare; the
+//     pitch-floor arithmetic above still references the nominal widths.
 export const COLS = { xxxxl: 128, xxxl: 96, xxl: 64, xl: 45, lg: 30, md: 25, sm: 15, xs: 10, xxs: 5 }
-export const BREAKPOINTS = { xxxxl: 5120, xxxl: 3840, xxl: 2560, xl: 1800, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
+export const BREAKPOINTS = { xxxxl: 5056, xxxl: 3776, xxl: 2496, xl: 1800, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }
 export const GRID_V = 5
 // Multiply a saved layout's x/w by this to reach the current grid, keyed by the
 // layout's stored gridV (1 = old 12-col, 2 = 24-col, 3+ = current 30-col base).
