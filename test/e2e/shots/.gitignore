@@ -1,0 +1,4 @@
+# shots harness runtime artifacts (generated; never committed)
+.state/
+output/
+node_modules/
