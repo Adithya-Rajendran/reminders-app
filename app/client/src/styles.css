@@ -1046,6 +1046,7 @@ body {
   z-index: 2;
   user-select: none;
 }
+.react-grid-item.resizing .widget-body { mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent); }
 /* the widget frame fills the grid item */
 .react-grid-item > .widget { height: 100%; }
 /* Resize from any border or corner. Handles sit mostly in the inter-widget
