@@ -316,6 +316,12 @@ body {
 .chip.due-soon { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 30%, transparent); }
 .chip.overdue { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
 .chip.done { color: var(--green); background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 30%, transparent); }
+/* Other hand-rolled badges/pills below reuse .chip's radius/size tokens without
+   sharing its full box (their own background/color/padding stay independent —
+   see each rule). These two groupings only fold in the declarations that were
+   already byte-identical across sites. */
+.label-chip, .note-tag, .rg-count, .conn-badge, .backlinks-count { border-radius: var(--r-pill); }
+.label-chip, .note-tag, .conn-badge, .backlinks-count { font-size: var(--fs-2xs); }
 
 .pdot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -1145,7 +1151,7 @@ body {
 .due-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
 .due-chip:hover { filter: brightness(1.12); border-color: var(--accent); }
 .due-chip svg { opacity: .8; }
-.label-chip { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 7px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
+.label-chip { font-weight: 600; padding: 2px 7px; background: var(--accent-soft); color: var(--accent); }
 
 /* subtasks (folded-in Goals): expand/progress chip on a parent + nested rows */
 .task-wrap { display: flex; flex-direction: column; }
@@ -1336,7 +1342,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-folder-in { flex: 1; min-width: 90px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 6px 10px; color: var(--text); font-size: var(--fs-meta); outline: none; }
 .note-folder-in:focus { border-color: var(--accent); }
 .note-tags-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px 8px; }
-.note-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--accent-soft); color: var(--accent); border: none; border-radius: var(--r-pill); padding: 2px 8px; font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; line-height: 1.6; }
+.note-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--accent-soft); color: var(--accent); border: none; padding: 2px 8px; font-weight: 600; cursor: pointer; line-height: 1.6; }
 .note-tag.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--on-accent); }
 .note-tag-x { background: none; border: none; color: inherit; cursor: pointer; font-size: var(--fs-micro); padding: 0 0 0 2px; opacity: .8; }
 .note-tag-x:hover { opacity: 1; }
@@ -1355,7 +1361,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rg-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .rg-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
 .rg-name { font-size: var(--fs-ctrl); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.rg-count { font-size: var(--fs-micro); color: var(--muted); background: var(--accent-soft); border-radius: var(--r-pill); padding: 1px 7px; font-weight: 700; }
+.rg-count { font-size: var(--fs-micro); color: var(--muted); background: var(--accent-soft); padding: 1px 7px; font-weight: 700; }
 .rg-actions { display: inline-flex; align-items: center; gap: 6px; }
 .rg-cal { font-size: var(--fs-meta); padding: 5px 8px; max-width: 190px; }
 .rg-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1489,7 +1495,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .conn-widget { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .conn-widget-name { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-ctrl); font-weight: 600; min-width: 120px; }
 .conn-plugs { display: flex; flex-wrap: wrap; gap: 5px; }
-.conn-badge { display: inline-flex; align-items: center; gap: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-2xs); padding: 2px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
+.conn-badge { display: inline-flex; align-items: center; gap: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 7px; border: 1px solid var(--line); color: var(--muted); }
 .conn-badge.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
 .conn-badge.warn { color: var(--text); border-color: var(--accent); }
 .conn-badge.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
@@ -1608,7 +1614,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .backlinks { border-top: 1px solid var(--line); padding: 8px 14px 12px; }
 .backlinks-head { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; color: var(--muted); font-size: var(--fs-meta); font-weight: 700; letter-spacing: .02em; cursor: pointer; padding: 4px 0; }
 .backlinks-head .ic { color: var(--faint); }
-.backlinks-count { background: var(--accent-soft); color: var(--accent); border-radius: var(--r-pill); font-size: var(--fs-2xs); padding: 0 7px; font-weight: 700; }
+.backlinks-count { background: var(--accent-soft); color: var(--accent); padding: 0 7px; font-weight: 700; }
 .backlinks-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 .backlinks-item { display: flex; flex-direction: column; gap: 1px; text-align: left; background: none; border: none; border-radius: var(--r-btn); padding: 6px 8px; cursor: pointer; color: var(--text); }
 .backlinks-item:hover { background: var(--accent-soft); }
@@ -1706,7 +1712,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
    (due / priority / labels / cue) before submit — recognition over recall.
    Aligned under the input text (past the leading icon); hidden when nothing parses. */
 .qa-preview { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 4px 34px; }
-.qa-chip { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; line-height: 1.4; padding: 2px 8px; border-radius: var(--r-pill); background: var(--panel2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.qa-chip { font-size: 11.5px; line-height: 1.4; padding: 2px 8px; border-radius: var(--r-pill); }
 .qa-chip.due { color: var(--text); }
 .qa-chip.due.due-soon { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 30%, transparent); }
 .qa-chip.due.overdue { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }

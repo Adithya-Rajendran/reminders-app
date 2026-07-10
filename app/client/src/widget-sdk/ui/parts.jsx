@@ -98,14 +98,14 @@ export function QuickAddPreview({ text }) {
   const chips = []
   if (isRealDate(p.due_date)) {
     const c = dueChip(p.due_date), t = timeLabel(p.due_date)
-    chips.push({ k: 'due', cls: `qa-chip due ${c?.cls || ''}`, label: `${c?.label || ''}${t ? ` · ${t}` : ''}`, title: absDate(p.due_date) })
+    chips.push({ k: 'due', cls: `chip qa-chip due ${c?.cls || ''}`, label: `${c?.label || ''}${t ? ` · ${t}` : ''}`, title: absDate(p.due_date) })
   }
   if (p.priority) {
     const pr = PRIORITIES[p.priority]
-    chips.push({ k: 'pri', cls: `qa-chip pri p${p.priority}`, label: pr ? pr.label : `P${p.priority}`, title: `Priority ${p.priority} — ${pr?.label || ''}` })
+    chips.push({ k: 'pri', cls: `chip qa-chip pri p${p.priority}`, label: pr ? pr.label : `P${p.priority}`, title: `Priority ${p.priority} — ${pr?.label || ''}` })
   }
-  for (const l of (p.labels || [])) chips.push({ k: `lbl-${l}`, cls: 'qa-chip lbl', label: `*${l}`, title: `Group / label: ${l}` })
-  if (p.cue) chips.push({ k: 'cue', cls: 'qa-chip cue', label: `⤳ ${p.cue}`, title: `Cue: ${p.cue}` })
+  for (const l of (p.labels || [])) chips.push({ k: `lbl-${l}`, cls: 'chip qa-chip lbl', label: `*${l}`, title: `Group / label: ${l}` })
+  if (p.cue) chips.push({ k: 'cue', cls: 'chip qa-chip cue', label: `⤳ ${p.cue}`, title: `Cue: ${p.cue}` })
   // Nothing parsed yet but the user IS typing: teach the syntax right where it
   // would take effect (the tokens are invisible until one parses otherwise).
   if (!chips.length) {
