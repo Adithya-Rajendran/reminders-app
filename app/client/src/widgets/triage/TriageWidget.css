@@ -23,6 +23,12 @@
 /* ---- Eisenhower matrix ---- */
 .eisen { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
 .eisen-stack { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 7px; }
+/* Wide widgets lay all four quadrants in a single row instead of a 2x2 square —
+   there's horizontal room to spare and it reads better than a tall square. Gated
+   on data-wsize (stamped by WidgetFrame from the same useElementSize() tier used
+   by layout.js's `roomy`, so this activates at the exact width layout.js already
+   widens the per-quadrant row cap for — columns and item-cap grow together). */
+.widget-body[data-wsize="lg"] .eisen, .widget-body[data-wsize="xl"] .eisen { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
 .eq { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; transition: background 120ms ease, border-color 120ms ease; }
 .triage.compact .eq { padding: 7px 8px; }
 .eisen.roomy .eq { padding-block: 10px; }

@@ -25,6 +25,12 @@
 .daily-sg .ic { color: var(--accent); flex: 0 0 auto; }
 .daily-sg-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .daily.compact .daily-sg { padding: 5px 8px; font-size: 12.5px; }
+/* Wide widgets: run suggestions two-across instead of one long column — there's
+   width to spare. min-width:0 lets each button shrink below its icon+text
+   content size (the default flex-item floor), so .daily-sg-t's own ellipsis
+   truncation (above) still kicks in at half width instead of the row overflowing. */
+.widget-body[data-wsize="lg"] .daily-suggest, .widget-body[data-wsize="xl"] .daily-suggest { flex-direction: row; flex-wrap: wrap; gap: var(--sp-4); }
+.widget-body[data-wsize="lg"] .daily-sg, .widget-body[data-wsize="xl"] .daily-sg { flex: 0 1 calc(50% - (var(--sp-4) / 2)); min-width: 0; width: auto; }
 .daily-suggest-compact { font-size: 12px; color: var(--muted); padding: 5px 8px; border: 1px dashed var(--line); border-radius: var(--r-btn); }
 .daily-recap { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); padding: 8px 10px; }
 .daily-recap .ic { color: var(--green); }
