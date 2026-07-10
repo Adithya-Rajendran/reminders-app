@@ -32,15 +32,39 @@
 .eq { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 8px 10px; transition: background 120ms ease, border-color 120ms ease; }
 .triage.compact .eq { padding: 7px 8px; }
 .eisen.roomy .eq { padding-block: 10px; }
-.eq-Q1 { border-left: 3px solid var(--danger); }
-.eq-Q2 { border-left: 3px solid var(--accent); }
-.eq-Q3 { border-left: 3px solid var(--warn); }
-.eq-Q4 { border-left: 3px solid var(--line-strong); }
+/* Quadrant identity colors — pinned to fixed semantic tokens, deliberately
+   NOT var(--accent). accents.js lets the user recolor --accent to indigo/
+   blue/emerald/amber/rose/pink/… (SettingsModal accent picker), and Q2 used
+   to alias --accent directly: under the default copper theme that already
+   reads almost identical to Q3's amber warn bar, and an amber or rose accent
+   pick would fully collide with Q3 or Q1. Deriving from --danger/--warn/
+   --green instead keeps all four identities distinct under every accent
+   choice and both themes, and frees --accent to read as the "Most important"
+   callout's own signal rather than doubling as a quadrant color. Q2 leans
+   the fixed --green token warm (mixed toward --accent2) so it reads as part
+   of the same family as its copper/amber neighbors rather than a foreign
+   hue, while staying clearly separated from Q3's amber. Q4 (Later) stays
+   intentionally colorless: the same --line-strong every other card border
+   already uses, since "later" has nothing to signal. */
+.triage {
+  --tri-q1: var(--danger);
+  --tri-q2: color-mix(in oklab, var(--green) 82%, var(--accent2) 18%);
+  --tri-q3: var(--warn);
+  --tri-q4: var(--line-strong);
+}
+.eq-Q1 { border-left: 3px solid var(--tri-q1); }
+.eq-Q2 { border-left: 3px solid var(--tri-q2); }
+.eq-Q3 { border-left: 3px solid var(--tri-q3); }
+.eq-Q4 { border-left: 3px solid var(--tri-q4); }
 /* Drop-target feedback while a task is dragged over a quadrant. */
 .eq.drop-over { background: var(--accent-soft); border-color: var(--accent); }
 .eq-head { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; min-width: 0; gap: 8px; }
-.eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
-.eq-count { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Small-caps eyebrow, matching the app-wide group-header treatment (see
+   --tracking-eyebrow / .group-head .g-title in styles.css) instead of a
+   one-off bold sentence-case label — the colored --tri-qN border above now
+   carries the primary identity signal, so the title can sit quiet. */
+.eq-label { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
+.eq-count { font-size: 11px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
 .eq-sub { flex: 0 0 auto; font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
 .eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
 /* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift
@@ -56,7 +80,7 @@
 .eq-list .check-btn.on::after { left: 4px; top: 1px; width: 3.5px; height: 8px; }
 .eq-list .task .chip { font-size: 10px; padding: 0 5px; }
 .eq-more { font-size: 11px; color: var(--faint); padding: 2px 4px; }
-.eq-empty { flex: 1 1 auto; display: flex; align-items: center; font-size: 11.5px; color: var(--faint); }
+.eq-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11.5px; color: var(--faint); }
 
 /* Keep the undo bar readable at the bottom of a long board. The base .undo-bar
    rule supplies position:sticky; don't override `position` here (a `relative`
