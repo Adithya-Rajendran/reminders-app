@@ -36,16 +36,21 @@ const join = (...p) => p.map(trimSlashes).filter(Boolean).join('/')
 
 // Resolve { account, root } for a user. Defaults to the first CalDAV account +
 // a `Notes` folder when nothing is configured, so notes work out of the box.
+// `defaulted` marks that guess: when the first account turns out not to speak
+// WebDAV (e.g. a plain Radicale), a defaulted listing degrades to "not
+// configured" instead of erroring forever — only an EXPLICIT config errors.
 async function ctx(userId) {
   let cfg = await getNotesConfig(userId)
+  let defaulted = false
   if (!cfg || !cfg.accountId) {
     const accts = await listAccounts(userId)
     if (!accts.length) return null
     cfg = { accountId: accts[0].id, rootPath: (cfg && cfg.rootPath) || DEFAULT_ROOT }
+    defaulted = true
   }
   const account = await getAccount(userId, cfg.accountId)
   if (!account) return null
-  return { account, root: trimSlashes(cfg.rootPath) || DEFAULT_ROOT }
+  return { account, root: trimSlashes(cfg.rootPath) || DEFAULT_ROOT, defaulted }
 }
 
 // Guard every path stays inside the configured notes root (no traversal).
@@ -161,7 +166,16 @@ export async function listNotes(userId) {
     folderCount += subdirs.length
     await Promise.all(subdirs.slice(0, 400).map((d) => walk(d, depth + 1))) // siblings in parallel
   }
-  await walk(c.root, 0)
+  try {
+    await walk(c.root, 0)
+  } catch (e) {
+    // A DEFAULTED account that can't serve WebDAV (plain Radicale, no Files
+    // app) reads as "notes not configured", not as an endless error — the
+    // widget then shows its connect state. An explicitly configured account
+    // still errors loudly: that's a real outage the user must see.
+    if (c.defaulted) return null
+    throw e
+  }
   let tc = tagCache.get(userId); if (!tc) { tc = new Map(); tagCache.set(userId, tc) }
   const seen = new Set()
   const notes = await Promise.all(files.map(async (f) => {
