@@ -89,14 +89,19 @@ Output lands in `test/e2e/shots/output/<step>/<board>/`:
 
 ```
 <viewport>-<theme>.png                       # full-page
-widgets/<viewport>-<theme>-<type>.png        # one crop per widget (9 types)
-widgets/<viewport>-<theme>-triage-matrix.png # Triage's Matrix tab, extra crop
+widgets/<viewport>-<theme>-<type>.png        # one crop per widget type
 ```
 
 `<viewport>` is one of `1512x982` / `2560x1440` / `5120x2160`; `<theme>` is
-`dark` / `light`; `<type>` is a widget manifest type (`reminders`, `upcoming`,
-`calendar`, `notes`, `review`, `cues`, `triage`, `daily`, `focus`). The
-`no-widgets` board has no per-widget crops (there are no widgets).
+`dark` / `light`; `<type>` is a widget manifest type — currently 12 of them
+(`overview`, `inbox`, `reminders`, `upcoming`, `calendar`, `notes`, `notepin`,
+`review`, `cues`, `triage`, `daily`, `focus`), read from `WIDGET_MANIFEST` at
+run time so a widget added to the app gets a crop with no harness change. The
+`no-widgets` board has no per-widget crops (there are no widgets). There is no
+extra `triage-matrix` crop anymore: the de-gamified Prioritize widget (still
+type `triage` — persisted types never rename) renders its Eisenhower matrix
+inline rather than behind a Matrix tab, so the plain frame crop already shows
+it.
 
 Each page load also prints a diagnostic line:
 
@@ -118,13 +123,35 @@ app's breakpoints, not by editing anything in this directory.
 
 ### Boards
 
-- **showcase** — all 9 widget types, shelf-packed at their manifest default
-  sizes, with real data in every one (tasks across overdue/today/this-week/
-  undated/done buckets, labels, a `time_estimate`+`dread` pair, 3 cues with 2
-  placed + linked on the Cues canvas and 1 queued, 2 calendar events, 3 notes
-  including a markdown table+task-list note and a long no-linebreak paragraph
-  for the measure-cap check).
-- **empty** — the exact same layout, zero data (every widget's empty state).
+- **showcase** — EVERY widget type in `WIDGET_MANIFEST` (built dynamically —
+  currently 12), shelf-packed at their manifest default sizes, with real data
+  in every one (tasks across overdue/today/this-week/undated/done buckets,
+  labels, a `time_estimate`+`dread` pair, 3 cues with 2 placed + linked on
+  the Cues canvas and 1 queued, 2 calendar events, a 2-task daily plan, 3
+  notes including a markdown table+task-list note and a long no-linebreak
+  paragraph for the measure-cap check). How the v2 widgets are fed:
+  - **Inbox** shows open `clarified: false` tasks (`selectInbox`), and a task
+    that never set the flag reads back unclarified — so every regular task is
+    seeded `clarified: true` and exactly three raw captures are left
+    unclarified. The Inbox thus shows its clarify card + "Up next" peek
+    instead of swallowing the whole task list.
+  - **Prioritize** (type `triage`) buckets its Eisenhower matrix by the
+    EXPLICIT `important` flag (not priority) — three tasks carry it, spread
+    so Q1 (important+urgent) gets two, Q2 (important+later) one, and the
+    "Most important" callout names 'Prep board deck'. Overview's
+    most-important line shares that same selector/pick.
+  - **Overview** aggregates the seeded tasks/events (status line, overdue and
+    due-today counts, next event/task, capture row) — nothing extra to seed.
+  - **Note** (`notepin`) has no seedable config: WHICH note is pinned is
+    per-instance UI state (localStorage via `widgetStore`, written when the
+    user picks a note in the widget) — deliberately left unset rather than
+    faking the app's internal storage. Unconfigured it falls back to the most
+    recently edited note, so its crop is still non-empty: expect the
+    last-seeded note ('Q3 planning recap'), not a hand-picked one. (The seed
+    spaces the note saves >1s apart — WebDAV mtimes are second-granular, and
+    a tie would make the fallback follow server listing order instead.)
+- **empty** — the exact same layout, zero data (every widget's empty state;
+  Note shows "No notes yet", Inbox shows "Inbox zero").
 - **no-widgets** — an empty board (Dashboard's "add a widget" card).
 
 ### Port collision with `test/e2e/`
@@ -144,8 +171,8 @@ to bind. They use separate credentials/collection paths (`shots`/`shotspw` at
 | `setup-backends.sh` | Build the backends image, start `shots-radicale`/`shots-wsgidav`, wait for both, seed the CalDAV calendar |
 | `start-bff.sh` | Build (or reuse, `--no-rebuild`) `shots-bff:local` from `app/Dockerfile`'s `runtime` stage, start it, provision the CalDAV account + notes WebDAV account |
 | `teardown.sh` | `docker rm -f` every `shots-*` container (idempotent) |
-| `seedlib.mjs` | Shared seed helpers (fetch wrapper, task/notes/event/layout builders) — imports the app's pure `dashlayout.js`/`manifest.js` from `/repo` |
-| `seed-showcase.mjs` | All 9 widgets + full data set |
+| `seedlib.mjs` | Shared seed helpers (fetch wrapper, task/notes/event/plan/layout builders) — imports the app's pure `dashlayout.js`/`manifest.js` from `/repo` |
+| `seed-showcase.mjs` | Every manifest widget type + full data set |
 | `seed-empty.mjs` | Same layout, zero data |
 | `seed-no-widgets.mjs` | Empty widgets/layouts board |
 | `capture.mjs` | Playwright capture: full-page + per-widget PNGs, the tier diagnostic |
@@ -157,7 +184,8 @@ to bind. They use separate credentials/collection paths (`shots`/`shotspw` at
 
 `bash test/e2e/shots/run.sh --step selftest` is a good smoke test: it should
 seed all three boards without error, produce 3 viewports x 2 themes x
-(1 full-page + 9 widget crops + 1 Triage-matrix crop) PNGs for showcase/empty
-(and just the full-page shot for no-widgets), print the tier diagnostic for
-every page load, and `node test/e2e/shots/diff.mjs selftest selftest` (or
-`run.sh --diff selftest selftest`) should report 0% changed everywhere.
+(1 full-page + one crop per manifest widget type — currently 12) PNGs for
+showcase/empty (and just the full-page shot for no-widgets — 162 PNGs total
+at 12 types), print the tier diagnostic for every page load, and
+`node test/e2e/shots/diff.mjs selftest selftest` (or `run.sh --diff selftest
+selftest`) should report 0% changed everywhere.

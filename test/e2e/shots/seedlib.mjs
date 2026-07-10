@@ -11,6 +11,11 @@
 // read-only at /repo so the two pure app modules below can be imported
 // directly (see run.sh) — no npm deps, no ABI concerns, never drifts from
 // the app's real grid math.
+//
+// NOTE: app/client/src/dashlayout.js is now a compatibility shim re-exporting
+// ./domain/dashlayout.js. The whole harness (this file + capture.mjs, same as
+// test/e2e/lib.mjs) imports the shim path consistently; if the shim is ever
+// removed, point both imports at /repo/app/client/src/domain/dashlayout.js.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -53,6 +58,15 @@ export async function clearNotes() {
   for (const n of notes) await api(`/api/notes/item?path=${encodeURIComponent(n.path)}`, { method: 'DELETE' })
 }
 
+// ---- daily plan ----
+// Same shape test/e2e/lib.mjs uses: PUT { date: 'YYYY-MM-DD', ids } — an empty
+// ids array IS the clear (there's no DELETE). Feeds the Daily Plan widget's
+// picked-for-today list and Focus's plan-first ranking.
+const pad2 = (n) => String(n).padStart(2, '0')
+export const ymd = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+export const putDailyPlan = (ids, date = ymd()) => api('/api/daily-plan', { method: 'PUT', body: JSON.stringify({ date, ids }) })
+export const clearDailyPlan = () => putDailyPlan([])
+
 // ---- calendar events ----
 export async function clearEvents() {
   const from = isoDaysFromNow(-40), to = isoDaysFromNow(40)
@@ -71,11 +85,17 @@ const sizeFor = (type) => {
 }
 export const WIDGET_ID = (type) => `w-${type}`
 
-// All 9 manifest widget types at their default sizes, shelf-packed at the lg
-// tier — see docs/adding-a-widget.md + widgets/manifest.js for the catalog.
-// Every other breakpoint is intentionally OMITTED: Dashboard.jsx derives them
-// on load (fillBreakpoints), which this harness also uses to live-check that
-// self-healing path (see capture.mjs's diagnostic print).
+// EVERY manifest widget type at its default size, shelf-packed at the lg tier
+// — built dynamically from WIDGET_MANIFEST (see docs/adding-a-widget.md +
+// widgets/manifest.js for the catalog), so a widget added to the app shows up
+// in the showcase with no harness change. Every other breakpoint is
+// intentionally OMITTED: Dashboard.jsx derives them on load (fillBreakpoints,
+// now clamped to each widget's manifest size contract), which this harness
+// also uses to live-check that self-healing path (see capture.mjs's
+// diagnostic print). The host's size contract (applyConstraints/clampAspect
+// in domain/dashlayout.js) is render-time only and never rewrites x/y/w/h on
+// load; every manifest defaultSize already sits inside its own aspect band,
+// so the seeded lg tier round-trips unchanged.
 export function showcaseLayout() {
   const types = WIDGET_MANIFEST.map((m) => m.type)
   const raw = types.map((type) => ({ i: WIDGET_ID(type), type, x: 0, y: 0, ...sizeFor(type) }))

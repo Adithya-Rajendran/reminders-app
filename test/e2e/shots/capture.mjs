@@ -52,7 +52,13 @@ function tierFor(px) {
   return entries[entries.length - 1][0]
 }
 
-const widgetFrame = (page, label) => page.locator('.widget').filter({ has: page.getByText(label, { exact: true }) })
+// Each widget frame carries role="group" aria-label={title} (Dashboard.jsx),
+// and an un-grouped widget's title IS its manifest label — an exact-attribute
+// match, so 'Note' (notepin) can never resolve to the 'Notes' widget and a
+// label that appears as body text inside another widget (e.g. 'Inbox' in
+// Overview's capture row) can't grab the wrong frame the way a text filter
+// could on the wider board. Same locator the e2e resize spec uses.
+const widgetFrame = (page, label) => page.locator(`.widget[aria-label="${label}"]`)
 
 async function waitSettled(page) {
   await page.locator('.app').waitFor({ state: 'visible', timeout: 20000 })
@@ -103,19 +109,17 @@ async function diagnostic(page, label) {
   console.log(`  ${label} measured=${measured}px tier=${tier} cols=${COLS[tier]}${actualCols != null ? ` actualCols≈${actualCols}` : ''}`)
 }
 
+// One crop per manifest type. No per-type special cases anymore: the old
+// gamified Triage widget kept its Eisenhower matrix behind a 'Matrix' tab
+// (which needed an extra click + crop); the de-gamified Prioritize widget
+// (type 'triage' — the persisted type never renames) renders the matrix
+// inline below its "Most important" callout, so the plain frame crop already
+// shows it.
 async function shootWidgets(page, viewport, theme) {
   for (const { type, label } of WIDGET_MANIFEST) {
     const frame = widgetFrame(page, label)
     if (await frame.count() === 0) continue
     await frame.first().screenshot({ path: path.join(OUT_WIDGETS, `${viewport}-${theme}-${type}.png`) }).catch((e) => console.warn(`  (skip ${type} crop: ${e.message})`))
-    if (type === 'triage') {
-      const matrixTab = frame.first().getByRole('tab', { name: 'Matrix' })
-      if (await matrixTab.count() > 0) {
-        await matrixTab.click().catch(() => {})
-        await page.waitForTimeout(150)
-        await frame.first().screenshot({ path: path.join(OUT_WIDGETS, `${viewport}-${theme}-triage-matrix.png`) }).catch((e) => console.warn(`  (skip triage-matrix crop: ${e.message})`))
-      }
-    }
   }
 }
 
