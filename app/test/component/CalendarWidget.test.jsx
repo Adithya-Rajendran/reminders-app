@@ -80,4 +80,56 @@ describe('CalendarWidget', () => {
     expect(cal.calls.createEvent.length).toBe(1)
     expect(cal.calls.createEvent[0].summary).toBe('Old title')
   })
+
+  it('shows a loading skeleton over the still-mounted calendar chrome while the first vevents fetch is pending, then clears it', async () => {
+    let resolveEvents
+    const cal = fakeCalendar([])
+    cal.listEvents = () => new Promise((resolve) => { resolveEvents = () => resolve({ events: [] }) })
+    const { container } = render(<CalendarWidget tasks={fakeTasks([])} calendar={cal} />)
+    await flush()
+
+    expect(container.querySelector('.cal-vevents-scrim')).toBeTruthy()
+    expect(container.querySelector('.fc-toolbar')).toBeTruthy() // FullCalendar itself stays mounted underneath
+
+    await act(async () => { resolveEvents(); await Promise.resolve() })
+    expect(container.querySelector('.cal-vevents-scrim')).toBeFalsy()
+  })
+
+  it('shows the full-body ErrorState when the vevents fetch fails before anything has ever loaded, and Retry recovers it', async () => {
+    let fail = true
+    const cal = fakeCalendar([])
+    cal.listEvents = () => (fail ? Promise.reject(new Error('boom')) : Promise.resolve({ events: [] }))
+    render(<CalendarWidget tasks={fakeTasks([])} calendar={cal} />)
+    await flush()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn.t reach your server/i)
+
+    fail = false
+    await userEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await flush()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps the stale calendar visible with a ReconnectBanner (not the full ErrorState) when a LATER vevents refetch fails', async () => {
+    const ev = [{ id: 'e1', title: 'Standup', start: at(10), end: at(11), allDay: false, accountId: 1, objectUrl: 'u1', listUrl: 'l1', etag: 'x' }]
+    const cal = fakeCalendar(ev)
+    // FullCalendar can call the events function more than once while its initial
+    // view settles under jsdom (no real layout) — succeed every call until the
+    // initial render is confirmed, THEN flip to failing for the explicit refetch
+    // below, so this doesn't depend on the exact number of initial invocations.
+    let broken = false
+    cal.listEvents = () => (broken ? Promise.reject(new Error('boom')) : Promise.resolve({ events: ev }))
+    render(<CalendarWidget tasks={fakeTasks([])} calendar={cal} />)
+    await flush()
+    expect(await screen.findByText('Standup')).toBeInTheDocument()
+
+    // The existing visibilitychange recovery wiring triggers a fresh vevents
+    // fetch (see the widget's "cross-device freshness" effect); this fake fails it.
+    broken = true
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); await Promise.resolve() })
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument() // no full-body takeover…
+    expect(screen.getByText(/can.t reach your server/i)).toBeInTheDocument() // …just the reconnect strip…
+    expect(screen.getByText('Standup')).toBeInTheDocument() // …and the stale event stays visible
+  })
 })

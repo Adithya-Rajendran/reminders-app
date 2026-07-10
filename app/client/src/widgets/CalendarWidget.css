@@ -97,6 +97,20 @@
 
 .cal-modal { width: 480px; max-width: 100%; }
 
+/* vevents loading/error overlays (full FullCalendar path). A full scrim covers
+   the grid only while there's nothing rendered yet (initial load, or an error
+   before any load has ever succeeded) — FullCalendar itself stays mounted
+   underneath throughout, per .cal-wrap's own position:relative. Once real data
+   has shown once, a failed refetch instead gets a small non-blocking strip so
+   the stale (still-useful) calendar stays fully visible and interactive. */
+.cal-vevents-scrim {
+  position: absolute; inset: 0; z-index: 4;
+  background: var(--panel2);
+  overflow: auto;
+  padding: 10px;
+}
+.cal-vevents-reconnect { position: absolute; left: 12px; right: 12px; top: 10px; z-index: 5; }
+
 /* Calendar: trimmed toolbar when the widget is narrow. */
 .cal-compact .fc-toolbar-title { font-size: 14px; }
 .cal-compact .fc .fc-button { padding: 2px 7px; font-size: 12px; }
@@ -126,6 +140,7 @@
 .cal-mini-wrap { min-width: 0; overflow: hidden; }
 .cal-mini { display: flex; flex-direction: column; height: 100%; min-width: 0; overflow: hidden; }
 .cal-mini-toolbar { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 8px 8px 7px; border-bottom: 1px solid var(--line); }
+.cal-mini-reconnect { padding: 6px 8px 0; }
 .cal-mini-nav { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
 .cal-mini-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 13px; font-weight: 750; color: var(--text); }
 .cal-mini-today { flex: 0 0 auto; padding-left: 8px; padding-right: 8px; }

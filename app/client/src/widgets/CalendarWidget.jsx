@@ -6,7 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useWidgetSize, atMostW, atLeastW, useModalRef, useTaskList, UndoBar, tasksToCalendarEvents, TaskPopover, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
+import { useWidgetSize, atMostW, atLeastW, useModalRef, useTaskList, UndoBar, tasksToCalendarEvents, TaskPopover, SkeletonRows, ErrorState, ReconnectBanner, IconCalendar, IconX, IconTrash, IconCheck, IconSpinner } from '../widget-sdk'
 
 // Read-only system calendars (e.g. Nextcloud "Contact birthdays") reject new
 // events, so they must never appear in — let alone default — the create picker.
@@ -87,13 +87,18 @@ function errText(e) {
   try { return JSON.parse(m).error || m } catch { return m }
 }
 
-function MiniAgenda({ rangeStart, rangeEnd, items, loading, onPrev, onNext, onToday, onTaskClick, onEventClick }) {
+function MiniAgenda({ rangeStart, rangeEnd, items, loading, error, onRetry, onPrev, onNext, onToday, onTaskClick, onEventClick }) {
   const days = []
   for (let d = new Date(rangeStart); d < rangeEnd; d = addDays(d, 1)) {
     const day = new Date(d)
     const dayItems = items.filter((it) => sameDay(it.startDate, day))
     if (dayItems.length || sameDay(day, new Date())) days.push({ day, items: dayItems })
   }
+  // A failed fetch used to blank straight to "Nothing scheduled" — indistinguishable
+  // from a genuinely quiet week. If there's stale (or locally-sourced) data to show,
+  // keep it up with a small reconnect strip; only swap to the full ErrorState when
+  // there's truly nothing to show instead.
+  const nothingToShow = error && items.length === 0
   return (
     <div className="cal-mini">
       <div className="cal-mini-toolbar">
@@ -104,10 +109,14 @@ function MiniAgenda({ rangeStart, rangeEnd, items, loading, onPrev, onNext, onTo
         <div className="cal-mini-title">{fmtRange(rangeStart, rangeEnd)}</div>
         <button type="button" className="btn ghost sm cal-mini-today" onClick={onToday}>Today</button>
       </div>
+      {error && items.length > 0 && (
+        <div className="cal-mini-reconnect"><ReconnectBanner onRetry={onRetry} /></div>
+      )}
       <div className="cal-mini-list">
         {loading && <div className="cal-mini-empty"><IconSpinner size={16} /> Loading calendar…</div>}
-        {!loading && days.length === 0 && <div className="cal-mini-empty">Nothing scheduled this week.</div>}
-        {!loading && days.map(({ day, items: dayItems }) => (
+        {!loading && nothingToShow && <ErrorState onRetry={onRetry} />}
+        {!loading && !nothingToShow && days.length === 0 && <div className="cal-mini-empty">Nothing scheduled this week.</div>}
+        {!loading && !nothingToShow && days.map(({ day, items: dayItems }) => (
           <section className="cal-mini-day" key={day.toISOString()}>
             <div className="cal-mini-day-head">
               <span>{fmtDay(day)}</span>
@@ -234,6 +243,14 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   // so a capture/complete elsewhere updates the calendar with zero network.
   useEffect(() => tasksCap.subscribe(refetchTasks), [tasksCap])
 
+  // vevents load state — 'loading' | 'ready' | 'error', mirroring the shared task
+  // store's own machine (taskstore.js) so a failed refetch reads the same way
+  // everywhere in the app: the skeleton only for a load with nothing rendered
+  // yet, a small reconnect strip once something has. taskSource never errors
+  // (falls back to []), so only the vevents layer needs this.
+  const [veventsState, setVeventsState] = useState('loading')
+  const hadVeventsRef = useRef(false) // true once vevents has loaded at least once — ErrorState vs ReconnectBanner
+
   // ---- two event sources: (a) the task overlay from the shared store, (b) CalDAV VEVENTs ----
   // Split (was one merged source) so each refetches on its own trigger. Each half
   // resolves to [] on failure — one failing half must not blank the other (the
@@ -242,16 +259,20 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
     tasksCap.ensureLoaded().then((ts) => success(tasksToCalendarEvents(ts))).catch(() => success([]))
   }, [tasksCap])
   const veventSource = useCallback((info, success, failure) => {
+    setVeventsState((s) => (s === 'ready' ? s : 'loading'))
     calendar.listEvents(info.startStr, info.endStr).then((r) => {
       success((r?.events || []).map((e) => ({
         id: e.id, title: e.title, start: e.start, end: e.end, allDay: !!e.allDay,
         classNames: ['cal-event'],
         extendedProps: { kind: 'event', accountId: e.accountId, objectUrl: e.objectUrl, listUrl: e.listUrl, etag: e.etag },
       })))
+      hadVeventsRef.current = true
+      setVeventsState('ready')
       // A transient failure keeps the previously-rendered events on screen
       // (failure(), not success([]) — which would blank the layer until the
-      // next CRUD or view change now that task mutations no longer refetch it).
-    }).catch(failure)
+      // next CRUD or view change now that task mutations no longer refetch it);
+      // the overlays below tell the user why instead of a silently stale grid.
+    }).catch((e) => { setVeventsState('error'); failure(e) })
   }, [calendar])
 
   // Recovery + cross-device freshness for the vevents layer: task mutations used
@@ -276,6 +297,7 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
   const [miniTick, setMiniTick] = useState(0)
   const [miniEvents, setMiniEvents] = useState([])
   const [miniLoading, setMiniLoading] = useState(false)
+  const [miniError, setMiniError] = useState(false)
   const miniRange = useMemo(() => {
     const start = startOfWeek(miniAnchor)
     const end = addDays(start, 7)
@@ -301,7 +323,13 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         objectUrl: e.objectUrl,
         listUrl: e.listUrl,
       })).filter((e) => !isNaN(e.startDate.getTime())))
-    }).catch(() => { if (alive) setMiniEvents([]) })
+      setMiniError(false)
+    }).catch(() => {
+      // Keep whatever was last fetched (plus the always-live local task overlay)
+      // instead of blanking to [] — an error must read as an error (the
+      // ReconnectBanner/ErrorState below), never as a quiet, event-free week.
+      if (alive) setMiniError(true)
+    })
       .finally(() => { if (alive) setMiniLoading(false) })
     return () => { alive = false }
   }, [calendar, mini, miniRange.startIso, miniRange.endIso, miniTick])
@@ -422,6 +450,8 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
           rangeEnd={miniRange.end}
           items={miniItems}
           loading={miniLoading}
+          error={miniError}
+          onRetry={bumpMini}
           onPrev={() => setMiniAnchor((d) => addDays(d, -7))}
           onNext={() => setMiniAnchor((d) => addDays(d, 7))}
           onToday={() => setMiniAnchor(new Date())}
@@ -495,6 +525,21 @@ export default function CalendarWidget({ tasks: tasksCap, calendar }) {
         eventDrop={onEventChange}
         eventResize={onEventChange}
       />
+      {/* vevents loading/error overlays sit ON TOP of FullCalendar rather than
+          replacing it, so its mounted DOM/view state survives a fetch. A full
+          scrim only while there's nothing rendered yet (initial load, or an
+          error before any load has ever succeeded); once real data has shown
+          once, a failed refetch gets a small non-blocking reconnect strip and
+          the (stale) calendar underneath stays fully visible and usable. */}
+      {veventsState === 'loading' && (
+        <div className="cal-vevents-scrim" aria-hidden="true"><SkeletonRows n={4} /></div>
+      )}
+      {veventsState === 'error' && !hadVeventsRef.current && (
+        <div className="cal-vevents-scrim"><ErrorState onRetry={refetch} /></div>
+      )}
+      {veventsState === 'error' && hadVeventsRef.current && (
+        <div className="cal-vevents-reconnect"><ReconnectBanner onRetry={refetch} /></div>
+      )}
       {modal && (
         <EventModal
           key={modal.key}
