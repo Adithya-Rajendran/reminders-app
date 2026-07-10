@@ -33,6 +33,16 @@ env:
   # here if their Deployment names ever differ on the cluster.
   DEV_K8S_RADICALE_DEPLOYMENT: radicale
   DEV_K8S_WSGIDAV_DEPLOYMENT: wsgidav
+  # CalDAV account the "Provision dev fixture data" step connects through the
+  # app's real Add-account API (test/e2e/live-provision.mjs). Defaults mirror
+  # test/e2e/setup-backends.sh's convention (same credentials, same
+  # /<user>/tasks/ seeded collection) — the reminders-dev fixture's Radicale
+  # ConfigMap is built the same way. The password isn't a real secret (it's
+  # already committed in plaintext in setup-backends.sh, same as the local
+  # e2e harness) — override via repo vars if the fixture ever diverges.
+  DEV_CALDAV_URL: ${{ vars.DEV_CALDAV_URL || 'http://radicale.reminders-dev.svc:5232/' }}
+  DEV_CALDAV_USER: ${{ vars.DEV_CALDAV_USER || 'e2e' }}
+  DEV_CALDAV_PASS: ${{ vars.DEV_CALDAV_PASS || 'e2epw' }}
   # Chromium + system deps are preinstalled in the reminders-ci runner image
   # (see runner/Dockerfile) — never `playwright install` at job time.
   PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
@@ -107,6 +117,21 @@ jobs:
               exit 1
             fi
           done
+
+      # reminders-dev runs with CONFIG_DB_PATH=/tmp/config.db (ephemeral) so
+      # every scale-up above boots a brand-new app with no CalDAV account —
+      # without this, the audit's task/event/note seeding PUTs just hang or
+      # 4xx against an unconfigured app. Provisions entirely through the app's
+      # own HTTP API (same calls the Settings UI makes) — this runner's
+      # ServiceAccount has no pods/exec RBAC, so there's no way to reach the
+      # dev app's storage directly. Idempotent: safe on a retried step.
+      - name: Provision dev fixture data
+        working-directory: test/e2e
+        env:
+          # DEV_VISUAL_USER and the DEV_CALDAV_* credentials are already set
+          # job-wide above — only BASE_URL needs computing here.
+          BASE_URL: http://${{ env.DEV_K8S_DEPLOYMENT }}.${{ env.DEV_K8S_NAMESPACE }}.svc
+        run: node live-provision.mjs
 
       - name: Run live dev resize audit
         working-directory: test/e2e
