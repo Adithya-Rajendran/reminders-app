@@ -1422,7 +1422,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Themed prompt dialog (replaces window.prompt). */
 .prompt-overlay { align-items: center; justify-content: center; }
 .prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn 140ms ease; }
-.prompt-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.prompt-title { font-size: var(--fs-title); font-weight: 700; color: var(--text); }
 .prompt-label { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
 .prompt-input { width: 100%; font-size: var(--fs-body); padding: 8px 10px; margin-top: 12px; }
 .prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
