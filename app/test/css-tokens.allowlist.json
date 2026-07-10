@@ -1,0 +1,142 @@
+{
+  "host/CommandPalette.css": {
+    "border-radius": {
+      "5px": 2
+    },
+    "font-size": {
+      "9.5px": 1,
+      "11.5px": 1
+    }
+  },
+  "styles.css": {
+    "border-radius": {
+      "1px": 1,
+      "2px": 2,
+      "3px": 2,
+      "4px": 4,
+      "5px": 6,
+      "7px": 2,
+      "9px": 4,
+      "22px": 1
+    },
+    "font-size": {
+      "1.12em": 1,
+      "1.35em": 1,
+      "1.7em": 1,
+      "9.5px": 1,
+      "10.5px": 7,
+      "11.5px": 15,
+      "12.5px": 16,
+      "13.5px": 8,
+      "15px": 1,
+      "18px": 2
+    }
+  },
+  "widget-sdk/ui/TaskRow.css": {
+    "border-radius": {
+      "3px": 5,
+      "4px": 1,
+      "7px": 1
+    },
+    "font-size": {
+      "11.5px": 1
+    }
+  },
+  "widgets/CalendarWidget.css": {
+    "border-radius": {
+      "9px": 1
+    },
+    "font-size": {
+      "11.5px": 3,
+      "12.5px": 2
+    }
+  },
+  "widgets/CuesWidget.css": {
+    "font-size": {
+      "11.5px": 3,
+      "12.5px": 1
+    }
+  },
+  "widgets/DailyWidget.css": {
+    "border-radius": {
+      "7px": 1,
+      "9px": 1
+    },
+    "font-size": {
+      "11.5px": 1,
+      "12.5px": 2
+    }
+  },
+  "widgets/FocusWidget.css": {
+    "font-size": {
+      "11.5px": 1,
+      "12.5px": 1,
+      "15px": 1,
+      "17px": 1,
+      "26px": 1,
+      "32px": 1,
+      "40px": 1
+    }
+  },
+  "widgets/InboxWidget.css": {
+    "font-size": {
+      "10.5px": 1,
+      "11.5px": 1,
+      "12.5px": 1,
+      "15px": 1
+    }
+  },
+  "widgets/NotePinWidget.css": {
+    "font-size": {
+      "12.5px": 1,
+      "12.75px": 1
+    }
+  },
+  "widgets/NotesWidget.css": {
+    "border-radius": {
+      "5px": 2
+    },
+    "font-size": {
+      "10.5px": 2,
+      "12.5px": 1
+    }
+  },
+  "widgets/OverviewWidget.css": {
+    "font-size": {
+      "10.5px": 1,
+      "11.5px": 1,
+      "12.5px": 3,
+      "15px": 1,
+      "17px": 1,
+      "21px": 1,
+      "26px": 1
+    }
+  },
+  "widgets/ReviewWidget.css": {
+    "border-radius": {
+      "5px 5px 2px 2px": 1
+    },
+    "font-size": {
+      "9px": 1,
+      "10.5px": 4,
+      "11.5px": 2,
+      "12.5px": 2,
+      "38px": 1
+    }
+  },
+  "widgets/triage/TriageWidget.css": {
+    "border-radius": {
+      "8px": 1
+    },
+    "font-size": {
+      "10px": 1,
+      "10.5px": 2,
+      "11px": 2,
+      "11.5px": 1,
+      "12px": 2,
+      "12.5px": 1,
+      "14px": 1,
+      "17px": 1
+    }
+  }
+}
