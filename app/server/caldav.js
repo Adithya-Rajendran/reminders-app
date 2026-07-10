@@ -11,6 +11,7 @@ import { coalesce, cacheDecision } from './readcache.js'
 import {
   getAccount, listAccounts, insertAccount, deleteAccount, deleteAccountById,
   upsertList, pruneLists, listsForAccount, enabledListsForAccount, setListEnabled,
+  setAccountHomeUrl,
 } from './config.js'
 
 // ---- SSRF egress guard for outbound CalDAV requests ----
@@ -165,6 +166,57 @@ function calendarHome(calendars) {
   return u ? u.replace(/\/[^/]+\/?$/, '/') : null
 }
 
+// Resolve the calendar-home URL with fallbacks, so bootstrapping the FIRST
+// calendar on a principal with zero existing calendars is possible. Preferred
+// order:
+//   1. derived from an actually-discovered calendar (existing behavior,
+//      unaffected — always correct when there's at least one calendar to
+//      derive it from);
+//   2. freshHome — the calendar-home-set URL probeHomeUrl() just discovered
+//      for THIS discover() run, available even with zero calendars;
+//   3. storedHome — the account's home_url column, captured at a PRIOR
+//      successful discovery. This is the only option available to
+//      createGroupCalendar(), which has no live discovery of its own — it
+//      must work off what's already persisted.
+// Pure (no I/O) so it's unit-testable directly.
+export function resolveHome(calendars, freshHome, storedHome) {
+  return calendarHome(calendars) || freshHome || storedHome || null
+}
+
+// Pull the first <prop><href> value out of a multistatus body, namespace-prefix
+// agnostic (Radicale emits no prefix, Nextcloud emits d:/cal:). Exported for
+// unit tests (pure string parsing, no I/O).
+export function extractPropHref(xml, prop) {
+  const re = new RegExp('<(?:[a-z0-9-]+:)?' + prop + '[^>]*>\\s*<(?:[a-z0-9-]+:)?href[^>]*>([^<]+)</', 'i')
+  const m = re.exec(String(xml || ''))
+  return m ? m[1].trim() : null
+}
+
+// RFC 4791 §6.2.1 calendar-home discovery: current-user-principal on the server
+// root, then calendar-home-set on the principal. tsdav performs the exact same
+// two PROPFINDs inside createDAVClient(), but its factory keeps the resolved
+// account in a closure and never exposes it — so with zero calendars there is no
+// way to recover the home from the client object, and we re-derive it here with
+// our own SSRF-guarded safeFetch. Returns null on any failure (discovery then
+// simply behaves as before this probe existed).
+async function probeHomeUrl(acc) {
+  try {
+    const propfind = async (url, props) => {
+      const body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>' + props + '</d:prop></d:propfind>'
+      const r = await safeFetch(url, { method: 'PROPFIND', headers: { Authorization: authHeader(acc), Depth: '0', 'Content-Type': 'application/xml' }, body })
+      return (r.ok || r.status === 207) ? r.text() : null
+    }
+    const base = acc.server_url.replace(/\/+$/, '') + '/'
+    const principal = extractPropHref(await propfind(base, '<d:current-user-principal/>'), 'current-user-principal')
+    if (!principal) return null
+    const principalUrl = new URL(principal, base).href
+    const home = extractPropHref(await propfind(principalUrl, '<c:calendar-home-set/>'), 'calendar-home-set')
+    if (!home) return null
+    const homeUrl = new URL(home, principalUrl).href
+    return homeUrl.endsWith('/') ? homeUrl : homeUrl + '/'
+  } catch { return null }
+}
+
 // Create the app's dedicated VTODO "Reminders" calendar via MKCALENDAR — the
 // single default list reminders go to. Idempotent (405 = already exists).
 async function createRemindersCalendar(acc, home) {
@@ -188,7 +240,9 @@ const escapeXml = (s) => String(s).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>
 // list. Returns the new calendar URL. (MKCALENDAR; collision-safe slug.)
 export async function createGroupCalendar(acc, name) {
   const lists = await listsForAccount(acc.id)
-  const home = calendarHome(lists)
+  // No live client here (no re-discovery), so the only fallback available is
+  // the home_url captured at the account's last discover() — see resolveHome().
+  const home = resolveHome(lists, null, acc.home_url)
   if (!home) { const e = new Error('cannot locate the CalDAV calendar home'); e.status = 502; throw e }
   const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('g-' + crypto.randomUUID().slice(0, 8))
   const taken = new Set(lists.map((l) => baseOf(l.url)))
@@ -216,6 +270,14 @@ export async function deleteCalendar(acc, url) {
 // ---- discovery: list VTODO-capable calendars and persist them ----
 async function discover(acc) {
   const client = await clientFor(acc)
+  // Probe the principal's calendar-home-set (see probeHomeUrl) so an EMPTY
+  // principal (fresh Radicale/Baïkal, zero calendars) still has a home to
+  // bootstrap the "Reminders" calendar into below. Persist it so
+  // createGroupCalendar (which runs no discovery of its own) can fall back to
+  // it later, and refresh it on every re-discover in case a server migrates
+  // principals. Best-effort: a null probe changes nothing.
+  const freshHome = await probeHomeUrl(acc)
+  if (freshHome && freshHome !== acc.home_url) await setAccountHomeUrl(acc.id, freshHome)
   const calendars = await client.fetchCalendars()
   const vtodo = calendars.filter((c) => {
     const comps = (c.components || []).map((x) => String(x).toUpperCase())
@@ -236,9 +298,12 @@ async function discover(acc) {
     await upsertList(acc.id, { url: c.url, displayName: name, color, supportsVtodo })
   }
   await pruneLists(acc.id, vtodo.map((c) => c.url)) // drop lists that no longer exist
-  // Ensure the app's single default "Reminders" (VTODO) calendar exists.
+  // Ensure the app's single default "Reminders" (VTODO) calendar exists. On an
+  // empty principal (vtodo is []) calendarHome(calendars) has nothing to derive
+  // from — resolveHome falls back to freshHome (this login's own discovery) so
+  // the very first calendar can still be created.
   if (!remindersExists) {
-    const home = calendarHome(calendars)
+    const home = resolveHome(calendars, freshHome, acc.home_url)
     if (home) {
       const url = await createRemindersCalendar(acc, home)
       if (url) await upsertList(acc.id, { url, displayName: 'Reminders', color: '', supportsVtodo: true })
