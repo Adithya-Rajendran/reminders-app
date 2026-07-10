@@ -895,6 +895,14 @@ body {
 .state.error .state-ic { color: var(--danger); background: var(--danger-soft); }
 .state.error .state-title { color: var(--danger); }
 
+/* Shared inline empty-state text row (small/muted/centered) — used by list-ish
+   panels that need one line of "nothing here" copy without the full icon+title+sub
+   .state treatment above. .start left-aligns for panels whose rows are left-aligned
+   (menus/pickers); .faint drops to --faint for panels that already skew quieter. */
+.inline-empty { font-size: var(--fs-meta); color: var(--muted); padding: var(--sp-4); text-align: center; }
+.inline-empty.start { text-align: left; }
+.inline-empty.faint { color: var(--faint); }
+
 .skel-task { display: flex; align-items: center; gap: 10px; padding: 9px 10px; }
 .skel-line { height: 10px; }
 
@@ -1296,7 +1304,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .trash-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .trash-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: var(--fs-body); }
 .trash-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 4px; }
-.trash-empty { color: var(--muted); font-size: var(--fs-ctrl); text-align: center; padding: 24px; }
+.trash-empty { font-size: var(--fs-ctrl); padding: 24px; }
 .trash-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-btn); }
 .trash-row:hover { background: var(--accent-soft); }
 .trash-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -1314,7 +1322,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-row-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note-row-folder { font-size: var(--fs-2xs); color: var(--muted); display: inline-flex; align-items: center; gap: 3px; }
 .note-row-date { font-size: var(--fs-2xs); color: var(--muted); flex: none; }
-.note-empty-q { color: var(--muted); font-size: var(--fs-meta); padding: 12px; text-align: center; }
+.note-empty-q { padding: 12px; }
 
 /* Full-text "Found in contents" results under the sidebar search */
 .note-search-head { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 10px 8px 4px; }
@@ -1382,7 +1390,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .gp-new { color: var(--accent); font-weight: 600; }
 .gp-sec { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 6px 9px 2px; }
 .gp-sep { height: 1px; background: var(--line); margin: 5px 4px; }
-.gp-empty { font-size: var(--fs-meta); color: var(--muted); padding: 8px 9px; }
+.gp-empty { padding: 8px 9px; }
 
 .note-overlay { align-items: stretch; }
 .note-editor { width: min(900px, 94vw); height: min(88vh, 940px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); animation: modalIn 160ms ease; }
@@ -1397,7 +1405,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-outline-head > span { flex: 1; }
 .note-outline-x { background: none; border: none; color: var(--faint); cursor: pointer; display: inline-flex; padding: 2px; border-radius: 5px; }
 .note-outline-x:hover { color: var(--text); background: var(--accent-soft); }
-.note-outline-empty { font-size: var(--fs-meta); color: var(--muted); padding: 6px 8px; }
+.note-outline-empty { padding: 6px 8px; }
 .note-outline-list { display: flex; flex-direction: column; gap: 1px; }
 .note-outline-item { text-align: left; background: none; border: none; color: var(--muted); font-size: 12.5px; padding: 4px 8px; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .note-outline-item:hover { color: var(--text); background: var(--accent-soft); }
@@ -1440,7 +1448,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .cmdk-input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; color: var(--text); font: inherit; font-size: var(--fs-title); }
 .cmdk-input::placeholder { color: var(--faint); }
 .cmdk-list { max-height: min(52vh, 440px); overflow-y: auto; padding: 6px; }
-.cmdk-empty { padding: 24px 16px; text-align: center; color: var(--muted); font-size: var(--fs-ctrl); display: flex; gap: 8px; align-items: center; justify-content: center; }
+.cmdk-empty { padding: 24px 16px; font-size: var(--fs-ctrl); display: flex; gap: 8px; align-items: center; justify-content: center; }
 .cmdk-row { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; font: inherit; padding: 9px 11px; border: none; background: transparent; border-radius: var(--r-btn); color: var(--text); cursor: pointer; transition: background 90ms ease; }
 .cmdk-row.sel { background: var(--accent-soft); }
 .cmdk-row-ic { color: var(--muted); display: inline-flex; flex: none; }

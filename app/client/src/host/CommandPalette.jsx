@@ -199,7 +199,7 @@ export default function CommandPalette({ initialMode = 'search', commands = [], 
         </div>
         <div className="cmdk-list" id="cmdk-listbox" ref={listRef} role="listbox">
           {results.length === 0 ? (
-            <div className="cmdk-empty">
+            <div className="inline-empty cmdk-empty">
               {loadingNotes && !term ? <><IconSpinner size={18} /> Loading…</> : cmdMode ? 'No matching command.' : 'No matches — try a task title, note, or command.'}
             </div>
           ) : results.map((r, i) => {

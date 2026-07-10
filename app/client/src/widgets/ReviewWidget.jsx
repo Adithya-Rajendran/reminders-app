@@ -85,8 +85,8 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
         </div>
         <div className="rv-flow-sub">{s.sub}</div>
         <div className="rv-flow-body">
-          {step === 0 && (overdue.length ? <div className="task-stream">{overdue.map(rowFor)}</div> : <div className="rv-flow-empty">Nothing overdue — clear. ✓</div>)}
-          {step === 1 && (stalled.length ? <div className="task-stream">{stalled.map(rowFor)}</div> : <div className="rv-flow-empty">No stalled tasks — every open item has a next step. ✓</div>)}
+          {step === 0 && (overdue.length ? <div className="task-stream">{overdue.map(rowFor)}</div> : <div className="inline-empty rv-flow-empty">Nothing overdue — clear. ✓</div>)}
+          {step === 1 && (stalled.length ? <div className="task-stream">{stalled.map(rowFor)}</div> : <div className="inline-empty rv-flow-empty">No stalled tasks — every open item has a next step. ✓</div>)}
           {step === 2 && (
             <>
               {/* Continuity beat: reflection lands better against last week's note

@@ -113,9 +113,9 @@ function MiniAgenda({ rangeStart, rangeEnd, items, loading, error, onRetry, onPr
         <div className="cal-mini-reconnect"><ReconnectBanner onRetry={onRetry} /></div>
       )}
       <div className="cal-mini-list">
-        {loading && <div className="cal-mini-empty"><IconSpinner size={16} /> Loading calendar…</div>}
+        {loading && <div className="inline-empty cal-mini-empty"><IconSpinner size={16} /> Loading calendar…</div>}
         {!loading && nothingToShow && <ErrorState onRetry={onRetry} />}
-        {!loading && !nothingToShow && days.length === 0 && <div className="cal-mini-empty">Nothing scheduled this week.</div>}
+        {!loading && !nothingToShow && days.length === 0 && <div className="inline-empty cal-mini-empty">Nothing scheduled this week.</div>}
         {!loading && !nothingToShow && days.map(({ day, items: dayItems }) => (
           <section className="cal-mini-day" key={day.toISOString()}>
             <div className="cal-mini-day-head">

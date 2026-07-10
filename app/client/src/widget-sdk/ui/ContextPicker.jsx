@@ -57,8 +57,8 @@ function ContextPanel({ value, options, onToggle, onCreate }) {
             </button>
           )
         })}
-        {query && !matches.length && <div className="gp-empty">No matching context</div>}
-        {!query && !options.length && <div className="gp-empty">No contexts yet — type to add one</div>}
+        {query && !matches.length && <div className="inline-empty start gp-empty">No matching context</div>}
+        {!query && !options.length && <div className="inline-empty start gp-empty">No contexts yet — type to add one</div>}
         {query && !exists && onCreate && (
           <>
             <div className="gp-sep" />

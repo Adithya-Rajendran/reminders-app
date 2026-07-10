@@ -140,7 +140,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
             </span>
           </div>
           {chosen.length === 0
-            ? <div className="daily-empty">Pick 1–3 things to focus on today from the suggestions below.</div>
+            ? <div className="inline-empty start daily-empty">Pick 1–3 things to focus on today from the suggestions below.</div>
             : <div className="task-stream">{chosen.map((t) => (
               <div key={t.id} className="daily-row">
                 <div className="daily-row-main">{taskRow(t)}</div>
@@ -150,7 +150,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
 
           {!short && <div className="group-head daily-secline"><span className="g-title">Suggestions</span><span className="g-count">{suggestions.length}</span></div>}
           {suggestions.length === 0
-            ? <div className="daily-empty">Nothing overdue or unscheduled — you’re on top of it.</div>
+            ? <div className="inline-empty start daily-empty">Nothing overdue or unscheduled — you’re on top of it.</div>
             : short
               ? <div className="daily-suggest-compact">{suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'} ready when you expand.</div>
               : <div className="daily-suggest">{visibleSuggestions.map((t) => {
@@ -172,7 +172,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
 
           <div className="group-head daily-secline"><span className="g-title">Carry over</span><span className="g-count">{chosen.length}</span></div>
           {chosen.length === 0
-            ? <div className="daily-empty">Today’s focus is all done — close the day. 🌙</div>
+            ? <div className="inline-empty start daily-empty">Today’s focus is all done — close the day. 🌙</div>
             : <div className="task-stream">{chosen.map((t) => (
               <div key={t.id} className="daily-row">
                 <div className="daily-row-main">{taskRow(t)}</div>

@@ -53,7 +53,7 @@
 .notes-split .notes-main { padding-left: 12px; }
 /* On a very wide widget, give the tree more room so deep paths don't truncate. */
 .notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
-.notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
+.notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; font-size: inherit; }
 .notes-main-empty .state-ic { margin-bottom: 4px; }
 .notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
 .notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: var(--fs-ctrl); cursor: pointer; padding: 2px 4px 8px; }

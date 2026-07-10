@@ -52,7 +52,7 @@ export default function TrashView({ onClose, onChanged, onRestored }) {
             <button className="undo-btn" style={{ marginLeft: 8 }} onClick={load}><IconRefresh size={12} /> Retry</button>
           </div>
         ) : items === null ? <div className="note-loading"><IconSpinner size={20} /></div>
-          : items.length === 0 ? <div className="trash-empty">Trash is empty.</div>
+          : items.length === 0 ? <div className="inline-empty trash-empty">Trash is empty.</div>
             : items.map((t) => (
               <div key={t.path} className="trash-row">
                 <div className="trash-row-main">
