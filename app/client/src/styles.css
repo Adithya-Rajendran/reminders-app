@@ -1024,7 +1024,7 @@ body {
   color: var(--on-accent);
   box-shadow: 0 12px 30px -10px var(--accent), inset 0 1px 0 rgba(255,255,255,0.3);
 }
-.login-card h1 { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.login-card h1 { font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
 .login-card p.lede { font-size: var(--fs-body); color: var(--muted); margin: 0 0 26px; }
 .login-foot { margin-top: 22px; font-size: var(--fs-meta); color: var(--faint); line-height: 1.5; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .sso-detail { margin-top: 14px; font-size: var(--fs-meta); color: var(--faint); display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -1151,7 +1151,7 @@ body {
 
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-popover);
-  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-menu);
   box-shadow: var(--shadow); padding: 5px; min-width: 150px; animation: menuIn 120ms ease;
 }
 .mini-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; font-size: var(--fs-ctrl); color: var(--text); padding: 7px 9px; border: 0; background: transparent; border-radius: var(--r-chip); cursor: pointer; }
@@ -1422,7 +1422,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Themed prompt dialog (replaces window.prompt). */
 .prompt-overlay { align-items: center; justify-content: center; }
 .prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn 140ms ease; }
-.prompt-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.prompt-title { font-size: var(--fs-title); font-weight: 700; color: var(--text); }
 .prompt-label { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
 .prompt-input { width: 100%; font-size: var(--fs-body); padding: 8px 10px; margin-top: 12px; }
 .prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }

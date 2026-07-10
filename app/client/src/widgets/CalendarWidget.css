@@ -34,7 +34,7 @@
 
 /* Toolbar */
 .cal-wrap .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
-.cal-wrap .fc .fc-toolbar-title { font-size: 15px; font-weight: 650; color: var(--text); }
+.cal-wrap .fc .fc-toolbar-title { font-size: var(--fs-title); font-weight: 650; color: var(--text); }
 
 /* Toolbar buttons */
 .cal-wrap .fc .fc-button {
