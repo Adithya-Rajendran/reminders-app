@@ -555,9 +555,9 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
               )
               : (
                 <div className="notes-main-empty">
-                  <div className="state-ic"><IconNote size={24} /></div>
-                  <div className="state-title">Select a note</div>
-                  <div className="state-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>
+                  <div className="notes-empty-ic"><IconNote size={22} /></div>
+                  <div className="notes-empty-title">Select a note</div>
+                  <div className="notes-empty-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>
                   <button className="btn primary sm" style={{ marginTop: 10 }} onClick={newNote}><IconPlus size={14} /> New note</button>
                 </div>
               )}
