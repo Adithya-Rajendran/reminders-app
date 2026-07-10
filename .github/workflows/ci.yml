@@ -141,3 +141,22 @@ jobs:
             test/e2e/.artifacts
             test/e2e/.state/*.log
           retention-days: 7
+
+  helm:
+    # Lint + render the packaged install (charts/reminders-app) in its main
+    # value shapes. helm is preinstalled on ubuntu-latest runners; renders go
+    # to /dev/null — this job only proves the chart lints and templates.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Helm lint
+        run: helm lint charts/reminders-app
+      - name: Template (defaults)
+        run: helm template reminders-app charts/reminders-app > /dev/null
+      - name: Template (valkey disabled)
+        run: helm template reminders-app charts/reminders-app --set valkey.enabled=false > /dev/null
+      - name: Template (route enabled)
+        run: >-
+          helm template reminders-app charts/reminders-app
+          --set route.enabled=true --set route.hostname=tasks.example.com > /dev/null
