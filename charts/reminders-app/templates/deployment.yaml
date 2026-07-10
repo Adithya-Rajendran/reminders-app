@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "reminders-app.fullname" . }}
+  labels:
+    {{- include "reminders-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  # 0 replicas is a supported steady state ("paused" — CD skips rollouts on
+  # a 0-scaled Deployment; see k8s/README.md). Never run more than 1: the
+  # SQLite volume is RWO and exactly one process may open the file.
+  replicas: {{ .Values.replicas }}
+  # The RWO volume can't be multi-attached, so a rolling update would
+  # deadlock — recreate the pod instead (brief downtime on deploy is fine).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "reminders-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "reminders-app.labels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: app
+          image: {{ include "reminders-app.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: production
+            # Tasks/reminders live in the user's CalDAV server; only config +
+            # dashboard layout (+ sessions) live in this SQLite file.
+            - name: CONFIG_DB_PATH
+              value: /data/config.db
+            {{- if .Values.valkey.enabled }}
+            # Read cache survives pod restarts (see valkey.* in values.yaml).
+            - name: VALKEY_URL
+              value: {{ include "reminders-app.valkey.url" . | quote }}
+            {{- end }}
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+          envFrom:
+            # The secret contract: SESSION_SECRET etc. live in this
+            # pre-existing Secret (default name "reminders-app-env").
+            - secretRef:
+                name: {{ .Values.existingSecret | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "reminders-app.pvcName" . }}
