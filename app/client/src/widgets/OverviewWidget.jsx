@@ -173,21 +173,21 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
           {!short && (
             <div className="ov-metrics">
               <div className={`ov-metric${overdue.length > 0 ? ' warn' : ''}`}>
-                <span className="ov-metric-num">{overdue.length}</span>
-                <span className="ov-metric-lbl">Overdue</span>
+                <span className="wg-stat">{overdue.length}</span>
+                <span className="wg-eyebrow">Overdue</span>
               </div>
               <div className="ov-metric">
-                <span className="ov-metric-num">{dueToday.length}</span>
-                <span className="ov-metric-lbl">Due today</span>
+                <span className="wg-stat">{dueToday.length}</span>
+                <span className="wg-eyebrow">Due today</span>
               </div>
             </div>
           )}
 
           {/* (3) today's most important, with a real complete checkbox */}
           <div className="ov-focus">
-            <div className="ov-sec-label"><IconTarget size={12} /> Most important</div>
+            <div className="wg-eyebrow"><IconTarget size={12} /> Most important</div>
             {mostImportant ? (
-              <div className="ov-focus-row">
+              <div className="wg-card wg-card--accent wg-card--row ov-focus-row">
                 <button
                   type="button"
                   className="ov-check"
@@ -210,15 +210,15 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
               honestly reflects both meetings and remaining work. */}
           {!short && (
           <div className={`ov-event${compact ? ' compact' : ''}`}>
-            <div className="ov-sec-label"><IconCalendar size={12} /> Next up</div>
+            <div className="wg-eyebrow"><IconCalendar size={12} /> Next up</div>
             {nextEvent && roomy && (
-              <div className="ov-event-row">
+              <div className="wg-card wg-card--row ov-event-row">
                 <span className="ov-event-time">{eventTime(nextEvent.start, nextEvent.allDay)}</span>
                 <span className="ov-event-title">{nextEvent.title || '(untitled event)'}</span>
               </div>
             )}
             {nextTask && (
-              <div className="ov-event-row ov-event-task">
+              <div className="wg-card wg-card--row ov-event-row ov-event-task">
                 <span className="ov-event-time">{dueChip(nextTask.due_date)?.label || ''}{timeLabel(nextTask.due_date) ? ' ' + timeLabel(nextTask.due_date) : ''}</span>
                 <span className="ov-event-title"><IconCheck size={11} className="ov-task-ic" /> {nextTask.title}</span>
               </div>

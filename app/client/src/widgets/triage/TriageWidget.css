@@ -6,8 +6,14 @@
 .triage.short { gap: 7px; padding: 8px 9px; }
 
 /* ---- "Most important" callout (the one task to do now) ---- */
-.tri-focus { position: relative; flex: 0 0 auto; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
-.tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+/* wg-card (accent variant) supplies the surface; .tri-focus overrides the
+   layout to a row (icon + body) instead of wg-card's default column, and
+   its padding. Radius now comes from wg-card's --r-btn (was a bespoke
+   --r-card/18px) — the fidelity pass's documented rule (see FocusWidget.css)
+   is that every inset callout steps down to --r-btn, so this was the one
+   holdout; the tighter corner is an intentional fix, not a fresh design. */
+.triage .tri-focus { flex: 0 0 auto; display: flex; gap: 12px; align-items: flex-start; padding: 14px; }
+.tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; }
 /* The complete button is a real button (not a bare circle) so it's keyboard- and
    screen-reader-reachable; the check icon only shows the affordance on hover. */
 .tri-focus-check { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 14px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: transparent; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
@@ -59,12 +65,9 @@
 /* Drop-target feedback while a task is dragged over a quadrant. */
 .eq.drop-over { background: var(--accent-soft); border-color: var(--accent); }
 .eq-head { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; min-width: 0; gap: 8px; }
-/* Small-caps eyebrow, matching the app-wide group-header treatment (see
-   --tracking-eyebrow / .group-head .g-title in styles.css) instead of a
-   one-off bold sentence-case label — the colored --tri-qN border above now
-   carries the primary identity signal, so the title can sit quiet. */
-.eq-label { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
-.eq-count { font-size: 11px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
+/* .eq-label (wg-eyebrow) / .eq-count (wg-count) carry the look now — the
+   colored --tri-qN border above carries the primary identity signal, so the
+   title can sit quiet, same as before the primitives consolidation. */
 .eq-sub { flex: 0 0 auto; font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
 .eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
 /* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift
@@ -79,7 +82,8 @@
 .eq-list .check-btn { width: 15px; height: 15px; margin-top: 0; }
 .eq-list .check-btn.on::after { left: 4px; top: 1px; width: 3.5px; height: 8px; }
 .eq-list .task .chip { font-size: 10px; padding: 0 5px; }
-.eq-more { font-size: 11px; color: var(--faint); padding: 2px 4px; }
+/* wg-footnote carries the look; .eq-more keeps only its padding. */
+.eq-more { padding: 2px 4px; }
 .eq-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11.5px; color: var(--faint); }
 
 /* Keep the undo bar readable at the bottom of a long board. The base .undo-bar

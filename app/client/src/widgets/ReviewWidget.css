@@ -11,11 +11,11 @@
    point before the CTA. */
 .rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .rv-stat { display: flex; flex-direction: column; line-height: 1.05; }
-/* Deliberately SANS + tabular, not serif: this is an instrument reading (like
-   .focus-clock 40px/800 and .ov-metric-num 26px/800), and the big-number gauges
-   must read as one family across widgets. Serif is reserved for headings/prose
-   ("written in"); measured figures stay on the dial face. */
-.rv-big { font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+/* wg-stat (--lg modifier) carries the look — deliberately SANS + tabular, not
+   serif: this is an instrument reading (like .focus-clock/.ov-metric-num, the
+   rest of the wg-stat family), and every big-number gauge in the app reads as
+   one family. Serif is reserved for headings/prose ("written in"); measured
+   figures stay on the dial face. */
 .rv-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 /* A real delta is a measured reading — give it the same chip chrome every other
    gauge value in the app gets (see .chip). rv-note (below) opts back out for the
@@ -69,7 +69,11 @@
    taller tiers/more content: margin-top: auto only absorbs POSITIVE free space,
    so it's a no-op once the footer already has neighbors filling the column. */
 .rv-footer { margin-top: auto; display: flex; flex-direction: column; gap: 14px; }
-.rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
+/* wg-card (accent, row) carries the surface; only the padding differs
+   slightly from the primitive's default (11px 13px vs 13px 14px) — kept
+   local rather than forced onto the shared class since it's this card's
+   only genuine one-off. */
+.rv-prompt { padding: 11px 13px; }
 .rv-prompt-body { flex: 1; min-width: 0; }
 /* Serif: a card headline (like .h-title/.h-modal/.fc-toolbar-title), not a
    control label — the "written in, not operated" thesis applies here too. */
@@ -81,13 +85,15 @@
    clamped two-line look is unchanged; a hover wash signals it's clickable. */
 .rv-last-reflect { font-size: 11.5px; font-family: inherit; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: transparent; border: 0; padding: 3px 5px; margin: -3px -5px; border-radius: var(--r-chip); cursor: pointer; text-align: left; }
 .rv-last-reflect:hover { background: var(--panel2); }
-.rv-last-label { font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); font-size: var(--fs-micro); color: var(--muted); margin-right: 4px; }
+/* wg-eyebrow carries the look for both labels below (10.5px/--fs-micro ->
+   the standard --fs-2xs/11px eyebrow size — an imperceptible delta). */
+.rv-last-label { margin-right: 4px; }
 .rv-hist-wrap { display: block; position: relative; }
 /* History opens UPWARD (the row sits at the widget's bottom edge) and scrolls. */
 .rv-hist-menu { top: auto; bottom: calc(100% + 6px); left: 0; right: 0; max-height: 220px; overflow-y: auto; cursor: default; }
 .rv-hist-item { padding: 6px 8px; }
 .rv-hist-item + .rv-hist-item { border-top: 1px solid var(--line); }
-.rv-hist-date { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); font-variant-numeric: tabular-nums; }
+.rv-hist-date { font-variant-numeric: tabular-nums; }
 .rv-hist-text { font-size: var(--fs-meta); color: var(--muted); line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word; }
 
 /* Compact review entry for heights below the md tier (the default size!), where
@@ -104,7 +110,7 @@
 /* Ruled off from the body like .rv-top on the stats face — the step header is
    this face's headline row and gets the same ledger-line treatment. */
 .rv-flow-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.rv-flow-step { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--accent); font-variant-numeric: tabular-nums; }
+/* wg-eyebrow (accent variant) carries the look now. */
 /* Serif at title weight — "Get clear / current / creative" are the planner's
    page headings (same role as .h-title / the widget title), not control text. */
 .rv-flow-title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -.01em; color: var(--text); font-family: var(--font-serif); }

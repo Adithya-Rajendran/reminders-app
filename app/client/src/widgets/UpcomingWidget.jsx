@@ -138,7 +138,7 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, organizer, i
           ? (
             <>
               {rows(flatItems)}
-              {moreCount > 0 && <div className="up-more">+{moreCount} more</div>}
+              {moreCount > 0 && <div className="wg-footnote up-more">+{moreCount} more</div>}
             </>
           )
           : UPCOMING_ORDER.filter((k) => groups[k]).map((k) => {

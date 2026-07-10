@@ -87,6 +87,14 @@
   --fs-lg: 18px;
   --fs-modal: 20px;
   --fs-display: 22px;
+  /* Big instrument-reading numerals (widget-sdk/ui/primitives.css's
+     .wg-stat family — was .ov-metric-num/.rv-big/.focus-clock before the
+     primitives consolidation). Sit above --fs-display: these are dial-face
+     figures, not headings, and none of the heading sizes matched what the
+     fidelity pass had already converged the widgets on. */
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
 
   /* Font stacks. Display roles (widget titles, modal titles, the masthead)
      switch to the system serif for the "written in, not operated" thesis;
