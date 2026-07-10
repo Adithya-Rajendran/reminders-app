@@ -154,7 +154,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
 
       {(state === 'ready' || (state === 'error' && hasData)) && (
         nowTask ? (
-          <div className="focus-now">
+          <div className="wg-card wg-card--accent focus-now">
             {/* In-flow full-width row (grid row 1 in the CSS) — this used to be
                 absolutely positioned top-right of the card, which floated it
                 directly on top of the title text at every widget size instead
@@ -163,7 +163,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
                 header, and the plan context moves into the meta row below —
                 the ~27px it costs is what made the default 7x8 size overflow. */}
             {!compact && (
-              <div className="focus-eyebrow">
+              <div className="wg-eyebrow wg-eyebrow--accent focus-eyebrow">
                 <IconTarget size={14} /> Focus on
                 {nowIsFromPlan && (
                   <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
@@ -193,7 +193,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
       {beat && <div className="focus-beat">{beat}</div>}
 
       <div className={`focus-timer${running ? ' running' : ''}${done ? ' done' : ''}`}>
-        <div className="focus-clock" aria-live="off">{done ? 'Done ✓' : fmtClock(remaining)}</div>
+        <div className="wg-stat wg-stat--xl focus-clock" aria-live="off">{done ? 'Done ✓' : fmtClock(remaining)}</div>
         {/* The ticking clock stays aria-live="off"; completion is announced once via
             this separate polite region (empty until done, so SRs read it on change). */}
         <span className="sr-only" role="status" aria-live="polite">{done ? 'Focus session complete' : ''}</span>
@@ -237,7 +237,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
             <ul className="focus-endpark-list">
               {shown.map((e, i) => <li key={i}>{e?.data?.event?.data?.task?.title || 'Reminder'}</li>)}
             </ul>
-            {all.length > shown.length && <div className="focus-endpark-more">+{all.length - shown.length} more in the Reminders widget</div>}
+            {all.length > shown.length && <div className="wg-footnote focus-endpark-more">+{all.length - shown.length} more in the Reminders widget</div>}
           </div>
         )
       })()}

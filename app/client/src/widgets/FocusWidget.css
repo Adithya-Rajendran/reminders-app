@@ -20,14 +20,18 @@
 /* Two-row grid: the eyebrow spans the full width, then check + body share
    row 2 — the check circle stays locked to the title line no matter how the
    eyebrow wraps at narrow sizes (a fixed top-margin can't survive that wrap).
-   Radius steps down from the outer .widget's --r-card to --r-btn so this reads
-   as a card ON the paper, not a second widget shell — the same layering rule
-   as every other widget's inset callout (.ov-focus-row, .rv-prompt, .ib-card). */
-.focus-now { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: start; min-width: 0; overflow: hidden; padding: 14px 16px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
+   wg-card (accent variant) supplies the inset-callout surface — the same
+   layering rule (--r-btn ON the paper, not a second widget shell) every other
+   widget's callout follows; the rules here re-shape it into the grid.
+   `gap: 0 12px` (not just column-gap): wg-card's own gap would otherwise
+   introduce a row-gap between the eyebrow row and the title row that the
+   containment fix's budget (eyebrow margin-bottom 7px) never had. */
+.focus-now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 12px; align-items: start; min-width: 0; overflow: hidden; padding: 14px 16px; }
 /* In-flow row (grid row 1) — was absolutely positioned top-right, which
    floated it directly over the title text below at every widget size instead
-   of reserving its own space. */
-.focus-eyebrow { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; font-size: var(--fs-2xs); font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+   of reserving its own space. Type/color comes from wg-eyebrow (accent
+   variant); this keeps the grid placement + wrap behavior. */
+.focus-eyebrow { grid-column: 1 / -1; flex-wrap: wrap; margin-bottom: 7px; }
 .focus-eyebrow .chip { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; }
 .focus-check:hover { background: color-mix(in oklab, var(--accent) 22%, transparent); }
@@ -51,14 +55,12 @@
 
 .focus-timer { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-btn); }
 .focus-timer.running { border-color: color-mix(in oklab, var(--accent) 45%, transparent); }
-/* Deliberately NOT --font-serif: the app's rule is display roles (titles) get
-   the "written in" serif, body/controls stay sans (see styles.css's font-stack
-   comment). This clock is a live instrument reading, not a heading — it keeps
-   the inherited sans stack + tabular-nums so digits don't jitter as they tick,
-   which a countdown needs more than the paper conceit does. */
-/* line-height 1.05, every tier: the inherited body 1.5 padded ~20px of dead
-   air around the digits — height the standard/min grid sizes don't have. */
-.focus-clock { font-size: 40px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--text); }
+/* wg-stat--xl carries the dial-face look (sans + tabular, never serif — this
+   is a live instrument reading; see the wg-stat comment in primitives.css).
+   line-height 1.05 stays a local override of wg-stat's 1: the containment fix
+   sized the timer card's height budget against 1.05 exactly — the digits keep
+   a hair of breathing room without re-inflating toward the inherited 1.5. */
+.focus-clock { line-height: 1.05; }
 .focus-timer.done .focus-clock { color: var(--green); }
 .focus-dur { display: inline-flex; align-items: center; gap: 8px; }
 .focus-dur-val { font-size: var(--fs-ctrl); font-weight: 700; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -88,7 +90,7 @@
 .focus-endpark-urgent { color: var(--warn); }
 .focus-endpark-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .focus-endpark-list li { font-size: var(--fs-meta); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.focus-endpark-more { font-size: var(--fs-2xs); color: var(--faint); }
+/* .focus-endpark-more's look now comes from wg-footnote. */
 
 .focus-parked { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: var(--fs-meta); color: var(--muted); }
 .focus-breakthrough { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-size: var(--fs-meta); font-weight: 600; color: var(--warn); }
