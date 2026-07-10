@@ -271,7 +271,7 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
           right — instead of each floating on its own row between the quick-add
           and the first group (two loose rows of dead vertical rhythm). */}
       {(showHint || showSort) && (
-        <div className="rem-toolrow">
+        <div className="wg-toolrow rem-toolrow">
           {showHint && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
           {showSort && (
             <button type="button" className="chip rem-sort" onClick={cycleSort} title="Change sort order">
