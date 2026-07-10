@@ -24,11 +24,10 @@
 .qw-filter.on:hover { border-color: color-mix(in oklab, var(--warn) 55%, transparent); }
 
 /* Compact mode's "+N more" footer — a quiet footnote below the preview rows.
-   Tokenized to match the sibling "+N more" affordances (InboxWidget's
-   .ib-upnext-more, FocusWidget's .focus-endpark-more: var(--faint) + a small
-   eyebrow-scale font), replacing an inline style that used --muted (too
-   prominent — it read almost as loud as a real row) and a raw 13px size. */
-.up-more { padding: var(--sp-3) var(--sp-5); color: var(--faint); font-size: var(--fs-2xs); }
+   wg-footnote carries the look now (the shared version of the treatment
+   this rule was itself standardized from — see widget-sdk/ui/primitives.css);
+   this keeps only the local padding. */
+.up-more { padding: var(--sp-3) var(--sp-5); }
 
 /* Empty states. The wrappers must grow (flex: 1) so the shared .state inside
    keeps filling the body and centering vertically — as plain divs they'd
