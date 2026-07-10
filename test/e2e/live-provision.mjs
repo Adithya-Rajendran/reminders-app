@@ -109,6 +109,33 @@ async function waitHealthy() {
 // it created last time instead of creating a duplicate.
 const normalizeGeneric = (u) => String(u || '').trim().replace(/\/+$/, '')
 
+// ---- 0) Bootstrap: MKCALENDAR one VTODO collection directly against
+//         Radicale (basic auth), mirroring setup-backends.sh. The app cannot
+//         create the FIRST calendar on an empty principal (calendarHome()
+//         derives the home from existing calendars — see caldav.js; product
+//         gap tracked separately), so the fixture must be seeded before the
+//         account is added. Idempotent: an existing collection answers 405.
+async function seedFixtureCalendar() {
+  const url = normalizeGeneric(CALDAV_URL) + '/' + encodeURIComponent(CALDAV_USER) + '/tasks/'
+  const body = '<?xml version="1.0" encoding="utf-8"?>'
+    + '<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop>'
+    + '<D:displayname>tasks</D:displayname>'
+    + '<C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set>'
+    + '</D:prop></D:set></C:mkcalendar>'
+  const r = await fetch(url, {
+    method: 'MKCALENDAR',
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(`${CALDAV_USER}:${CALDAV_PASS}`).toString('base64'),
+      'Content-Type': 'application/xml; charset=utf-8',
+    },
+    body,
+    signal: AbortSignal.timeout(10000),
+  })
+  if (r.status === 201) { console.log(`seeded fixture calendar ${url}`); return }
+  if (r.status === 405 || r.status === 409) { console.log(`fixture calendar already present (${r.status}) ${url}`); return }
+  throw new Error(`MKCALENDAR ${url} -> ${r.status}: ${await r.text()}`)
+}
+
 // ---- 1) CalDAV account: reuse if one already matches, else add it through
 //         the real "Add account" flow (POST -> discover -> lists). ----
 async function ensureCaldavAccount() {
@@ -189,6 +216,7 @@ async function logTaskProject() {
 async function main() {
   console.log(`provisioning ${BASE} as ${USER}`)
   await waitHealthy()
+await seedFixtureCalendar()
   const { id: accountId, lists } = await ensureCaldavAccount()
   await enableAllLists(accountId, lists)
   await logTaskProject()
