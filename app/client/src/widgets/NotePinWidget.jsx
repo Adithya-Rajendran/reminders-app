@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   usePopover, widgetStore, announce, SkeletonRows, EmptyState, ErrorState,
   useWidgetSize, atMostW, atMostH,
@@ -60,6 +60,32 @@ export default function NotePinWidget({ notes, instanceId }) {
 
   const choose = (p) => { setPinned(p); store.saveJson(PATH_KEY, p); setPickOpen(false) }
 
+  // The pinned note is a fixed-height index card, not an editor — long notes get
+  // cut off at the fold. overflow-y:auto lets a mouse/keyboard/touch user scroll
+  // to see the rest, but nothing else hints that; a headless/overlay scrollbar
+  // (or one that's just visually subtle against the paper surface) leaves the cut
+  // reading as a hard clip mid-sentence instead of an intentional "there's more".
+  // Track whether the scrolled-to position still has content below the fold so
+  // the CSS can fade the last lines into the paper instead (see .notepin-fade).
+  const bodyRef = useRef(null)
+  const [moreBelow, setMoreBelow] = useState(false)
+  const checkOverflow = useCallback(() => {
+    const el = bodyRef.current
+    setMoreBelow(!!el && el.scrollHeight - el.clientHeight - el.scrollTop > 1)
+  }, [])
+  const hasBody = state === 'ready' && !!note?.body?.trim()
+  useEffect(() => {
+    if (!hasBody) { setMoreBelow(false); return undefined }
+    checkOverflow()
+    const el = bodyRef.current
+    // jsdom (component tests) has no ResizeObserver — degrades to the one-shot
+    // check above, same guard useElementSize uses for the same reason.
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(checkOverflow)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hasBody, note, checkOverflow])
+
   if (!configured) {
     return <EmptyState icon={IconNote} title="Notes aren’t connected" sub="Connect Nextcloud in Settings, then pick a note to pin here." />
   }
@@ -102,12 +128,19 @@ export default function NotePinWidget({ notes, instanceId }) {
           )}
         </span>
       </div>
-      {state === 'loading' && <div className="notepin-body"><SkeletonRows n={4} /></div>}
+      {state === 'loading' && <div className="notepin-skel"><SkeletonRows n={4} /></div>}
       {state === 'error' && <ErrorState onRetry={refresh} />}
       {state === 'empty' && <EmptyState icon={IconNote} title="No note selected" sub="Pick a note from the menu above." />}
       {state === 'ready' && (
-        note?.body?.trim()
-          ? <div className="notepin-body" tabIndex={0}>{note.body}</div>
+        hasBody
+          ? (
+            <div className="notepin-scroll">
+              <div className="notepin-body" ref={bodyRef} tabIndex={0} onScroll={checkOverflow}>
+                <div className="notepin-prose">{note.body}</div>
+              </div>
+              <div className={`notepin-fade${moreBelow ? '' : ' hide'}`} aria-hidden="true" />
+            </div>
+          )
           : <EmptyState icon={IconNote} title="This note is empty" sub="Open it in Notes to start writing." />
       )}
     </div>
