@@ -87,6 +87,21 @@ sqlite.exec(`
     PRIMARY KEY (user_id, src_path, target));
   CREATE INDEX IF NOT EXISTS note_links_target_idx ON note_links(user_id, target);
 `)
+// The calendar-home collection URL discovered at the account's last successful
+// CalDAV login (tsdav's calendar-home-set discovery — see caldav.js's discover()).
+// Not a secret, so it's a plain column like server_url/username, not inside the
+// encrypted blob. Needed as a bootstrap fallback: with zero calendars on the
+// principal, caldav.js's calendarHome() has nothing to derive a home URL FROM
+// (its normal path — deriving the home from an existing calendar's URL — is a
+// no-op on an empty account), so the app could never create even its own auto
+// "Reminders" list on a fresh CalDAV server. Accounts created before this column
+// existed simply have NULL here; they keep working via the derived-from-lists
+// path as before, and their next discover() backfills this column.
+// SQLite has no "ADD COLUMN IF NOT EXISTS" here (older engines reject the IF
+// NOT EXISTS clause on ALTER TABLE) — the standard idiom is to attempt the ALTER
+// and swallow the "duplicate column" error on every import after the first.
+try { sqlite.exec('ALTER TABLE caldav_accounts ADD COLUMN home_url TEXT') }
+catch (e) { if (!/duplicate column/i.test(e.message || '')) throw e }
 console.log('sqlite config db ready at', path, '(journal_mode=' + sqlite.pragma('journal_mode', { simple: true }) + ')')
 
 const bool = (v) => !!v && v !== 0 && v !== '0'
@@ -210,6 +225,12 @@ export async function getAccount(userId, id) {
 export async function insertAccount(acc) {
   sqlite.prepare('INSERT INTO caldav_accounts (id,user_id,name,type,server_url,username,password_enc) VALUES (?,?,?,?,?,?,?)')
     .run(acc.id, acc.user_id, acc.name, acc.type, acc.server_url, acc.username, acc.password_enc)
+}
+// Backfill/refresh the discovered calendar-home URL (see the home_url column
+// comment above). Called from caldav.js's discover() after every successful
+// login, so the stored value stays current even if a server migrates principals.
+export async function setAccountHomeUrl(id, homeUrl) {
+  sqlite.prepare('UPDATE caldav_accounts SET home_url=? WHERE id=?').run(homeUrl, id)
 }
 export async function deleteAccount(userId, id) {
   sqlite.prepare('DELETE FROM caldav_accounts WHERE id=? AND user_id=?').run(id, userId)

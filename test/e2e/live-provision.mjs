@@ -109,33 +109,6 @@ async function waitHealthy() {
 // it created last time instead of creating a duplicate.
 const normalizeGeneric = (u) => String(u || '').trim().replace(/\/+$/, '')
 
-// ---- 0) Bootstrap: MKCALENDAR one VTODO collection directly against
-//         Radicale (basic auth), mirroring setup-backends.sh. The app cannot
-//         create the FIRST calendar on an empty principal (calendarHome()
-//         derives the home from existing calendars — see caldav.js; product
-//         gap tracked separately), so the fixture must be seeded before the
-//         account is added. Idempotent: an existing collection answers 405.
-async function seedFixtureCalendar() {
-  const url = normalizeGeneric(CALDAV_URL) + '/' + encodeURIComponent(CALDAV_USER) + '/tasks/'
-  const body = '<?xml version="1.0" encoding="utf-8"?>'
-    + '<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop>'
-    + '<D:displayname>tasks</D:displayname>'
-    + '<C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set>'
-    + '</D:prop></D:set></C:mkcalendar>'
-  const r = await fetch(url, {
-    method: 'MKCALENDAR',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(`${CALDAV_USER}:${CALDAV_PASS}`).toString('base64'),
-      'Content-Type': 'application/xml; charset=utf-8',
-    },
-    body,
-    signal: AbortSignal.timeout(10000),
-  })
-  if (r.status === 201) { console.log(`seeded fixture calendar ${url}`); return }
-  if (r.status === 405 || r.status === 409) { console.log(`fixture calendar already present (${r.status}) ${url}`); return }
-  throw new Error(`MKCALENDAR ${url} -> ${r.status}: ${await r.text()}`)
-}
-
 // ---- 1) CalDAV account: reuse if one already matches, else add it through
 //         the real "Add account" flow (POST -> discover -> lists). ----
 async function ensureCaldavAccount() {
@@ -160,13 +133,11 @@ async function ensureCaldavAccount() {
 // ---- 2) enable every discovered list (idempotent — same desired state every run). ----
 async function enableAllLists(accountId, lists) {
   if (!lists.length) {
-    // The auto "Reminders" VTODO calendar (caldav.js createRemindersCalendar)
-    // only gets created server-side if discovery found at least one existing
-    // calendar to derive the calendar-home from — see caldav.js calendarHome().
-    // An empty list here means the fixture's Radicale has no pre-seeded
-    // calendar (setup-backends.sh seeds one under /<user>/tasks/ for exactly
-    // this reason) — nothing left for this script to enable.
-    console.warn('no CalDAV lists discovered — the fixture Radicale needs at least one pre-seeded calendar (see test/e2e/setup-backends.sh\'s MKCALENDAR step) for the app\'s auto "Reminders" list to be created')
+    // caldav.js's discover() now bootstraps its own "Reminders" VTODO calendar
+    // even on an empty principal (home_url fallback — see caldav.js resolveHome()),
+    // so this should never actually be empty; kept as a loud diagnostic in case
+    // discovery itself failed rather than silently leaving the audit stuck.
+    console.warn('no CalDAV lists discovered after account creation — expected at least the auto-created "Reminders" list; check discover() / caldav.js logs')
     return
   }
   must(`PUT /api/caldav/accounts/${accountId}/lists`, await api(`/api/caldav/accounts/${accountId}/lists`, {
@@ -216,7 +187,6 @@ async function logTaskProject() {
 async function main() {
   console.log(`provisioning ${BASE} as ${USER}`)
   await waitHealthy()
-await seedFixtureCalendar()
   const { id: accountId, lists } = await ensureCaldavAccount()
   await enableAllLists(accountId, lists)
   await logTaskProject()
