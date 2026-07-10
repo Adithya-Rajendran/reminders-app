@@ -10,7 +10,7 @@ metadata:
   labels: { app: reminders-app }
 spec:
   accessModes: ["ReadWriteOnce"]
-  storageClassName: standard   # set to your cluster's RWO block-storage class
+  storageClassName: ceph-rbd   # this project's real cluster (Ceph RBD, RWO block); set to your own cluster's RWO block-storage class
 
   resources:
     requests:

@@ -18,7 +18,7 @@ env:
 
 jobs:
   lint-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # deliberate: stays GitHub-hosted alongside the docker job below, which needs a real Docker daemon the reminders-ci cluster runners (plain-mode ARC, no docker) don't have
     timeout-minutes: 15
     defaults:
       run:
@@ -54,7 +54,7 @@ jobs:
     # container — also the only in-container build of native better-sqlite3),
     # then builds AND BOOTS the production image: a missing-file crash-on-boot
     # (the server imports client/src at module load) passes a build-only job.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # deliberate: needs a Docker daemon (buildx build+boot-smoke) — the reminders-ci cluster runners run plain-mode with no docker
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
     # runner — no self-hosted infra. Gated on lint-build so it only runs once
     # the cheap checks pass. See test/e2e/ for the harness.
     needs: lint-build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # deliberate: kept alongside the rest of this file's GitHub-hosted jobs (see docker job above) rather than split onto the docker-less cluster runners
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
