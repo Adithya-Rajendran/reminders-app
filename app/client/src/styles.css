@@ -1244,8 +1244,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rem-chev { transition: transform .15s ease; opacity: .6; flex: 0 0 auto; }
 .rem-chev.open { transform: rotate(90deg); }
 
-/* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
-.up-overdue > .up-head .g-title { color: var(--danger); }
 /* a widget whose lazy chunk failed to load (e.g. a stale tab after a deploy) */
 .widget-load-err { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 100%; min-height: 100px; padding: 20px; text-align: center; }
 
@@ -1666,11 +1664,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Eat-the-frog + Eisenhower matrix now live in the Triage widget → co-located in
    widgets/TriageWidget.css (the standalone Frog widget was folded into it). */
 
-/* Two-minute quick-win badge + Upcoming filter toggle */
-.qw-badge { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 32%, transparent); font-weight: 700; }
-.up-filter { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
-.qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }
+/* Two-minute quick-win badge → co-located in widget-sdk/ui/TaskRow.css (it's a
+   TaskRow chip, not Upcoming-exclusive) */
 
 /* Cues mindmap/flowchart canvas → co-located in widgets/CuesWidget.css */
 

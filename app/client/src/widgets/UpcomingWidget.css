@@ -1,0 +1,12 @@
+/* Upcoming widget — CSS for classes used only by UpcomingWidget (moved out of
+   styles.css). The task-row chrome itself (.task, chip controls, etc.) is
+   shared via widget-sdk/ui/TaskRow.css; .qw-badge lives there too since it's
+   rendered by TaskRow, not Upcoming. */
+
+/* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
+.up-overdue > .up-head .g-title { color: var(--danger); }
+
+/* Upcoming filter toggle */
+.up-filter { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
+.qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }

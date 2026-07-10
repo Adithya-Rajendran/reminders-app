@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTaskList, selectUpcoming, applyOrganizer, useOrganizerFilter, dueBucket, byImportanceThenDue, UPCOMING_ORDER, isQuickWin, parseQuickAdd, widgetStore, useWidgetSize, atMostW, atMostH, TaskRow, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, IconClock, IconBolt, IconPlus, IconChevR } from '../widget-sdk'
+import './UpcomingWidget.css'
 
 const COLLAPSE_KEY = 'upcoming-collapsed'
 // Default a quick-added task to today at 9am so it lands in the "Today" bucket
