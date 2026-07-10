@@ -87,9 +87,12 @@ export async function setConfig(userId, accountId, rootPath) {
   const acc = accts.find((a) => a.id === accountId) || accts[0]
   if (!acc) throw err('connect a CalDAV account first', 409)
   const root = sanitizeFolder(rootPath) || DEFAULT_ROOT
+  // Validate BEFORE persisting: if the folder can't be created/reached (rights,
+  // dead server), a failed attempt must leave the previous config intact —
+  // persisting first left /api/notes wired to a folder it could never read.
+  await dav.ensureCollection(acc, root)
   await setNotesConfig(userId, acc.id, root)
   idx.clearUser(userId) // the search index is per-WebDAV — drop it so it regenerates lazily after a reconnect/retarget
-  await dav.ensureCollection(acc, root)
   return { accountId: acc.id, rootPath: root }
 }
 
