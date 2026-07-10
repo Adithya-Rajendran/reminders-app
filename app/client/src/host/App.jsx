@@ -19,10 +19,11 @@ import { revealTaskInDom } from '../data/revealtask.js'
 import { createAndOpenNote } from '../data/noteactions.js'
 import {
   IconBell, IconSun, IconMoon, IconMonitor, IconGear, IconLogout,
-  IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
+  IconShield, IconKey, IconSpinner, IconPalette, IconSearch, IconSwatch, IconCheck,
 } from '../widget-sdk/icons.jsx'
 import { ACCENTS, DEFAULT_ACCENT, applyAccent } from './accents.js'
 import { effectiveTheme, normalizeThemePref, nextThemePref } from './theme.js'
+import { PALETTES, DEFAULT_PALETTE, paletteFor, applyPalette } from './palettes.js'
 
 // Human label + glyph for a theme preference (light / dark / system).
 const THEME_LABEL = { light: 'Light', dark: 'Dark', system: 'System' }
@@ -115,12 +116,53 @@ function AccentPicker({ accent, onPick }) {
   )
 }
 
+/* ---------- Theme preset ("palette") picker ---------- */
+// A palette is a whole token-block identity swap (styles.css's [data-palette]
+// blocks) — a coarser, rarer choice than the accent picker's single hue swap,
+// so it gets its own control rather than folding into AccentPicker. Each row
+// shows the preset's name plus a small dot pair (surface + accent) so the
+// list reads at a glance instead of requiring a name-only guess.
+function PalettePicker({ palette, onPick }) {
+  const [open, setOpen] = useState(false)
+  const ref = usePopover(open, setOpen)
+  const current = paletteFor(palette)
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button className="iconbtn" aria-label="Theme preset" title={`Theme preset: ${current.name}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <IconSwatch size={18} />
+      </button>
+      {open && (
+        <div className="menu palette-pop" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', animation: 'menuIn 150ms ease' }}>
+          <div className="menu-label">Theme preset</div>
+          {PALETTES.map((p) => (
+            <button
+              key={p.key}
+              className="menu-item"
+              role="menuitemradio"
+              aria-checked={p.key === palette}
+              onClick={() => { onPick(p.key); setOpen(false) }}
+            >
+              <span className="palette-dots" aria-hidden="true">
+                <span className="palette-dot" style={{ background: p.preview.a }} />
+                <span className="palette-dot" style={{ background: p.preview.b }} />
+              </span>
+              {p.name}
+              {p.key === palette && <IconCheck size={14} style={{ marginLeft: 'auto' }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ---------- TopBar ---------- */
-function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, onOpenPalette }) {
+function TopBar({ user, theme, onToggleTheme, accent, onAccent, palette, onPalette, onOpenSettings, onOpenPalette }) {
   const [menuOpen, setMenuOpen] = useState(false)
   // Accent submenu inside the avatar dropdown: on narrow screens the inline
   // accent picker (.topbar-actions) is hidden, so the dropdown carries its own.
   const [accentOpen, setAccentOpen] = useState(false)
+  const [presetOpen, setPresetOpen] = useState(false)
   const ref = usePopover(menuOpen, setMenuOpen)
   const initials = initialsFor(user)
   const email = user?.email || user?.name || ''
@@ -149,6 +191,7 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, 
         <div className="topbar-actions">
           <ThemeToggle theme={theme} onCycle={onToggleTheme} />
           <AccentPicker accent={accent} onPick={onAccent} />
+          <PalettePicker palette={palette} onPick={onPalette} />
           <button className="iconbtn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
             <IconGear size={18} />
           </button>
@@ -197,6 +240,28 @@ function TopBar({ user, theme, onToggleTheme, accent, onAccent, onOpenSettings, 
                   ))}
                 </div>
               )}
+              {/* Theme preset lives here too, same reasoning as accent color
+                  above (it's part of .topbar-actions, hidden on narrow screens). */}
+              <button className="menu-item" role="menuitem" aria-haspopup="menu" aria-expanded={presetOpen} onClick={() => setPresetOpen((o) => !o)}>
+                <IconSwatch size={16} /> Theme preset
+              </button>
+              {presetOpen && PALETTES.map((p) => (
+                <button
+                  key={p.key}
+                  className="menu-item"
+                  role="menuitemradio"
+                  aria-checked={p.key === palette}
+                  style={{ paddingLeft: 28 }}
+                  onClick={() => { onPalette(p.key); setPresetOpen(false); setMenuOpen(false) }}
+                >
+                  <span className="palette-dots" aria-hidden="true">
+                    <span className="palette-dot" style={{ background: p.preview.a }} />
+                    <span className="palette-dot" style={{ background: p.preview.b }} />
+                  </span>
+                  {p.name}
+                  {p.key === palette && <IconCheck size={14} style={{ marginLeft: 'auto' }} />}
+                </button>
+              ))}
               <button className="menu-item" role="menuitem" onClick={() => { setMenuOpen(false); onOpenSettings() }}>
                 <IconGear size={16} /> Settings
               </button>
@@ -272,10 +337,18 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
   const [theme, setTheme] = useState(() => normalizeThemePref(localStorage.getItem('reminders-theme')))
-  // Falls back to DEFAULT_ACCENT (not a hardcoded key) — main.jsx applies the
-  // same fallback pre-paint, and this effect's applyAccent(accent) below would
-  // otherwise stomp that first-paint color back to whatever was hardcoded here.
-  const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || DEFAULT_ACCENT)
+  // The theme PRESET (a whole [data-palette] token block — see
+  // host/palettes.js). Named `preset`, not `palette`, because `palette` below
+  // is already taken by the command-palette modal's open/mode state.
+  // Falls back to DEFAULT_PALETTE — read BEFORE accent below, since the
+  // accent fallback needs the resolved preset's defaultAccent.
+  const [preset, setPreset] = useState(() => localStorage.getItem('reminders-palette') || DEFAULT_PALETTE)
+  // Falls back to the current preset's defaultAccent (not a hardcoded key) —
+  // main.jsx applies the identical fallback pre-paint, and this effect's
+  // applyAccent(accent) below would otherwise stomp that first-paint color
+  // back to whatever was hardcoded here (see the Wave 2 "silent default-
+  // revert" fix this shape is modeled on).
+  const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || paletteFor(preset).defaultAccent || DEFAULT_ACCENT)
   const [settings, setSettings] = useState(null) // null = closed | { createGroup? }
   // Accepts an optional { createGroup } to open Settings with the group create form
   // prefilled; called as a plain onClick handler elsewhere, so ignore event args.
@@ -375,6 +448,19 @@ export default function App() {
     localStorage.setItem('reminders-accent', accent)
   }, [accent])
 
+  // Preset: apply the [data-palette] attribute (applyPalette also persists —
+  // see host/palettes.js's comment on why, unlike applyAccent, it owns that).
+  useEffect(() => { applyPalette(preset) }, [preset])
+
+  // Picking a NEW preset resets the accent to that preset's own default —
+  // otherwise an unrelated accent (e.g. copper) would bleed into a preset
+  // built around a different hue (e.g. Instrument's flat indigo), which reads
+  // as a half-applied preset rather than a deliberate identity switch.
+  const pickPreset = (key) => {
+    setPreset(key)
+    setAccent(paletteFor(key).defaultAccent)
+  }
+
   // Session: fetch /api/me directly so a 401 shows the login screen instead of
   // the api() helper's auto-redirect (the login button starts the OIDC flow).
   useEffect(() => {
@@ -443,6 +529,7 @@ export default function App() {
     { id: 'shortcuts', label: 'Keyboard shortcuts', hint: 'Cheat sheet — shortcut: ?', priority: 1, aliases: ['help', 'keys', 'hotkeys'], run: () => setHelp(true) },
     { id: 'toggle-theme', label: 'Theme: light / dark / system', icon: themeIcon(theme), aliases: ['dark mode', 'light mode', 'system theme', 'auto theme', 'appearance'], run: toggleTheme },
     { id: 'cycle-accent', label: 'Change accent color', icon: IconPalette, aliases: ['theme color', 'highlight color'], run: () => setAccent((a) => { const i = ACCENTS.findIndex((x) => x.key === a); return ACCENTS[(i + 1) % ACCENTS.length].key }) },
+    { id: 'cycle-preset', label: 'Change theme preset', hint: `Current: ${paletteFor(preset).name}`, icon: IconSwatch, aliases: ['theme preset', 'palette', 'paper planner', 'classic indigo', 'instrument', 'aurora'], run: () => pickPreset(PALETTES[(PALETTES.findIndex((p) => p.key === preset) + 1) % PALETTES.length].key) },
     { id: 'new-dashboard', label: 'New dashboard', hint: 'Add a dashboard tab', aliases: ['add dashboard', 'new board', 'new tab'], run: addDashboard },
     { id: 'logout', label: 'Log out', icon: IconLogout, priority: -1, aliases: ['sign out'], run: () => window.location.assign('/auth/logout') },
   ]
@@ -465,6 +552,8 @@ export default function App() {
             onToggleTheme={toggleTheme}
             accent={accent}
             onAccent={setAccent}
+            palette={preset}
+            onPalette={pickPreset}
             onOpenSettings={openSettings}
             onOpenPalette={() => setPalette({ mode: 'search' })}
           />

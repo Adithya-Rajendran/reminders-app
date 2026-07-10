@@ -209,6 +209,15 @@ export const IconGrid = (p) => (
   </Icon>
 )
 export const IconBolt = (p) => <Icon {...p} d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+// Theme preset ("palette") picker — three overlapping swatch cards, distinct
+// from IconPalette (paint palette, used for the accent-color picker) and
+// IconGrid (four equal cells, used for board/layout chrome).
+export const IconSwatch = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="7" width="12" height="14" rx="2" transform="rotate(-12 9 14)" />
+    <rect x="9" y="3" width="12" height="14" rx="2" />
+  </Icon>
+)
 
 // Provider brand-ish marks (simple, original geometry)
 export const IconNextcloud = (p) => (

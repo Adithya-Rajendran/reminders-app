@@ -10,10 +10,17 @@ import './styles.css'
 import './widget-sdk/ui/primitives.css'
 import { applyAccent, DEFAULT_ACCENT } from './host/accents.js'
 import { effectiveTheme, normalizeThemePref } from './host/theme.js'
+import { applyPalette, paletteFor, DEFAULT_PALETTE } from './host/palettes.js'
 
-// Apply persisted theme + accent before first paint to avoid a flash. The stored
-// preference may be 'system', which resolves to the OS's current scheme here.
+// Apply persisted theme + palette + accent before first paint to avoid a flash.
+// The stored theme preference may be 'system', which resolves to the OS's
+// current scheme here. Palette is applied BEFORE accent, and the accent
+// fallback below reads the resolved palette's defaultAccent (not the global
+// DEFAULT_ACCENT) — mirrors App.jsx's own state-init fallback exactly, so
+// this pre-paint color and the first render agree (see host/App.jsx's accent
+// useState comment for the "silent default-revert" bug this shape avoids).
 document.documentElement.setAttribute('data-theme', effectiveTheme(normalizeThemePref(localStorage.getItem('reminders-theme'))))
-applyAccent(localStorage.getItem('reminders-accent') || DEFAULT_ACCENT)
+const paletteKey = applyPalette(localStorage.getItem('reminders-palette') || DEFAULT_PALETTE)
+applyAccent(localStorage.getItem('reminders-accent') || paletteFor(paletteKey).defaultAccent || DEFAULT_ACCENT)
 
 createRoot(document.getElementById('root')).render(<App />)
