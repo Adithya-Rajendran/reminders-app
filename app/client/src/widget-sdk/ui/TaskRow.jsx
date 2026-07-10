@@ -10,6 +10,7 @@ import { atMostW } from '../../domain/widgetsize.js'
 import { IconTrash, IconBell, IconFlame, IconPlus, IconChevR } from '../icons.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
 import TaskPopover from './TaskPopover.jsx'
+import './TaskRow.css'
 
 const HABIT_DOTS = 14
 

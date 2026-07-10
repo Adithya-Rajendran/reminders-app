@@ -1,0 +1,102 @@
+/* TaskRow — CSS for the shared task-row family, used only by TaskRow.jsx
+   (moved out of styles.css). TaskRow is consumed by 5+ widgets (Upcoming,
+   Reminders, Daily, Review, Triage), each lazy-loaded as its own build chunk,
+   so anything ALSO rendered independently by a widget that doesn't import
+   TaskRow has to stay global instead — verified by grepping every class
+   below across client/src before moving it. Kept in styles.css for that
+   reason:
+     - .task (base row) — CalendarWidget's mini-agenda tags a pill button with
+       the literal class "task" too (`cal-mini-item task` vs `…event`).
+     - .check-btn — CuesWidget renders its own toggle button with this class.
+     - .mini-menu / .mini-item — reused as a generic small-popover-menu
+       primitive by NotePinWidget (file picker) and ReviewWidget (history).
+     - .inline-ctl — same generic popover-trigger wrapper, same two widgets.
+     - .cue-chip / .cue-arrow — the static if-then cue glyph is rendered
+       directly by FocusWidget and CuesWidget, not just via TaskRow.
+     - .pdot — a shared colour-swatch primitive (GroupPicker/AreaPicker use it
+       too); only .pdot.p0 lives next to TaskRow's other rules in styles.css.
+   Everything below this point has zero consumers outside TaskRow.jsx (or, for
+   RemindersWidget's own due-chip/quick-add button, a consumer that already
+   imports TaskRow directly, so the chunk is safe either way). */
+
+/* Importance marker on a task row — a star GLYPH (shape, not colour alone) so
+   the first-class importance axis is visible everywhere a task is listed. */
+.imp-star { color: var(--warn); font-size: var(--fs-meta); line-height: 1; flex: 0 0 auto; }
+
+/* priority menu trigger */
+.pri-dot-btn { background: transparent; border: 0; cursor: pointer; padding: 3px; display: inline-flex; border-radius: var(--r-sm); }
+.pri-dot-btn:hover { background: var(--panel2); }
+/* WCAG 2.2 tap target: pad the small hit area up to ~24px, pull the box back
+   with a negative margin so layout/spacing is unchanged. */
+.pri-dot-btn { padding: 8px; margin: -5px; }
+
+/* due / schedule chip */
+.due-chip { cursor: pointer; border: 1px solid var(--line); }
+.due-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
+.due-chip:hover { filter: brightness(1.12); border-color: var(--accent); }
+.due-chip svg { opacity: .8; }
+.rem-add .due-chip { flex: 0 0 auto; white-space: nowrap; }
+
+.label-chip { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 7px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
+
+/* subtasks (folded-in Goals): expand/progress chip on a parent + nested rows */
+.task-wrap { display: flex; flex-direction: column; }
+.task-children { margin: 2px 0 6px 30px; padding-left: 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+.subtask-chip { cursor: pointer; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 3px; }
+.subtask-chip:hover { border-color: var(--accent); }
+.subtask-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
+.subtask-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.subtask-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+.subtask-add { margin-top: 4px; }
+
+/* If-then cue: inline editor popover (the static .cue-chip/.cue-arrow glyph
+   itself stays in styles.css — FocusWidget and CuesWidget render it too). */
+.cue-pop { padding: 8px; min-width: 230px; }
+.cue-input { width: 100%; }
+.cue-pop-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+/* typed cue-trigger kind selector (After / Time / Place) */
+.cue-kinds { display: flex; gap: 4px; margin-top: 8px; }
+.cue-kind { flex: 1; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 0; cursor: pointer; }
+.cue-kind.on { color: var(--text); background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 30%, transparent); }
+
+/* time-estimate chip */
+.est-chip { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
+.est-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
+
+/* Habits — streak / consistency dots / automaticity bar, rendered by
+   TaskRow's HabitStrip helper when a widget passes showHabit. */
+.habit-streak { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-meta); font-weight: 700; color: var(--faint); }
+.habit-streak.on { color: var(--warn); }
+.habit-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.hdot { width: 12px; height: 12px; border-radius: 4px; background: var(--line-strong); }
+.hdot.done { background: var(--green); }
+.habit-auto { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); color: var(--muted); font-weight: 600; }
+.habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
+.habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+
+.habit-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.habit-strip .habit-streak { margin-left: 0; }
+.habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
+.habit-strip .chip { font-size: var(--fs-2xs); }
+
+/* Two-minute quick-win badge */
+.qw-badge { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in oklab, var(--warn) 32%, transparent); font-weight: 700; }
+
+/* === Quieter resting rows: empty placeholder controls reveal on hover/focus ===
+   Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
+   intentionally NOT gated (scheduling is the primary triage action).
+   Dim-but-visible at rest (was opacity 0 until hover — an affordance you had
+   to already know about); hover/focus-within below raise to full strength. */
+.task .cue-chip.empty,
+.task .est-chip.empty,
+.task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
+.task:hover .cue-chip.empty,
+.task:hover .est-chip.empty,
+.task:hover .subtask-chip.empty,
+.task:focus-within .cue-chip.empty,
+.task:focus-within .est-chip.empty,
+.task:focus-within .subtask-chip.empty { opacity: 1; }
+@media (hover: none) {
+  .task .cue-chip.empty, .task .est-chip.empty,
+  .task .subtask-chip.empty { opacity: 1; }
+}

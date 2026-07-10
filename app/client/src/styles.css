@@ -1124,31 +1124,17 @@ body {
 @keyframes checkPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
 .repeat-badge { color: var(--faint); font-size: var(--fs-meta); }
-/* Importance marker on a task row — a star GLYPH (shape, not colour alone) so the
-   first-class importance axis is visible everywhere a task is listed. */
-.imp-star { color: var(--warn); font-size: var(--fs-meta); line-height: 1; flex: 0 0 auto; }
 .pdot.p0 { background: var(--line-strong); }
 
-/* inline priority + scheduler controls */
+/* inline priority + scheduler controls (.inline-ctl is shared beyond TaskRow —
+   NotePinWidget/ReviewWidget reuse it as a generic popover-trigger wrapper —
+   so it stays here; the controls it wraps in TaskRow itself are co-located in
+   widget-sdk/ui/TaskRow.css) */
 .inline-ctl { position: relative; display: inline-flex; }
-.pri-dot-btn { background: transparent; border: 0; cursor: pointer; padding: 3px; display: inline-flex; border-radius: var(--r-sm); }
-.pri-dot-btn:hover { background: var(--panel2); }
-.due-chip { cursor: pointer; border: 1px solid var(--line); }
-.due-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
-.due-chip:hover { filter: brightness(1.12); border-color: var(--accent); }
-.due-chip svg { opacity: .8; }
-.label-chip { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 7px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
 
-/* subtasks (folded-in Goals): expand/progress chip on a parent + nested rows */
-.task-wrap { display: flex; flex-direction: column; }
-.task-children { margin: 2px 0 6px 30px; padding-left: 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
-.subtask-chip { cursor: pointer; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 3px; }
-.subtask-chip:hover { border-color: var(--accent); }
-.subtask-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
-.subtask-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
-.subtask-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
-.subtask-add { margin-top: 4px; }
-
+/* .mini-menu/.mini-item are a generic small-popover-menu primitive reused by
+   NotePinWidget's file picker and ReviewWidget's reflection history — not
+   TaskRow-exclusive — so they stay global. */
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-popover);
   background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-menu);
@@ -1235,7 +1221,6 @@ body {
 .rem-add .rem-text { flex: 1 1 130px; min-width: 0; }
 .rem-add input.rem-group { flex: 0 1 94px; min-width: 60px; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 5px 8px; font-size: 12.5px; }
 .rem-add input.rem-group::placeholder { color: var(--faint); }
-.rem-add .due-chip { flex: 0 0 auto; white-space: nowrap; }
 .rem-add .iconbtn.sm { flex: 0 0 auto; }
 .rem-err { color: var(--danger); font-size: var(--fs-meta); padding: 0 10px 8px; }
 /* collapsible group header (minimize tab) */
@@ -1628,38 +1613,20 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Weekly Review widget → co-located in widgets/ReviewWidget.css */
 
-/* If-then cue chip + inline editor (TaskRow + Cues widget) */
+/* If-then cue chip: the static glyph (.cue-chip/.cue-arrow) is rendered
+   directly by FocusWidget and CuesWidget too, not just TaskRow, so it stays
+   here. The interactive edit popover (.cue-pop/.cue-kinds/…) is only ever
+   opened from TaskRow's CueControl → co-located in widget-sdk/ui/TaskRow.css. */
 .cue-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 220px; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); cursor: pointer; }
 .cue-chip .cue-arrow { font-weight: 800; line-height: 1; }
 .cue-chip > :not(.cue-arrow) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cue-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
-.cue-pop { padding: 8px; min-width: 230px; }
-.cue-input { width: 100%; }
-.cue-pop-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
-/* typed cue-trigger kind selector (After / Time / Place) */
-.cue-kinds { display: flex; gap: 4px; margin-top: 8px; }
-.cue-kind { flex: 1; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 0; cursor: pointer; }
-.cue-kind.on { color: var(--text); background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 30%, transparent); }
-/* time-estimate chip */
-.est-chip { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
-.est-chip.empty { color: var(--faint); background: transparent; border-style: dashed; border-color: var(--line-strong); }
 
-/* Habits widget — streak / consistency dots / automaticity bar */
-.habit-streak { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-meta); font-weight: 700; color: var(--faint); }
-.habit-streak.on { color: var(--warn); }
-.habit-dots { display: flex; gap: 3px; flex-wrap: wrap; }
-.hdot { width: 12px; height: 12px; border-radius: 4px; background: var(--line-strong); }
-.hdot.done { background: var(--green); }
-.habit-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.habit-auto { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); color: var(--muted); font-weight: 600; }
-.habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
-.habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+/* time-estimate chip → co-located in widget-sdk/ui/TaskRow.css */
 
-/* Inline habit consistency strip shown under a recurring task's row in Reminders. */
-.habit-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-.habit-strip .habit-streak { margin-left: 0; }
-.habit-strip .hdot { width: 10px; height: 10px; border-radius: 3px; }
-.habit-strip .chip { font-size: var(--fs-2xs); }
+/* Habits widget — streak / consistency dots / automaticity bar → co-located in
+   widget-sdk/ui/TaskRow.css (rendered only by TaskRow's HabitStrip helper). */
+.habit-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } /* currently unreferenced */
 
 /* Eat-the-frog + Eisenhower matrix now live in the Triage widget → co-located in
    widgets/TriageWidget.css (the standalone Frog widget was folded into it). */
@@ -1716,24 +1683,10 @@ button.rem-head:hover .g-title { color: var(--accent); }
   .palette-pill { padding: 0; width: 32px; justify-content: center; }
 }
 
-/* === Quieter resting rows: empty placeholder controls reveal on hover/focus === */
-/* Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
-   intentionally NOT gated (scheduling is the primary triage action). */
-/* Dim-but-visible at rest (was opacity 0 until hover — an affordance you had
-   to already know about); hover/focus-within below raise to full strength. */
-.task .cue-chip.empty,
-.task .est-chip.empty,
-.task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
-.task:hover .cue-chip.empty,
-.task:hover .est-chip.empty,
-.task:hover .subtask-chip.empty,
-.task:focus-within .cue-chip.empty,
-.task:focus-within .est-chip.empty,
-.task:focus-within .subtask-chip.empty { opacity: 1; }
-@media (hover: none) {
-  .task .cue-chip.empty, .task .est-chip.empty,
-  .task .subtask-chip.empty { opacity: 1; }
-}
+/* === Quieter resting rows: empty placeholder controls reveal on hover/focus ===
+   → co-located in widget-sdk/ui/TaskRow.css (only ever matches inside a
+   TaskRow-rendered .task row, despite referencing the shared .task/.cue-chip
+   classes that stay here). */
 
 /* === Reconnect banner: stale-list-visible on a sync blip (vs full ErrorState) === */
 .reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; padding: 5px 10px; border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent); background: var(--warn-soft); color: var(--warn); border-radius: var(--r-chip); font-size: var(--fs-meta); }
@@ -1785,10 +1738,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Focus: "From today's plan · N left" eyebrow chip. */
 .focus-plan-chip { font-size: 10.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); margin-left: 6px; }
 
-/* WCAG 2.2 tap targets: pad the small hit areas up to ~24px, pull the box back
-   with negative margins so layout/spacing is unchanged. */
+/* WCAG 2.2 tap targets: pad the small hit area up to ~24px, pull the box back
+   with a negative margin so layout/spacing is unchanged. (.pri-dot-btn's
+   matching override moved to widget-sdk/ui/TaskRow.css with the rest of that
+   class.) */
 .check-btn { padding: 3px; margin: -3px; box-sizing: content-box; }
-.pri-dot-btn { padding: 8px; margin: -5px; }
 
 /* === Settings → MCP access section === */
 .mcp-master-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; cursor: pointer; user-select: none; }
