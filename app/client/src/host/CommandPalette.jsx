@@ -12,6 +12,7 @@ import { emitRevealTask } from '../data/revealbus.js'
 import { getBoard, onBoard, flashWidget, emitAddWidget } from '../data/boardbus.js'
 import { dueChip } from '../domain/tasklib.js'
 import { IconSearch, IconNote, IconPlus, IconFolder, IconList, IconX, IconCornerDownLeft, IconSpinner, IconCheck, IconGrid, IconBolt } from '../widget-sdk/icons.jsx'
+import './CommandPalette.css'
 
 // Render a label with its fuzzy-matched characters emphasised. Groups runs so
 // the DOM stays small for short titles.
