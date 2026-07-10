@@ -86,7 +86,7 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
       <div className="review rv-flowwrap">
         {reconnect}
         <div className="rv-flow-head">
-          <span className="rv-flow-step">Step {step + 1} / {STEPS.length}</span>
+          <span className="wg-eyebrow wg-eyebrow--accent rv-flow-step">Step {step + 1} / {STEPS.length}</span>
           <span className="rv-flow-title">{s.title}</span>
         </div>
         <div className="rv-flow-sub">{s.sub}</div>
@@ -148,7 +148,7 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
       {reconnect}
       <div className="rv-top">
         <div className="rv-stat">
-          <div className="rv-big">{review.thisWeek}</div>
+          <div className="wg-stat wg-stat--lg rv-big">{review.thisWeek}</div>
           <div className="rv-label">done this week</div>
         </div>
         <div className={`rv-delta ${deltaCls}`}>
@@ -234,7 +234,7 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
           anchored footer reads as a deliberately quiet card, not an unfinished one. */}
       <div className="rv-footer">
         {showPrompt ? (review.promptDue ? (
-          <div className="rv-prompt">
+          <div className="wg-card wg-card--accent wg-card--row rv-prompt">
             <div className="rv-prompt-body">
               <div className="rv-prompt-title">Weekly review &amp; re-plan</div>
               <div className="rv-prompt-sub">A guided pass: clear overdue, give stalled items a next step, then reflect.</div>
@@ -268,13 +268,13 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
               aria-haspopup="dialog" aria-expanded={histOpen}
               onClick={() => setHistOpen((o) => !o)}
             >
-              <span className="rv-last-label">Last reflection</span> {lastReflection.text}
+              <span className="wg-eyebrow rv-last-label">Last reflection</span> {lastReflection.text}
             </button>
             {histOpen && (
               <div className="mini-menu rv-hist-menu" role="dialog" aria-label="Past reflections">
                 {reflections.map((r) => (
                   <div className="rv-hist-item" key={r.iso}>
-                    <div className="rv-hist-date">{new Date(r.iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                    <div className="wg-eyebrow rv-hist-date">{new Date(r.iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
                     <div className="rv-hist-text">{r.text}</div>
                   </div>
                 ))}
