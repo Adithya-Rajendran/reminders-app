@@ -104,6 +104,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ---- concurrency tripwire: the shots-* container NAMES and host ports are
+# global, so a second harness invocation (this script, run.sh, or another
+# checkout's copy) clobbers a live one — its teardown/`docker rm -f` kills the
+# first run's BFF mid-test, which surfaces downstream as ECONNREFUSED audits
+# and partial/foreign artifacts. A capture/spec container from either harness
+# is a `docker run --rm` one-shot on the mcr playwright image, so one RUNNING
+# now means a run is actively mid-flight (a crashed run leaves none behind) —
+# refuse to start rather than corrupt it. FIDELITY_FORCE=1 overrides.
+if [ "${FIDELITY_FORCE:-0}" != "1" ] && docker ps --format '{{.Image}}' | grep -q '^mcr.microsoft.com/playwright:'; then
+  echo "FATAL: a Playwright container is running — another shots/e2e harness run appears to be in progress." >&2
+  echo "       Wait for it to finish (docker ps), or set FIDELITY_FORCE=1 to clobber it anyway." >&2
+  KEEP_UP=1 # don't let our EXIT trap tear down the other run's containers
+  exit 1
+fi
+
 bash "$HERE/teardown.sh" >/dev/null 2>&1 || true # clear any leftovers first (idempotent re-run)
 bash "$HERE/setup-backends.sh"
 NO_REBUILD_FLAG=(); [ "$NO_REBUILD" = "1" ] && NO_REBUILD_FLAG=(--no-rebuild)
@@ -205,6 +220,41 @@ for theme in "${THEMES[@]}"; do
   fi
   n="$(find "$OUT" -name '*.png' 2>/dev/null | wc -l)"
   echo "  wrote $n PNG(s) to test/e2e/shots/output/fidelity-$STEP/$theme/"
+
+  # ---- collection guard: a "passed" audit whose artifacts are missing, or
+  # whose renders came out in the WRONG theme, must fail loudly here rather
+  # than be discovered later by eyeballing PNGs. The theme check reads the
+  # `theme` field the spec stamps into every resize-results.json row (the
+  # page's real <html data-theme> at shoot time) — if the rows carry no theme
+  # at all, the spec predates the stamp (stale checkout) and that's an error
+  # too: an unverifiable run is not a verified one. ----
+  python3 - "$OUT" "$theme" <<'PY'
+import glob, json, os, sys
+out, theme = sys.argv[1], sys.argv[2]
+problems = []
+shots = glob.glob(f"{out}/resize-shots/**/*.png", recursive=True)
+contacts = glob.glob(f"{out}/contact-*.png")
+if not shots: problems.append("no per-scenario PNGs under resize-shots/")
+if not contacts: problems.append("no contact-*.png sheets")
+results = f"{out}/resize-results.json"
+if not os.path.exists(results):
+    problems.append("resize-results.json missing")
+else:
+    rows = json.load(open(results)).get("results", [])
+    if not rows:
+        problems.append("resize-results.json has zero rows")
+    else:
+        themes = {r.get("theme") for r in rows}
+        if themes == {None}:
+            problems.append("rows carry no theme stamp — specs/resize-polish.spec.mjs predates the theme field (stale checkout?)")
+        elif themes != {theme}:
+            problems.append(f"rows rendered with theme(s) {sorted(str(t) for t in themes)} instead of '{theme}'")
+if problems:
+    print(f"FATAL: fidelity collection guard failed for theme={theme}:")
+    for p in problems: print(f"  - {p}")
+    sys.exit(1)
+print(f"  guard OK: {len(shots)} scenario PNG(s), {len(contacts)} contact sheet(s), every result row theme={theme}")
+PY
 done
 
 echo "done: fidelity-$STEP ($(find "$HERE/output/fidelity-$STEP" -name '*.png' 2>/dev/null | wc -l) PNG(s) total) in test/e2e/shots/output/fidelity-$STEP/"

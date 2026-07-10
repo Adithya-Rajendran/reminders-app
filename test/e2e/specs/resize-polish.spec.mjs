@@ -280,6 +280,17 @@ for (const viewport of PRIMARY_VIEWPORTS) {
         const label = `${viewport.name} ${w.type} ${scenarioName}`
         await seedLayout(request, [{ type: w.type, w: scenario.size.w, h: scenario.size.h }], DASH)
         await gotoApp(page)
+        // The theme this page ACTUALLY rendered with (main.jsx stamps it
+        // pre-paint). Always recorded into resize-results.json so a consumer
+        // (e.g. fidelity.sh's post-collection guard) can verify a themed run
+        // really rendered its theme; only ASSERTED when RESIZE_THEME is set —
+        // unset (CI) it changes nothing beyond the extra JSON field.
+        const renderedTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+        if (THEME && renderedTheme !== THEME) {
+          const msg = `${label}: rendered data-theme=${renderedTheme}, expected ${THEME} (RESIZE_THEME didn't take effect)`
+          if (RESIZE_SHOTS_ALL) failures.push(msg)
+          else expect(renderedTheme, msg).toBe(THEME)
+        }
         const frame = widget(page, w.label)
         if (RESIZE_SHOTS_ALL) {
           try {
@@ -307,6 +318,7 @@ for (const viewport of PRIMARY_VIEWPORTS) {
           type: w.type,
           widget: w.label,
           scenario: scenarioName,
+          theme: renderedTheme,
           ok: audit.ok,
           issues: audit.issues,
           warnings: audit.warnings,

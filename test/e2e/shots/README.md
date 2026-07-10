@@ -166,6 +166,18 @@ there's no data collision — only a port one. (`fidelity.sh` is a *partial*
 exception — see below: it transiently writes two files into `test/e2e/.state/`
 itself, restoring them on exit.)
 
+Worse than the bind failure: the `shots-*` container **names** are global too,
+so a second harness invocation from *any* checkout `docker rm -f`s a live
+run's backends/BFF mid-test — the victim's audit dies with `ECONNREFUSED`
+(or, before the collection guard existed, quietly produced partial/
+foreign-looking artifacts). `fidelity.sh` carries a cheap tripwire: it refuses
+to start while a `mcr.microsoft.com/playwright` container is running (those
+are `--rm` one-shots, so one running means a capture/spec is actively
+mid-flight; `FIDELITY_FORCE=1` overrides). That only covers the Playwright
+phase of a concurrent run — during its setup/seed phases the only signals are
+`shots-*` containers this script clobbers *by design* (idempotent restart), so
+coordinate runs rather than relying on the tripwire.
+
 ## Fidelity mode: the resize-polish e2e audit, with screenshots
 
 `test/e2e/specs/resize-polish.spec.mjs` is the real widget-resize audit — for
@@ -243,7 +255,18 @@ Two env hooks on the spec make this possible, **both default OFF** so CI
   (`host/theme.js`'s `normalizeThemePref` normalizes an unset/garbage pref to
   `'dark'`) — which is also `fidelity.sh --theme dark`'s result, just made
   explicit. `fidelity.sh --theme both` (the default) runs the whole spec twice,
-  once per theme.
+  once per theme. The spec stamps every `resize-results.json` row with the
+  page's *actually rendered* `<html data-theme>` (a `theme` field — always
+  recorded; only asserted when `RESIZE_THEME` is set, so still a CI no-op),
+  and asserts it matches when the env var is set — a silently-ignored theme
+  override fails the scenario instead of producing wrong-theme PNGs.
+
+After each theme's collection, `fidelity.sh` runs a guard that fails the run
+loudly if the collected output is unusable: no per-scenario PNGs, no contact
+sheets, a missing/empty `resize-results.json`, rows whose `theme` stamp
+doesn't match the requested theme (wrong-theme renders), or rows with no
+stamp at all (a stale spec checkout that predates the field — an unverifiable
+run is treated as a failed one).
 
 Output lands in `test/e2e/shots/output/fidelity-<step>/<theme>/` — a straight
 copy of `test/e2e/.artifacts/`:
