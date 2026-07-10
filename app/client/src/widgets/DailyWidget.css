@@ -3,7 +3,7 @@
 .daily.compact { gap: 3px; }
 .daily.short { gap: 2px; }
 .daily-toggle { display: inline-flex; gap: 4px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 2px; margin: 2px 0 4px; }
-.daily-seg { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+.daily-seg { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: var(--fs-meta); font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
 .daily-seg.on { color: var(--text); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
 .daily.compact .daily-toggle { margin-bottom: 2px; }
 .daily.compact .daily-seg { padding: 4px 9px; }
@@ -20,7 +20,7 @@
 @media (hover: none) { .daily-x { opacity: 1; } }
 .daily-carry { flex: 0 0 auto; white-space: nowrap; }
 .daily-suggest { display: flex; flex-direction: column; gap: 2px; }
-.daily-sg { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px dashed transparent; border-radius: 9px; padding: 7px 10px; cursor: pointer; }
+.daily-sg { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; font: inherit; font-size: var(--fs-ctrl); color: var(--text); background: none; border: 1px dashed transparent; border-radius: 9px; padding: 7px 10px; cursor: pointer; }
 .daily-sg:hover { background: var(--panel2); border-color: var(--line); }
 .daily-sg .ic { color: var(--accent); flex: 0 0 auto; }
 .daily-sg-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -31,9 +31,9 @@
    truncation (above) still kicks in at half width instead of the row overflowing. */
 .widget-body[data-wsize="lg"] .daily-suggest, .widget-body[data-wsize="xl"] .daily-suggest { flex-direction: row; flex-wrap: wrap; gap: var(--sp-4); }
 .widget-body[data-wsize="lg"] .daily-sg, .widget-body[data-wsize="xl"] .daily-sg { flex: 0 1 calc(50% - (var(--sp-4) / 2)); min-width: 0; width: auto; }
-.daily-suggest-compact { font-size: 12px; color: var(--muted); padding: 5px 8px; border: 1px dashed var(--line); border-radius: var(--r-btn); }
-.daily-recap { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text); padding: 8px 10px; }
+.daily-suggest-compact { font-size: var(--fs-meta); color: var(--muted); padding: 5px 8px; border: 1px dashed var(--line); border-radius: var(--r-btn); }
+.daily-recap { display: flex; align-items: center; gap: 7px; font-size: var(--fs-body); color: var(--text); padding: 8px 10px; }
 .daily-recap .ic { color: var(--green); }
 .daily-clear { align-self: flex-start; }
-.daily-note { width: 100%; min-height: 80px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; }
+.daily-note { width: 100%; min-height: 80px; resize: vertical; font: inherit; font-size: var(--fs-ctrl); line-height: 1.5; padding: 8px 10px; }
 .daily.compact .daily-note { min-height: 64px; }
