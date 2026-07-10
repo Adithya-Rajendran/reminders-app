@@ -1,7 +1,14 @@
 /* Focus / "what now" widget — theme-token driven (light/dark + accents). */
 .focus { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; height: 100%; min-height: 0; box-sizing: border-box; overflow-x: hidden; }
-.focus.compact { gap: 9px; padding: 10px 12px; }
-.focus.short { gap: 7px; padding: 8px 10px; }
+.focus.compact { gap: 8px; padding: 10px 12px; }
+.focus.short { gap: 6px; padding: 8px 10px; }
+/* Containment: the column's cards must never be squashed below their intrinsic
+   height — flex-shrink would compress .focus-now/.focus-timer into their own
+   overflow:hidden and clip a chip or button IN HALF at the min/standard grid
+   sizes. With shrink off, worst-case pressure degrades to the widget-body's
+   scroll instead of mid-element clipping (and the tier rules below are sized
+   so the five contract shapes fit outright, no scroll needed). */
+.focus > * { flex-shrink: 0; }
 /* .state (shared empty/error placeholder) sets height:100% assuming it's the
    ONLY child of its flex parent, which is true everywhere else it's used but
    not here — Focus keeps the timer/park-a-thought chrome mounted alongside it
@@ -30,12 +37,15 @@
 .focus-meta .chip { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-skip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; font: inherit; font-size: 11.5px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
 .focus-skip:hover { color: var(--accent); }
-.focus.compact .focus-now { column-gap: 9px; padding: 12px 13px; }
-.focus.compact .focus-title { font-size: 15px; line-height: 1.25; }
-.focus.compact .focus-meta { gap: 5px; }
-.focus.compact .focus-meta .cue-chip { flex: 1 1 100%; max-width: 100%; }
-.focus.short .focus-now { padding: 8px 10px; }
-.focus.short .focus-eyebrow { margin-bottom: 4px; }
+.focus.compact .focus-now { column-gap: 9px; padding: 8px 12px; }
+.focus.compact .focus-title { font-size: var(--fs-body); line-height: 1.25; }
+/* Chips flow and wrap naturally — the old force-the-cue-onto-its-own-row rule
+   (flex: 1 1 100%) burned a whole extra meta row (and pushed skip to a third)
+   at the default 7x8 size, which is exactly the height that clipped. The cap
+   keeps a long cue sharing its row (ellipsized) instead of claiming a new one. */
+.focus.compact .focus-meta { gap: 4px 5px; margin-top: 4px; }
+.focus.compact .focus-meta .cue-chip { max-width: 62%; }
+.focus.short .focus-now { padding: 6px 10px; }
 .focus.short .focus-check { width: 20px; height: 20px; }
 .focus.short .focus-title { font-size: var(--fs-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
@@ -46,17 +56,24 @@
    comment). This clock is a live instrument reading, not a heading — it keeps
    the inherited sans stack + tabular-nums so digits don't jitter as they tick,
    which a countdown needs more than the paper conceit does. */
-.focus-clock { font-size: 40px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+/* line-height 1.05, every tier: the inherited body 1.5 padded ~20px of dead
+   air around the digits — height the standard/min grid sizes don't have. */
+.focus-clock { font-size: 40px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--text); }
 .focus-timer.done .focus-clock { color: var(--green); }
 .focus-dur { display: inline-flex; align-items: center; gap: 8px; }
 .focus-dur-val { font-size: var(--fs-ctrl); font-weight: 700; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
 .focus-timer-actions { display: flex; gap: 8px; }
-.focus.compact .focus-timer { gap: 6px; padding: 9px; }
-.focus.compact .focus-clock { font-size: 32px; }
-.focus.short .focus-timer { padding: 7px 8px; }
-.focus.short .focus-clock { font-size: 26px; line-height: 1.05; }
+.focus.compact .focus-timer { gap: 5px; padding: 6px 8px; }
+/* One clock size for both squeezed tiers (short is a subset of compact — see
+   the tier derivation in widgetsize.js), so the ratchet sees one literal. */
+.focus.compact .focus-clock { font-size: 26px; }
+.focus.compact .focus-timer-actions .btn { padding-top: 5px; padding-bottom: 5px; }
+.focus.compact .focus-dur .iconbtn.sm { width: 24px; height: 24px; }
+.focus.short .focus-timer { gap: 4px; padding: 5px 8px; }
 .focus.short .focus-timer-actions { flex-wrap: wrap; justify-content: center; gap: 6px; }
-.focus.short .focus-timer-actions .btn { padding-left: 10px; padding-right: 10px; }
+/* Small enough that Start focus + Reset share one row at the 4-col min width —
+   wrapped, the second row is exactly what bled past the widget's bottom edge. */
+.focus.short .focus-timer-actions .btn { padding: 5px 8px; font-size: var(--fs-2xs); }
 
 /* Transient "Done ✓ — next: …" acknowledgment after completing the current task.
    Entry animation only — and none at all under reduced motion (the chip still

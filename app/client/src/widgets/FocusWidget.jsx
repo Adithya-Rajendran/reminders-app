@@ -158,13 +158,18 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
             {/* In-flow full-width row (grid row 1 in the CSS) — this used to be
                 absolutely positioned top-right of the card, which floated it
                 directly on top of the title text at every widget size instead
-                of reserving its own space. */}
-            <div className="focus-eyebrow">
-              <IconTarget size={14} /> {compact ? 'Focus' : 'Focus on'}
-              {nowIsFromPlan && !short && (
-                <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
-              )}
-            </div>
+                of reserving its own space. Compact tiers drop the whole row
+                (priority-collapse, not clipping): "FOCUS" restates the widget
+                header, and the plan context moves into the meta row below —
+                the ~27px it costs is what made the default 7x8 size overflow. */}
+            {!compact && (
+              <div className="focus-eyebrow">
+                <IconTarget size={14} /> Focus on
+                {nowIsFromPlan && (
+                  <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
+                )}
+              </div>
+            )}
             <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={completeNow} />
             <div className="focus-now-body">
               <div className="focus-title">{nowTask.title}</div>
@@ -172,6 +177,7 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
                 <PriorityDot value={nowTask.priority || 0} />
                 <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
                 {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
+                {nowIsFromPlan && compact && <span className="chip focus-plan-chip">Plan · {planRemaining} left</span>}
                 {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}
                 {ranked.length > 1 && <button className="focus-skip" title="Show another task" onClick={() => setSkip((s) => s + 1)}>skip <IconChevR size={11} /></button>}
               </div>}
@@ -202,7 +208,12 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
           {running
             ? <button className="btn ghost sm" onClick={() => setRunning(false)}>Pause</button>
             : <button className="btn primary sm" onClick={startTimer} disabled={!nowTask}>{remaining < durationMin * 60 && remaining > 0 ? 'Resume' : 'Start focus'}</button>}
-          <button className="btn ghost sm" onClick={resetTimer}>Reset</button>
+          {/* Priority-collapse at the shortest tier: Start/Pause is the primary
+              action and Start already re-arms a finished timer, so Reset is
+              redundant enough to drop — side by side the pair overflows the
+              4-col min width and the wrapped second row bled past the widget's
+              bottom edge. */}
+          {!short && <button className="btn ghost sm" onClick={resetTimer}>Reset</button>}
         </div>
       </div>
 
