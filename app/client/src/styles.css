@@ -168,7 +168,13 @@
 
   --text: #241f19;
   --muted: #6b6053;
-  --faint: #948a7c;
+  /* Was #948a7c — 2.6:1-3.3:1 against these panels (dips below the 3:1 floor
+     WCAG allows even for large text on --bg/--bg2/--panel2, the three most-
+     used surfaces this tints). The dark theme's --faint is a deliberately
+     quiet tertiary tier too, but it never drops below ~3.3:1 on its own
+     panels; this darkening brings light theme to the same floor (3.4-4.3:1
+     here) without pushing --faint up into --muted's 4.7+ range. */
+  --faint: #82766a;
 
   --accent: #96562d;
   --accent2: #b3703a;
@@ -360,7 +366,12 @@ body {
   white-space: nowrap;
 }
 .chip.due-soon { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 30%, transparent); }
-.chip.overdue { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
+/* Border at 50% (not the usual 30%) so the pill keeps a crisp, self-contained
+   outline — several places now put a plain --danger surface right next to
+   this chip (e.g. the Prioritize "Do first" quadrant's solid left bar), and
+   at 30% the chip's edge was soft enough that the two red shapes blurred
+   into one blob instead of reading as "category marker" + "status pill". */
+.chip.overdue { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in oklab, var(--danger) 50%, transparent); }
 .chip.done { color: var(--green); background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 30%, transparent); }
 
 .pdot {
@@ -629,6 +640,14 @@ body {
 .wordmark { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; font-family: var(--font-serif); }
 .topbar-spacer { flex: 1; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
+/* Never had a display rule (only the <=560px display:none override existed) — a
+   plain block div, so AccentPicker's own unstyled position:relative wrapper (a
+   block box) forced a hard line break inside it. Result: the theme toggle sat
+   alone on one line, the accent button alone on a second, gear+logout on a
+   third — a 3-row stack disguised as "wrapping" at any width wide enough that
+   .topbar-right didn't otherwise need to shrink (i.e. most of them). Flexing
+   this container fixes it at every breakpoint, not just 1512. */
+.topbar-actions { display: inline-flex; align-items: center; gap: 8px; }
 .user-email {
   font-size: var(--fs-ctrl);
   color: var(--muted);
@@ -663,7 +682,11 @@ body {
    title demotes to a small eyebrow and the date becomes the masthead. */
 .toolbar-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .toolbar h1 {
-  font-size: var(--fs-meta);
+  /* --fs-2xs, not --fs-meta: this is the app's highest-profile eyebrow (sits
+     directly over the masthead date) and every other eyebrow — .g-title,
+     .gp-sec, .note-search-head, .conn-subhead, etc. — has converged on
+     --fs-2xs. It was the one straggler still a size up. */
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
@@ -728,6 +751,13 @@ body {
 }
 .widget-title .t-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .widget-title .ic { color: var(--accent); flex: 0 0 auto; }
+/* At the narrowest tier (<260px body — a 2-col widget, or any widget mid-drag)
+   the icon + lock badge already eat most of the width, so --fs-title serif
+   at weight 600 has very little room left for the title text itself, and its
+   heavier, less-condensed glyphs lose to the sans stack on legibility before
+   they lose on space. Sans + a touch more weight keeps the same optical size
+   without the serif's tighter fit; .ic/.t-text layout is untouched. */
+.widget[data-wsize="xs"] .widget-title { font-family: var(--font-sans); font-weight: 700; }
 .widget-head-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 .widget-remove { opacity: 0; transition: opacity 150ms ease; }
 .widget:hover .widget-remove,
@@ -895,7 +925,7 @@ body {
 /* month grid */
 .month { display: flex; flex-direction: column; height: 100%; }
 .dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
-.dow span { font-size: 10.5px; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); text-align: center; }
+.dow span { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); text-align: center; }
 .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 4px; flex: 1; min-height: 0; }
 .day-cell {
   border-radius: var(--r-chip);
@@ -961,6 +991,19 @@ body {
   text-align: center;
   gap: 10px;
   padding: 28px 20px;
+  /* height:100% assumed EmptyState is the sole child of its parent — true when
+     a widget renders nothing but .state, but several widgets (Focus among
+     them) now keep their own chrome mounted alongside it (the loading-
+     consistency pass made that the norm, not the exception). In THAT layout
+     .state's parent is a column flexbox with other siblings taking real
+     space, and height:100% demands the parent's full height regardless,
+     overflowing past the chrome. flex:1 (basis 0) makes .state claim its
+     FAIR SHARE of a flex-column parent instead — it wins over height for
+     column-axis sizing when one is actually flexing, so mixed-chrome widgets
+     get correct sizing for free. height:100% stays as the fallback for the
+     sole-child case, where .state's parent isn't flex and flex has no effect. */
+  flex: 1;
+  min-height: 0;
   height: 100%;
   color: var(--muted);
 }
@@ -969,8 +1012,8 @@ body {
   display: grid; place-items: center;
   background: var(--panel2); color: var(--faint);
 }
-.state .state-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
-.state .state-sub { font-size: 12.5px; color: var(--muted); max-width: 220px; line-height: 1.5; }
+.state .state-title { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); }
+.state .state-sub { font-size: var(--fs-meta); color: var(--muted); max-width: 220px; line-height: 1.5; }
 .state.error .state-ic { color: var(--danger); background: var(--danger-soft); }
 .state.error .state-title { color: var(--danger); }
 
@@ -1369,7 +1412,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .trash-row-sub { font-size: 11.5px; color: var(--muted); }
 .note-tag.mini { font-size: 9.5px; padding: 0 5px; line-height: 1.5; }
 .note-toolbar { display: flex; gap: 6px; align-items: center; padding: 0 2px 8px; }
-.note-search { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 6px 10px; color: var(--text); font-size: var(--fs-ctrl); outline: none; }
+/* border: var(--line-strong), not the usual --line — this pill sits directly
+   on the Notes sidebar's --panel2 rail (not --panel/--bg), where --line's low
+   alpha reads as barely-there. --line-strong keeps the same crisp edge the
+   rest of the app's search/input pills have on their usual surfaces. */
+.note-search { flex: 1; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 6px 10px; color: var(--text); font-size: var(--fs-ctrl); outline: none; }
 .note-search:focus { border-color: var(--accent); }
 .note-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; min-height: 0; flex: 1; }
 .note-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; border-radius: var(--r-chip); padding: 8px; color: var(--text); cursor: pointer; }
@@ -1606,7 +1653,9 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .slash-item.sel { background: var(--accent-soft); }
 .slash-item-title { font-size: 13.5px; flex: 1; }
 .slash-item.sel .slash-item-title { color: var(--accent); }
-.slash-item-group { font-size: var(--fs-micro); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+/* font-weight:700 to match every other eyebrow in the app (see --tracking-eyebrow) —
+   this one was missing it and rendered visibly lighter than its siblings. */
+.slash-item-group { font-size: var(--fs-micro); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 
 /* Callout (Obsidian admonition) */
 .tiptap-content .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: var(--r-btn); padding: 8px 14px 10px; }
