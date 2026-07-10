@@ -40,6 +40,7 @@ env:
   # ConfigMap is built the same way. The password isn't a real secret (it's
   # already committed in plaintext in setup-backends.sh, same as the local
   # e2e harness) — override via repo vars if the fixture ever diverges.
+  DEV_SVC_PORT: ${{ vars.DEV_SVC_PORT || '8080' }}
   DEV_CALDAV_URL: ${{ vars.DEV_CALDAV_URL || 'http://radicale.reminders-dev.svc:5232/' }}
   DEV_CALDAV_USER: ${{ vars.DEV_CALDAV_USER || 'e2e' }}
   DEV_CALDAV_PASS: ${{ vars.DEV_CALDAV_PASS || 'e2epw' }}
@@ -130,13 +131,13 @@ jobs:
         env:
           # DEV_VISUAL_USER and the DEV_CALDAV_* credentials are already set
           # job-wide above — only BASE_URL needs computing here.
-          BASE_URL: http://${{ env.DEV_K8S_DEPLOYMENT }}.${{ env.DEV_K8S_NAMESPACE }}.svc
+          BASE_URL: http://${{ env.DEV_K8S_DEPLOYMENT }}.${{ env.DEV_K8S_NAMESPACE }}.svc:${{ env.DEV_SVC_PORT }}
         run: node live-provision.mjs
 
       - name: Run live dev resize audit
         working-directory: test/e2e
         env:
-          BASE_URL: http://${{ env.DEV_K8S_DEPLOYMENT }}.${{ env.DEV_K8S_NAMESPACE }}.svc
+          BASE_URL: http://${{ env.DEV_K8S_DEPLOYMENT }}.${{ env.DEV_K8S_NAMESPACE }}.svc:${{ env.DEV_SVC_PORT }}
           E2E_USER: ${{ env.DEV_VISUAL_USER }}
           CI: true
         run: |
