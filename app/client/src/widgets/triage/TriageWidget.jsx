@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import {
   useTaskList, useWidgetSize,
   groupEisenhower, selectMostImportant, isRealDate, dueChip, applyOrganizer, useOrganizerFilter,
-  EmptyState, ErrorState, SkeletonRows, UndoBar,
+  EmptyState, ErrorState, ReconnectBanner, SkeletonRows, UndoBar,
   IconTarget,
 } from '../../widget-sdk'
 import { IMPORTANT_QUAD, URGENT_QUAD, soonDue } from './constants.js'
@@ -68,30 +68,41 @@ export default function TriageWidget({ tasks: tasksCap, organizer }) {
     if (Object.keys(patch).length) onPatch(task, patch)
   }, [tasks, onPatch])
 
-  if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
-  if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
+  // The matrix IS the data (no separable toolbar/add-form here), so — like
+  // Overview — the whole callout+matrix region gates together; only a refresh
+  // failure with an already-loaded board keeps it visible via ReconnectBanner
+  // instead of blanking to the full ErrorState.
+  const hasData = tasks.length > 0
 
   return (
     <div className={`triage${layout.compact ? ' compact' : ''}${layout.short ? ' short' : ''}`}>
-      {/* Most important callout — the one task to do now (no points). */}
-      {mostImportant ? (
-        <MostImportantCard task={mostImportant} showWhy={layout.showWhy} why={whyFocus} onToggle={onToggle} />
-      ) : (
-        <EmptyState icon={IconTarget} title="Nothing flagged" sub="Mark a task important (or drag one into a top row) to set your focus." />
-      )}
+      {state === 'loading' && <SkeletonRows n={4} />}
+      {state === 'error' && !hasData && <ErrorState onRetry={load} />}
+      {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
 
-      {/* Eisenhower matrix — droppable quadrants; dragging a task persists its axes. */}
-      <TriageMatrix
-        quads={quads}
-        layout={layout}
-        dragOver={dragOver}
-        setDragOver={setDragOver}
-        onDropInto={onDropInto}
-        onToggle={onToggle}
-        onSchedule={onSchedule}
-        onSetPriority={onSetPriority}
-        onPatch={onPatch}
-      />
+      {(state === 'ready' || (state === 'error' && hasData)) && (
+        <>
+          {/* Most important callout — the one task to do now (no points). */}
+          {mostImportant ? (
+            <MostImportantCard task={mostImportant} showWhy={layout.showWhy} why={whyFocus} onToggle={onToggle} />
+          ) : (
+            <EmptyState icon={IconTarget} title="Nothing flagged" sub="Mark a task important (or drag one into a top row) to set your focus." />
+          )}
+
+          {/* Eisenhower matrix — droppable quadrants; dragging a task persists its axes. */}
+          <TriageMatrix
+            quads={quads}
+            layout={layout}
+            dragOver={dragOver}
+            setDragOver={setDragOver}
+            onDropInto={onDropInto}
+            onToggle={onToggle}
+            onSchedule={onSchedule}
+            onSetPriority={onSetPriority}
+            onPatch={onPatch}
+          />
+        </>
+      )}
 
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>
