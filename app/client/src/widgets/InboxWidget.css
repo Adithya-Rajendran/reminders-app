@@ -7,7 +7,7 @@
 /* Header: the running count leads — the surface's whole job is to drive it to 0. */
 .ib-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ib-title { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-ctrl); font-weight: 700; color: var(--text); }
-.ib-count { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); }
+.ib-count { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* The focused item card — one decision at a time. */
 .ib-card { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 13px 14px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
@@ -35,7 +35,7 @@
 /* Up-next peek: read-only titles so the pile is legible without inviting
    out-of-order editing (only the focused item is actionable). */
 .ib-upnext { display: flex; flex-direction: column; gap: 4px; }
-.ib-upnext-head { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.ib-upnext-head { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
 .ib-upnext-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .ib-upnext-item { font-size: 12.5px; color: var(--muted); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ib-upnext-more { font-size: 11.5px; color: var(--faint); margin-top: 1px; }

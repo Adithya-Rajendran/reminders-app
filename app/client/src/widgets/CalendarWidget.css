@@ -34,7 +34,9 @@
 
 /* Toolbar */
 .cal-wrap .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
-.cal-wrap .fc .fc-toolbar-title { font-size: var(--fs-title); font-weight: 650; color: var(--text); }
+/* The calendar's own period heading ("July 2026") — same display role as the
+   Dashboard masthead, so it gets the same serif treatment. */
+.cal-wrap .fc .fc-toolbar-title { font-size: var(--fs-title); font-weight: 650; color: var(--text); font-family: var(--font-serif); }
 
 /* Toolbar buttons */
 .cal-wrap .fc .fc-button {
@@ -49,7 +51,7 @@
 .cal-wrap .fc .fc-button-primary:disabled { opacity: .5; }
 .cal-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
 .cal-wrap .fc .fc-button-primary:not(:disabled):active {
-  background: var(--accent-grad);
+  background: var(--accent);
   border-color: transparent; color: var(--on-accent);
 }
 .cal-wrap .fc .fc-button-group > .fc-button { border-radius: 0; }

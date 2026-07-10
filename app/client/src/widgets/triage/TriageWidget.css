@@ -7,7 +7,7 @@
 
 /* ---- "Most important" callout (the one task to do now) ---- */
 .tri-focus { position: relative; flex: 0 0 auto; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--r-card); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent); }
-.tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+.tri-focus-eyebrow { position: absolute; top: 9px; right: 11px; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 /* The complete button is a real button (not a bare circle) so it's keyboard- and
    screen-reader-reachable; the check icon only shows the affordance on hover. */
 .tri-focus-check { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 14px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; color: transparent; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
@@ -40,7 +40,7 @@
 .eq.drop-over { background: var(--accent-soft); border-color: var(--accent); }
 .eq-head { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; min-width: 0; gap: 8px; }
 .eq-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
-.eq-count { font-size: 11px; font-weight: 700; color: var(--muted); }
+.eq-count { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .eq-sub { flex: 0 0 auto; font-size: 10.5px; color: var(--faint); margin-bottom: 6px; }
 .eq-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
 /* A draggable wrapper around each dense TaskRow — grab affordance + a subtle lift

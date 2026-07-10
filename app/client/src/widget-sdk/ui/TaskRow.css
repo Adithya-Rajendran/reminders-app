@@ -46,7 +46,7 @@
 .subtask-chip:hover { border-color: var(--accent); }
 .subtask-chip.empty { color: var(--faint); background: transparent; border: 1px dashed var(--line-strong); }
 .subtask-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
-.subtask-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+.subtask-fill { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .subtask-add { margin-top: 4px; }
 
 /* If-then cue: inline editor popover (the static .cue-chip/.cue-arrow glyph
@@ -65,14 +65,14 @@
 
 /* Habits — streak / consistency dots / automaticity bar, rendered by
    TaskRow's HabitStrip helper when a widget passes showHabit. */
-.habit-streak { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-meta); font-weight: 700; color: var(--faint); }
+.habit-streak { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-meta); font-weight: 700; color: var(--faint); font-variant-numeric: tabular-nums; }
 .habit-streak.on { color: var(--warn); }
 .habit-dots { display: flex; gap: 3px; flex-wrap: wrap; }
 .hdot { width: 12px; height: 12px; border-radius: 4px; background: var(--line-strong); }
 .hdot.done { background: var(--green); }
 .habit-auto { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); color: var(--muted); font-weight: 600; }
 .habit-auto-bar { width: 70px; height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
-.habit-auto-fill { display: block; height: 100%; background: var(--accent-grad); border-radius: 3px; }
+.habit-auto-fill { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 
 .habit-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .habit-strip .habit-streak { margin-left: 0; }
