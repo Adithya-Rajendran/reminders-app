@@ -5,7 +5,8 @@
 import crypto from 'node:crypto'
 import ICAL from 'ical.js'
 import { clientFor, authHeader, safeFetch, collectionCtag, VTODO_FILTER, CALDAV_PRODID, readFetchOptions } from './caldav.js'
-import { cacheDecision } from './readcache.js'
+import { cacheDecision, asRehydrated } from './readcache.js'
+import { getCache } from './cache.js'
 import { listsWithId, getListById, getGroupListId } from './config.js'
 import { safeParse, categoryNames, setCategories } from './vtodo.js'
 import { readCue, writeCue, readCueTrigger, writeCueTrigger, cleanDescription, readHabitLog, appendHabitLog, readGoalFlag, writeGoalFlag, readGoalPlan, writeGoalPlan, readParentGoal, writeParentGoal, readFlow, writeFlow, readDread, writeDread, readEstimate, writeEstimate, readArea, writeArea, readImportant, writeImportant, readClarified, writeClarified } from './vtodo_meta.js'
@@ -67,16 +68,68 @@ export function serializeVtodo(vt, listId, objectUrl) {
 const FRESH_TTL = 12000
 const cache = new Map() // sub -> Map<listUrl, { parsed:[{url,vt}], ctag:string|null, at:number }>
 const userCache = (sub) => { let c = cache.get(sub); if (!c) { c = new Map(); cache.set(sub, c) } return c }
-export const invalidateUserCache = (sub) => cache.delete(sub)
+// Best-effort: also drop the persistent (Valkey/in-memory-adapter) copy for
+// every list this process has seen for the user, so a hydrate right after this
+// invalidation can't hand back a pre-write snapshot. Not required for
+// correctness (asRehydrated() forces a ctag check on every hydrate, which
+// would catch the upstream change too) but keeps the persisted store honest
+// and avoids the extra PROPFIND when we already know the entry is dead.
+// Lists this process never fetched aren't tracked here — see the single-
+// replica note in cache.js/k8s docs; cross-replica invalidation is out of
+// scope, the ctag check bounds staleness regardless.
+export function invalidateUserCache(sub) {
+  const c = cache.get(sub)
+  if (c && c.size) {
+    const listUrls = [...c.keys()]
+    getCache().then((adapter) => Promise.all(listUrls.map((u) => adapter.del(vtodoKey(sub, u))))).catch(() => {})
+  }
+  cache.delete(sub)
+}
 const invalidate = invalidateUserCache
 
 // The pure fresh/ctag/report decision moved to readcache.js so the VEVENT cache
 // (caldav.js) shares it; re-exported here for the existing unit test's import.
 export { cacheDecision } from './readcache.js'
 
+// ---- persistent (Valkey-or-in-memory-adapter) read-through, survives restarts ----
+// Raw ICS text (not the parsed ICAL.Component) is what's persisted — the
+// component tree isn't JSON-serializable, and re-parsing it back from text on
+// hydrate is cheap relative to the network REPORT it replaces. TTL is generous
+// (irrelevant lists just age out): the ctag check on every hydrate (see
+// asRehydrated in readcache.js) is what actually bounds staleness, not this TTL.
+const VTODO_TTL_SEC = 7 * 24 * 3600
+const vtodoKey = (sub, listUrl) => `vtodo:${sub}:${listUrl}`
+
+async function hydrateVtodoEntry(sub, listUrl) {
+  const adapter = await getCache()
+  const persisted = await adapter.get(vtodoKey(sub, listUrl))
+  if (!persisted || !Array.isArray(persisted.items)) return null
+  const parsed = persisted.items.map(({ url, data }) => ({ url, vt: safeParse(data).vt })).filter((p) => p.vt)
+  if (!parsed.length && persisted.items.length) return null // every item failed to reparse — treat as a miss
+  return asRehydrated({ parsed, ctag: persisted.ctag ?? null, at: persisted.at || 0 }, Date.now(), FRESH_TTL)
+}
+
+// Fire-and-forget: never let a slow/unavailable cache backend delay the
+// response that just paid for the REPORT+parse.
+function persistVtodoEntry(sub, listUrl, entry, objs) {
+  getCache().then((adapter) => adapter.set(
+    vtodoKey(sub, listUrl),
+    { ctag: entry.ctag, at: entry.at, items: objs.map((o) => ({ url: o.url, data: o.data })) },
+    VTODO_TTL_SEC,
+  )).catch(() => {})
+}
+
 async function fetchObjectsCached(sub, account, listUrl) {
   const c = userCache(sub)
-  const entry = c.get(listUrl)
+  let entry = c.get(listUrl)
+  if (!entry) {
+    // Cold in-process entry (fresh boot, or evicted by invalidateUserCache) —
+    // try the persistent adapter before paying for a full REPORT. asRehydrated
+    // guarantees the decision below is at worst 'ctag' (one cheap PROPFIND),
+    // never a silent 'fresh' hit on possibly-stale data.
+    const hydrated = await hydrateVtodoEntry(sub, listUrl)
+    if (hydrated) { entry = hydrated; c.set(listUrl, entry) }
+  }
   const decision = cacheDecision(entry, Date.now(), FRESH_TTL)
   if (decision === 'fresh') return entry.parsed
   let knownCtag = entry?.ctag || null
@@ -91,7 +144,9 @@ async function fetchObjectsCached(sub, account, listUrl) {
   // Reuse the ctag the change-probe already fetched; only on a cold entry do we
   // pay one extra PROPFIND to seed it.
   const ctag = knownCtag != null ? knownCtag : await collectionCtag(account, listUrl).catch(() => null)
-  c.set(listUrl, { parsed, ctag, at: Date.now() })
+  const fresh = { parsed, ctag, at: Date.now() }
+  c.set(listUrl, fresh)
+  persistVtodoEntry(sub, listUrl, fresh, objs)
   return parsed
 }
 export async function allUserVtodos(sub) {
@@ -383,3 +438,7 @@ export async function attachLabel(req, res) {
     res.json({ ok: true, label_id: encodeLabelId(name) })
   } catch (e) { console.error('caldav attachLabel failed:', e?.message || e); res.status(502).json({ error: 'could not attach label' }) }
 }
+
+// exported for tests only — the persistent VTODO read-through (hydrate on a
+// cold in-process entry, persist after a real fetch, key format).
+export { vtodoKey as _vtodoKey, hydrateVtodoEntry as _hydrateVtodoEntry, persistVtodoEntry as _persistVtodoEntry }
