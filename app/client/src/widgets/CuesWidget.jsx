@@ -264,7 +264,11 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
     <div className="tasklist flow-wrap">
       <div className="flow-toolbar">
         <GroupPicker value={group} groups={allGroups} recent={recent} onChange={setGroup} onNew={(name) => groups.onNewGroup?.(name)} neutral={{ label: 'All reminders', value: '' }} placeholder="All reminders" />
-        {showHint && <span className="flow-hint">Drag a card onto the board · drag ● to link · click a line to remove · double-click to edit the cue</span>}
+        {/* Three beats, not a paragraph — cue editing already has a visible ✎
+            affordance on every card, so the legend only teaches the gestures
+            that have no on-card control. Hidden while there is nothing to
+            drag: the empty state already explains where cards come from. */}
+        {showHint && hasData && <span className="flow-hint">Drag to place · drag ● to link · click a line to unlink</span>}
         {compact && source.length > 0 && (
           <button type="button" className="btn ghost sm" aria-pressed={queueOpen} onClick={() => setQueueOpen((o) => !o)}>
             Queue · {queue.length}

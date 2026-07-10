@@ -2,45 +2,65 @@
    styles.css). All theme-token driven so light/dark + accents follow. */
 .flow-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .flow-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex: 0 0 auto; }
-.flow-hint { font-size: var(--fs-2xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The gesture legend reads as quiet marginalia: pushed to the toolbar's right
+   edge, away from the picker, so the row has one control cluster + one whisper
+   of help instead of a run-on sentence crowding the control. */
+.flow-hint { margin-left: auto; font-size: var(--fs-2xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-body { flex: 1; display: flex; min-height: 0; gap: 8px; }
 .flow-queue { flex: 0 0 158px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; border-right: 1px solid var(--line); }
+/* A wide widget can afford a wider rail — truncated queue titles cost more
+   than the extra 32px once the board has room to spare. */
+[data-wsize="xl"] .flow-queue { flex: 0 0 190px; }
 .flow-queue-head { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); padding: 2px; }
 .flow-queue-empty { font-size: var(--fs-meta); color: var(--faint); padding: 4px 2px; }
-.flow-qitem { text-align: left; cursor: grab; display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border-radius: var(--r-chip); border: 1px solid var(--line-strong); background: color-mix(in oklab, var(--panel-solid) 45%, transparent); color: var(--text); }
+/* Queue rows are cards NOT yet on the board: dashed outline over a translucent
+   fill (vs the placed cards' solid paper) so "waiting" and "placed" read apart
+   at a glance in both the rail and the compact list. */
+.flow-qitem { text-align: left; cursor: grab; display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border-radius: var(--r-chip); border: 1px dashed var(--line-strong); background: color-mix(in oklab, var(--panel-solid) 45%, transparent); color: var(--text); }
 .flow-qitem:hover { border-color: var(--accent); }
-.flow-qitem-t { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-qitem-t { font-size: var(--fs-meta); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-qitem-cue { font-size: var(--fs-2xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-compact-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .flow-compact-sec { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.flow-compact-card { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--panel-solid); }
+/* Placed cards in the compact list share the board cards' index-card language:
+   solid paper, chip radius, resting shadow — a real object, unlike the dashed
+   still-in-the-queue rows below them. */
+.flow-compact-card { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: var(--r-chip); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
 .flow-compact-card .check-btn { flex: 0 0 auto; margin-top: 1px; }
 .flow-compact-main { min-width: 0; flex: 1; }
 .flow-compact-title { font-size: var(--fs-ctrl); font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-compact-cue { font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-compact-cue { font-size: var(--fs-2xs); color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-canvas { flex: 1; overflow: auto; position: relative; border: 1px solid var(--line); border-radius: var(--r-btn); background:
   radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--bg2); }
 .flow-content { position: relative; }
 .flow-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 .flow-edge { pointer-events: auto; cursor: pointer; }
 .flow-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
-.flow-edge-line { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .85; }
+/* Connectors are pencil strokes on the board, not accent chrome: copper is now
+   the app-wide accent, so a full-strength 2px copper line shouted over the
+   cards. Settled links blend toward ink; full copper is reserved for the LIVE
+   link being dragged (.temp below) and the ● handles. */
+.flow-edge-line { fill: none; stroke: color-mix(in oklab, var(--accent) 60%, var(--muted)); stroke-width: 1.5; opacity: .9; }
 .flow-edge:hover .flow-edge-line,
 .flow-edge:focus-visible .flow-edge-line { stroke: var(--danger); }
 /* SVG <g> outlines render unevenly; recolor the line as the focus cue instead. */
 .flow-edge:focus { outline: none; }
-.flow-edge-line.temp { stroke-dasharray: 5 4; opacity: .7; pointer-events: none; }
-.flow-edges marker path { fill: var(--accent); }
-.flow-node { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: var(--r-btn); border: 1px solid var(--line-strong); background: var(--panel-solid); box-shadow: var(--shadow-sm); cursor: grab; touch-action: none; user-select: none; }
+.flow-edge-line.temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; opacity: .8; pointer-events: none; }
+.flow-edges marker path { fill: color-mix(in oklab, var(--accent) 60%, var(--muted)); }
+/* Placed cards are index cards pinned to the board: squarer chip radius (a
+   12px button radius read as floating UI, not paper), solid paper face, one
+   resting shadow. A ruled line under the title (below) finishes the look. */
+.flow-node { position: absolute; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: var(--r-chip); border: 1px solid var(--line-strong); background: var(--panel-solid); box-shadow: var(--shadow-sm); cursor: grab; touch-action: none; user-select: none; }
 .flow-node:hover { border-color: var(--accent); }
 .flow-node.dragging { cursor: grabbing; box-shadow: var(--shadow); border-color: var(--accent); z-index: 5; }
 .flow-node.done { opacity: .6; }
 .flow-node.done .flow-node-title { text-decoration: line-through; }
 .flow-node-body { flex: 1; min-width: 0; }
-.flow-node-title { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-node-cue { font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The index card's ruled line: a hairline between title and cue row. */
+.flow-node-title { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+.flow-node-cue { font-size: var(--fs-2xs); color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-cue-add { color: var(--faint); }
-.flow-cue-input { font-size: 11.5px; padding: 2px 6px; margin-top: 3px; width: 100%; }
+.flow-cue-input { font-size: var(--fs-2xs); padding: 2px 6px; margin-top: 3px; width: 100%; }
 .flow-unplace { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--muted); font-size: var(--fs-ctrl); line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
 .flow-node:hover .flow-unplace { display: inline-flex; }
 /* Keyboard (focus reaches the control) and touch (no hover) must expose the
