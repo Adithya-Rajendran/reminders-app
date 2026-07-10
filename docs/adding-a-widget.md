@@ -81,6 +81,10 @@ hooks, pure helpers, icons, and per-instance storage; see
   the CSS variables from `styles.css` (`var(--muted)`, `var(--accent)`, …) so
   light/dark themes and accents work. The widget body scrolls on its own; don't
   fight the frame.
+- **Design tokens** — `styles.css`'s `:root` block also has type (`--fs-*`),
+  macro-spacing (`--sp-*`), radius (`--r-*`), and z-index (`--z-*`) scales.
+  New widget CSS should consume these instead of picking new px literals —
+  they exist so hand-authored one-off sizes don't keep multiplying.
 
 ### Read the shared task store
 
