@@ -4,7 +4,7 @@
 // Run with: node test/flowgeom.test.mjs
 import {
   NODE_W, NODE_H, CONTENT_W, CONTENT_H,
-  edgePath, toContent, nodeOut, nodeIn, edgeBetween, dropBase, dragTo, uidFromPoint,
+  edgePath, toContent, nodeOut, nodeIn, edgeBetween, dropBase, dragTo, canvasExtent, uidFromPoint,
 } from '../client/src/flowgeom.js'
 
 let pass = 0, fail = 0
@@ -57,6 +57,42 @@ eq(edgePath(0, 0, 100, 40), 'M 0 0 C 55 0, 45 40, 100 40', 'edgePath builds the 
   ok(t.x === 310 && t.y === 170, 'dragTo subtracts the grab offset')
   const clamped = dragTo({ x: 50, y: 20 }, 90, 30)
   ok(clamped.x === 0 && clamped.y === 0, 'dragTo clamps to the top/left edge')
+}
+
+// --- dropBase & dragTo with custom canvas dimensions ---
+{
+  const customW = 1200, customH = 800
+  const b = dropBase({ x: 500, y: 300 }, customW, customH)
+  ok(b.x === 500 - NODE_W / 2 && b.y === 300 - 20, 'dropBase with custom canvas dimensions works normally in center')
+  const tooBigX = dropBase({ x: customW + 100, y: 300 }, customW, customH)
+  ok(tooBigX.x === customW - NODE_W, `dropBase clamps to right edge: x=${tooBigX.x}, expected ${customW - NODE_W}`)
+  const tooBigY = dropBase({ x: 500, y: customH + 100 }, customW, customH)
+  ok(tooBigY.y === customH - NODE_H, `dropBase clamps to bottom edge: y=${tooBigY.y}, expected ${customH - NODE_H}`)
+
+  const d = dragTo({ x: 400, y: 200 }, 90, 30, customW, customH)
+  ok(d.x === 310 && d.y === 170, 'dragTo with custom canvas dimensions works normally in center')
+  const dragTooBigX = dragTo({ x: customW + 100, y: 200 }, 90, 30, customW, customH)
+  ok(dragTooBigX.x === customW - NODE_W, `dragTo clamps to right edge: x=${dragTooBigX.x}, expected ${customW - NODE_W}`)
+  const dragTooBigY = dragTo({ x: 400, y: customH + 100 }, 90, 30, customW, customH)
+  ok(dragTooBigY.y === customH - NODE_H, `dragTo clamps to bottom edge: y=${dragTooBigY.y}, expected ${customH - NODE_H}`)
+}
+
+// --- canvasExtent: floor vs. view-scaled vs. node-extent coverage ---
+{
+  const e = canvasExtent([], CONTENT_W, CONTENT_H, 0, 0)
+  ok(e.w === CONTENT_W && e.h === CONTENT_H, 'no nodes + unmeasured view: the constant floor wins')
+  const grown = canvasExtent([], CONTENT_W, CONTENT_H, 5120, 2000)
+  ok(grown.w === 5120 * 2.2 && grown.h === 2000 * 2.2, 'a large widget scales the plane by 2.2× the view')
+  // The strand guard: a card parked far right/down while the widget was large
+  // must stay reachable after the widget shrinks — extents floor the plane.
+  const far = canvasExtent([{ x: 10000, y: 5000 }, { x: 20, y: 30 }], CONTENT_W, CONTENT_H, 800, 600)
+  ok(far.w === 10000 + NODE_W + 40 && far.h === 5000 + NODE_H + 40,
+    `node extents floor the plane with a 40px margin (got ${far.w}×${far.h})`)
+  // max is taken per-axis: a card far right but near the top only widens the plane.
+  const wideOnly = canvasExtent([{ x: 10000, y: 10 }], CONTENT_W, CONTENT_H, 800, 600)
+  ok(wideOnly.w === 10000 + NODE_W + 40 && wideOnly.h === CONTENT_H, 'extents apply independently per axis')
+  const nulls = canvasExtent([null, { x: 100, y: 100 }, undefined], CONTENT_W, CONTENT_H, 0, 0)
+  ok(nulls.w === CONTENT_W && nulls.h === CONTENT_H, 'unplaced entries (null flow) are ignored')
 }
 
 // --- uidFromPoint: walk up to the nearest [data-uid], stopping at <body> ---

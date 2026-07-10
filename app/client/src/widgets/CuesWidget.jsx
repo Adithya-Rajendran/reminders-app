@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue, NODE_W, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, edgeBetween, dropBase, dragTo, uidFromPoint } from '../widget-sdk'
+import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue, NODE_W, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, edgeBetween, dropBase, dragTo, canvasExtent, uidFromPoint } from '../widget-sdk'
 import './CuesWidget.css'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
@@ -80,6 +80,16 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
   }, [])
 
   const source = useMemo(() => selectFlowSource(tasks, group), [tasks, group])
+
+  // Effective canvas: the constant floor, grown with the measured widget (a
+  // bigger widget deserves more board) and never smaller than the placed nodes'
+  // extents — otherwise shrinking the widget after parking a card far right/down
+  // would strand it beyond the scrollable plane. Positions are absolute px, so
+  // resizing the plane never moves existing cards.
+  const { w: effectiveW, h: effectiveH } = useMemo(
+    () => canvasExtent(source.map((t) => t.flow), CONTENT_W, CONTENT_H, sz.width, sz.height),
+    [source, sz.width, sz.height],
+  )
   const draggingMoveUid = drag && drag.mode === 'move' ? drag.uid : null
   const placed = source.filter((t) => t.flow || t.uid === draggingMoveUid)
   const queue = source.filter((t) => !t.flow && t.uid !== draggingMoveUid)
@@ -119,11 +129,11 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
     if (e.button != null && e.button !== 0) return
     e.preventDefault()
     const s = ptToContent(e)
-    const base = task.flow || dropBase(s)
+    const base = task.flow || dropBase(s, effectiveW, effectiveH)
     const offX = fromQueue ? NODE_W / 2 : s.x - base.x
     const offY = fromQueue ? 20 : s.y - base.y
     setDrag({ mode: 'move', uid: task.uid, x: base.x, y: base.y, offX, offY })
-    const move = (ev) => { const p = ptToContent(ev); setDrag((d) => d && ({ ...d, ...dragTo(p, d.offX, d.offY) })) }
+    const move = (ev) => { const p = ptToContent(ev); setDrag((d) => d && ({ ...d, ...dragTo(p, d.offX, d.offY, effectiveW, effectiveH) })) }
     const up = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
       setDrag((d) => { if (d) persistFlow(task, { x: d.x, y: d.y }); return null })
@@ -217,8 +227,8 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
           </div>
         )}
         <div className="flow-canvas" ref={canvasRef}>
-          <div className="flow-content" style={{ width: CONTENT_W, height: CONTENT_H }}>
-            <svg className="flow-edges" width={CONTENT_W} height={CONTENT_H}>
+          <div className="flow-content" style={{ width: effectiveW, height: effectiveH }}>
+            <svg className="flow-edges" width={effectiveW} height={effectiveH}>
               <defs>
                 <marker id="flow-arrow" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" /></marker>
               </defs>
