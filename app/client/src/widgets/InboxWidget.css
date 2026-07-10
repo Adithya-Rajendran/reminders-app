@@ -6,15 +6,16 @@
 
 /* Header: the widget chrome above already says "Inbox" (icon + title), so this
    inner line doesn't repeat it — just the running count, demoted to a plain
-   eyebrow (matches the "Up next" eyebrow below it, same token, same voice). */
+   eyebrow (wg-eyebrow — matches the "Up next" eyebrow below it, same token,
+   same voice). */
 .ib-head { display: flex; align-items: center; }
-.ib-eyebrow { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* The focused item card — one decision at a time. Capped to the app's readable
-   measure (same token as task rows / note prose, see styles.css --measure) so a
-   widget resized very wide doesn't stretch a two-line card edge-to-edge and read
-   as an empty paper card floating in a sea of unused width. */
-.ib-card { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 13px 14px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); max-width: var(--measure); }
+/* The focused item card — one decision at a time (wg-card, the shared inset-
+   callout look). Capped to the app's readable measure (same token as task
+   rows / note prose, see styles.css --measure) so a widget resized very wide
+   doesn't stretch a two-line card edge-to-edge and read as an empty paper
+   card floating in a sea of unused width. */
+.ib-card { max-width: var(--measure); }
 .ib-card-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
 .inbox.compact .ib-card { gap: 8px; padding: 10px 11px; }
 .inbox.short .ib-card { gap: 7px; padding: 8px 9px; }
@@ -41,8 +42,6 @@
    as the card above, so the two blocks share a consistent right edge instead of
    the list trailing off into empty width the card no longer uses. */
 .ib-upnext { display: flex; flex-direction: column; gap: 4px; max-width: var(--measure); }
-.ib-upnext-head { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
 .ib-upnext-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .ib-upnext-item { font-size: 12.5px; color: var(--muted); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ib-upnext-more { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
 .ib-upnext-compact { font-size: var(--fs-meta); color: var(--muted); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -1,0 +1,133 @@
+/* ============================================================
+   Widget primitives — the shared "Paper Planner × Instrument" vocabulary.
+   Every widget converged on the same handful of shapes during the per-widget
+   fidelity pass (see git log: "… fidelity: …" PRs #163-178) but each one
+   hand-rolled its own class for it. This file is the ONE place those shapes
+   live now; widgets consume them via the wg- prefixed classNames below
+   instead of re-declaring the same tokens under a local name.
+
+   Loaded once at host boot (see main.jsx) so it's available before ANY
+   widget chunk paints — lazy widget chunks don't need to import this
+   themselves.
+
+   Every rule here is tokens-only (var(--...)) so both themes + every accent
+   stay coherent automatically — same discipline as styles.css. Widget CSS
+   files may size/position these (margin, width, grid placement) but must not
+   re-declare their look (font/color/radius/background) — see
+   test/css-tokens.test.mjs's "wg- boundary" check.
+   ============================================================ */
+
+/* ---- wg-eyebrow: the small-caps section/group label ----
+   Absorbs: .ib-eyebrow, .ib-upnext-head, .ov-sec-label, .ov-metric-lbl,
+   .eq-label, .tree-head, .flow-queue-head, .rv-last-label, .rv-hist-date,
+   .rv-flow-step (accent variant), .tri-focus-eyebrow (accent variant, not
+   yet migrated — Focus/Triage's own eyebrow lands with their migration).
+   Same token recipe the fidelity pass standardized everywhere else in the
+   app (see --tracking-eyebrow in styles.css): --fs-2xs / 700 / uppercase /
+   --tracking-eyebrow / --muted. */
+.wg-eyebrow {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-2xs); font-weight: 700;
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A handful of eyebrows carry emphasis (an in-progress step, an armed
+   callout) instead of a quiet label — same shape, accent ink. */
+.wg-eyebrow--accent { color: var(--accent); }
+/* Eyebrow as the leading element of a header row, with trailing content
+   (a count, an action) pushed to the far edge. */
+.wg-eyebrow-row { display: flex; align-items: center; gap: var(--sp-4); }
+.wg-eyebrow-row .wg-eyebrow { flex: 1 1 auto; min-width: 0; }
+
+/* ---- wg-count: a small numeric/label badge trailing a row or eyebrow ----
+   Absorbs: .g-count, .eq-count, .tree-count, .tree-note-folder. Plain-text
+   by default (matches the quiet "N" reading next to a group header); the
+   --pill modifier absorbs .rg-count's filled badge (a *count that means
+   something selected*, not just a tally). */
+.wg-count {
+  font-size: var(--fs-micro); color: var(--faint);
+  font-weight: 600; font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.wg-count--pill {
+  font-size: var(--fs-micro); font-weight: 700;
+  color: var(--muted); background: var(--accent-soft);
+  border-radius: var(--r-pill); padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- wg-card: an inset callout card, ON the widget's own paper ----
+   Radius steps down from the outer widget shell's --r-card to --r-btn —
+   documented in FocusWidget.css as the layering rule every inset callout
+   in the app follows (a card ON the paper, not a second widget shell).
+   Neutral by default (absorbs .ib-card, .ov-event-row, .ov-metric,
+   .rv-prev-reflect); the --accent modifier absorbs the "this is the one
+   that matters" treatment (.ov-focus-row, .rv-prompt, .tri-focus). */
+.wg-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--sp-5);
+  padding: 13px 14px;
+  border-radius: var(--r-btn);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+}
+.wg-card--accent {
+  background: var(--accent-soft);
+  border-color: color-mix(in oklab, var(--accent) 28%, transparent);
+}
+.wg-card--row { flex-direction: row; align-items: center; gap: var(--sp-5); }
+
+/* ---- wg-stat: a big tabular-sans instrument reading ----
+   Deliberately sans + tabular, never --font-serif — this is a dial-face
+   number (a live reading), not a heading (see FocusWidget.css's comment on
+   why .focus-clock isn't serif; every big-number gauge in the app follows
+   this same rule). Base size matches the smallest reading in the family
+   (.ov-metric-num, 26px); --lg/--xl absorb the taller readings
+   (.rv-big 38px, .focus-clock 40px — Focus not yet migrated). */
+.wg-stat {
+  font-size: var(--fs-stat); font-weight: 800; line-height: 1;
+  letter-spacing: -.02em; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.wg-stat--lg { font-size: var(--fs-stat-lg); }
+.wg-stat--xl { font-size: var(--fs-stat-xl); }
+
+/* ---- wg-footnote: the quiet "+N more" / hint affordance ----
+   Absorbs: .ib-upnext-more, .up-more, .eq-more, .focus-endpark-more (Focus
+   not yet migrated). One shared faint/small treatment instead of four
+   widgets picking their own faint-ish size. */
+.wg-footnote {
+  font-size: var(--fs-2xs); color: var(--faint);
+}
+
+/* ---- wg-toolrow: a single instrument-line row of controls ----
+   Absorbs the shape of .rem-toolrow (RemindersWidget) — a hint/label on
+   the leading edge, one action pinned to the trailing edge, single row. */
+.wg-toolrow {
+  display: flex; align-items: center; gap: var(--sp-4);
+}
+
+/* ---- wg-empty: inline "nothing selected" pane ----
+   The icon-pill + weighted title + capped-width sub language styles.css's
+   .state/.state-ic/.state-title/.state-sub already carry (see
+   widget-sdk/ui/parts.jsx's EmptyState) — but .state assumes it's the SOLE
+   child of a full-height flex parent (flex:1 + height:100%), which doesn't
+   fit an inline pane that sits beside other chrome (e.g. Notes' "select a
+   note" master-detail pane). wg-empty is the same visual language without
+   that layout assumption — absorbs NotesWidget's hand-rolled
+   .notes-empty-ic/-title/-sub, which existed only to route around it. */
+.wg-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 6px;
+  color: var(--muted);
+  padding: 24px;
+}
+.wg-empty-icon {
+  width: 44px; height: 44px; border-radius: var(--r-lg);
+  display: grid; place-items: center;
+  background: var(--panel2); color: var(--faint);
+  margin-bottom: 4px;
+}
+.wg-empty-title { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); }
+.wg-empty-sub { font-size: var(--fs-meta); color: var(--muted); line-height: 1.5; max-width: 220px; }

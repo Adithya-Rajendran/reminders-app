@@ -188,6 +188,46 @@ for (const file of cssFiles) {
   }
 }
 
+// ---- widget primitive boundary ----
+// widget-sdk/ui/primitives.css is the ONLY place a .wg-* class may be
+// DEFINED (the shared widget vocabulary — see the file's own header
+// comment). A widget re-declaring `.wg-card { ... }` locally would silently
+// shadow or drift from the shared definition, recreating exactly the "12
+// local dialects" problem the primitives file exists to end.
+//
+// A widget file MAY still reference a wg- class to size/position it in its
+// own layout — `.rem-widget .wg-toolrow { max-width: … }` is fine, that's
+// context, not a redefinition — so the check is narrow: it only bans a
+// selector that STARTS with `.wg-` (nothing scoping it), which is what
+// declaring/overriding the primitive's own look looks like. This is a
+// simple, low-false-positive heuristic, not full CSS parsing — paired with
+// a review convention: a PR touching widgets/**/*.css that adds new shared-
+// looking chrome should add it to primitives.css instead of a local class.
+const PRIMITIVES_FILE = join(SRC_ROOT, 'widget-sdk/ui/primitives.css')
+for (const file of cssFiles) {
+  if (file === PRIMITIVES_FILE) continue
+  const css = stripComments(readFileSync(file, 'utf8'))
+  const rel = relKey(file)
+  // Selectors are the text before each `{`, comma-separated. Splitting on
+  // `}` first keeps this cheap and matches the file's existing informal
+  // (non-AST) parsing style.
+  const selectorLists = css.split('{').slice(0, -1).map((chunk) => {
+    const lastBreak = Math.max(chunk.lastIndexOf('}'), chunk.lastIndexOf(';'))
+    return chunk.slice(lastBreak + 1)
+  })
+  const offenders = new Set()
+  for (const list of selectorLists) {
+    for (const sel of list.split(',')) {
+      const trimmed = sel.trim().replace(/\s+/g, ' ')
+      if (/^\.wg-[\w-]+/.test(trimmed)) offenders.add(trimmed)
+    }
+  }
+  ok(offenders.size === 0,
+    `${rel}: declares a .wg-* selector locally (${[...offenders].join(', ')}) — ` +
+    `.wg-* is the shared widget-sdk/ui/primitives.css vocabulary; add/extend the ` +
+    `look there and reference it from JSX, don't redeclare it in a widget's own CSS`)
+}
+
 // ---- ratchet ----
 let allowlist = {}
 if (existsSync(ALLOWLIST_PATH)) {

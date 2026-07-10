@@ -191,7 +191,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
     body = (
       <div className="flow-compact-list">
         <div className="flow-compact-sec">
-          <div className="flow-queue-head">Placed · {placed.length}</div>
+          <div className="wg-eyebrow flow-queue-head">Placed · {placed.length}</div>
           {placed.length === 0 && <div className="flow-queue-empty">Drag cards onto the board when there is more room.</div>}
           {placed.map((t) => (
             <div key={t.id} className="flow-compact-card">
@@ -204,7 +204,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
           ))}
         </div>
         <div className="flow-compact-sec">
-          <div className="flow-queue-head">Queue · {queue.length}</div>
+          <div className="wg-eyebrow flow-queue-head">Queue · {queue.length}</div>
           {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
           {queue.map((t) => (
             <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
@@ -220,7 +220,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
       <div className="flow-body">
         {(!compact || queueOpen) && (
           <div className="flow-queue">
-            <div className="flow-queue-head">Queue · {queue.length}</div>
+            <div className="wg-eyebrow flow-queue-head">Queue · {queue.length}</div>
             {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
             {queue.map((t) => (
               <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
@@ -268,7 +268,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
             affordance on every card, so the legend only teaches the gestures
             that have no on-card control. Hidden while there is nothing to
             drag: the empty state already explains where cards come from. */}
-        {showHint && hasData && <span className="flow-hint">Drag to place · drag ● to link · click a line to unlink</span>}
+        {showHint && hasData && <span className="wg-footnote flow-hint">Drag to place · drag ● to link · click a line to unlink</span>}
         {compact && source.length > 0 && (
           <button type="button" className="btn ghost sm" aria-pressed={queueOpen} onClick={() => setQueueOpen((o) => !o)}>
             Queue · {queue.length}

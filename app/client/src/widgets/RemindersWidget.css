@@ -35,9 +35,10 @@
 }
 .rem-widget .rem-add .iconbtn.sm:hover { background: var(--accent); color: var(--on-accent); }
 
-/* ---- tool line: hint left, sort right, one row ---- */
+/* ---- tool line: hint left, sort right, one row ----
+   wg-toolrow carries the shared shape (flex row, gap); this only adds the
+   local padding. */
 .rem-widget .rem-toolrow {
-  display: flex; align-items: center; gap: var(--sp-4);
   padding: var(--sp-1) var(--sp-5) 0;
 }
 .rem-widget .rem-toolrow .qa-hint { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; }

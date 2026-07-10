@@ -18,28 +18,31 @@
 .ov.short .ov-status { gap: 7px; }
 .ov.short .ov-dot { width: 8px; height: 8px; }
 
-/* Metric strip: OVERDUE + DUE TODAY as two glanceable counts. */
+/* Metric strip: OVERDUE + DUE TODAY as two glanceable counts (wg-stat +
+   wg-eyebrow for the numeral/label pair; .ov-metric is the surrounding
+   card — its own bg/border/radius still come from the widget's own compact
+   density steps, kept local since wg-card's default padding didn't fit this
+   narrower strip context). */
 .ov-metrics { display: flex; gap: 10px; }
 .ov-metric { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
 .ov-metric.warn { background: var(--danger-soft, color-mix(in oklab, var(--danger) 12%, transparent)); border-color: color-mix(in oklab, var(--danger) 32%, transparent); }
-.ov-metric-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
-.ov-metric.warn .ov-metric-num { color: var(--danger); }
-.ov-metric-lbl { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
+.ov-metric.warn .wg-stat { color: var(--danger); }
 .ov.compact .ov-metrics { gap: 7px; }
 .ov.compact .ov-metric { padding: 7px 9px; }
-.ov.compact .ov-metric-num { font-size: 21px; }
+.ov.compact .ov-metric .wg-stat { font-size: 21px; }
 .ov-metrics-mini { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .ov-metrics-mini span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-metrics-mini .warn { color: var(--danger); }
 
-/* Section label shared by "most important" and "next event". Same eyebrow
-   token as the metric labels (.ov-metric-lbl) below, so the two label styles
-   inside this card read as one system rather than two slightly different sizes. */
-.ov-sec-label { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); display: flex; align-items: center; gap: 5px; }
+/* Section label shared by "most important" and "next event" is now wg-eyebrow
+   (was .ov-sec-label) — same token as the metric labels, so the two label
+   styles inside this card read as one system rather than two slightly
+   different sizes. */
 
-/* Today's most important task — a single row with a real complete checkbox. */
+/* Today's most important task — a single row with a real complete checkbox.
+   The row itself is wg-card (accent variant, row layout); .ov-focus-row only
+   carries the compact-tier size override now. */
 .ov-focus { display: flex; flex-direction: column; gap: 5px; }
-.ov-focus-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 26%, transparent); }
 .ov-focus-title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-focus-none { font-size: 12.5px; color: var(--muted); padding: 2px 1px; }
 
@@ -50,9 +53,8 @@
 .ov.compact .ov-focus-row { padding: 7px 9px; gap: 8px; }
 .ov.short .ov-check { width: 20px; height: 20px; }
 
-/* Next calendar event today. */
+/* Next calendar event today — same wg-card (neutral, row layout) treatment. */
 .ov-event { display: flex; flex-direction: column; gap: 5px; }
-.ov-event-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
 .ov-event-time { font-size: 12.5px; font-weight: 700; color: var(--accent); flex: none; font-variant-numeric: tabular-nums; }
 .ov-event-title { flex: 1; min-width: 0; font-size: var(--fs-ctrl); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-event-none { font-size: 12.5px; color: var(--muted); padding: 2px 1px; }
@@ -62,7 +64,7 @@
 .ov-task-ic { color: var(--accent); flex: none; }
 /* Compact used to drop this label entirely (display: none), which — since the
    default board renders Overview at exactly this tier — meant "Next up" lost
-   its eyebrow while "Most important" kept its own (.ov-sec-label above), and an
+   its eyebrow while "Most important" kept its own (both wg-eyebrow), and an
    empty compact day showed no "Next up" content at all (label AND fallback both
    gone): a silent, inconsistent void. Keeping the label at every size the
    section renders at fixes both. */

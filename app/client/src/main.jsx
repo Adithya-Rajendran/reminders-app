@@ -1,6 +1,13 @@
 import { createRoot } from 'react-dom/client'
 import App from './host/App.jsx'
 import './styles.css'
+// The widget primitive vocabulary (wg-eyebrow/wg-card/wg-stat/…, see
+// widget-sdk/ui/primitives.css). Widgets are lazy chunks (registry.jsx), so
+// importing this from widget-sdk's own barrel wouldn't guarantee it's loaded
+// before the FIRST widget paints on a cold board — importing it here, next
+// to styles.css, does: the host loads it eagerly at boot, before any widget
+// chunk is requested.
+import './widget-sdk/ui/primitives.css'
 import { applyAccent, DEFAULT_ACCENT } from './host/accents.js'
 import { effectiveTheme, normalizeThemePref } from './host/theme.js'
 

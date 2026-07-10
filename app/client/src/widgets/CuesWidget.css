@@ -5,13 +5,15 @@
 /* The gesture legend reads as quiet marginalia: pushed to the toolbar's right
    edge, away from the picker, so the row has one control cluster + one whisper
    of help instead of a run-on sentence crowding the control. */
-.flow-hint { margin-left: auto; font-size: var(--fs-2xs); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* wg-footnote carries the faint/small look; layout (trailing edge, ellipsis) stays local. */
+.flow-hint { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-body { flex: 1; display: flex; min-height: 0; gap: 8px; }
 .flow-queue { flex: 0 0 158px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; border-right: 1px solid var(--line); }
 /* A wide widget can afford a wider rail — truncated queue titles cost more
    than the extra 32px once the board has room to spare. */
 [data-wsize="xl"] .flow-queue { flex: 0 0 190px; }
-.flow-queue-head { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); padding: 2px; }
+/* Look now comes from wg-eyebrow; this only keeps the layout padding. */
+.flow-queue-head { padding: 2px; }
 .flow-queue-empty { font-size: var(--fs-meta); color: var(--faint); padding: 4px 2px; }
 /* Queue rows are cards NOT yet on the board: dashed outline over a translucent
    fill (vs the placed cards' solid paper) so "waiting" and "placed" read apart
