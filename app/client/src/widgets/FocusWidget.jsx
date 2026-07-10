@@ -155,6 +155,10 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
       {(state === 'ready' || (state === 'error' && hasData)) && (
         nowTask ? (
           <div className="focus-now">
+            {/* In-flow full-width row (grid row 1 in the CSS) — this used to be
+                absolutely positioned top-right of the card, which floated it
+                directly on top of the title text at every widget size instead
+                of reserving its own space. */}
             <div className="focus-eyebrow">
               <IconTarget size={14} /> {compact ? 'Focus' : 'Focus on'}
               {nowIsFromPlan && !short && (
