@@ -53,7 +53,7 @@ function TreeLevel({ node, depth, sel, active, expanded, onSelect, onToggle, onO
               <IconChevR size={12} className={`tree-chev${isOpen ? ' open' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(f.path) }} />
               <IconFolder size={13} />
               <span className="tree-name">{f.name}</span>
-              <span className="tree-count">{countNotes(f)}</span>
+              <span className="wg-count tree-count">{countNotes(f)}</span>
             </div>
             {isOpen && <TreeLevel node={f} depth={depth + 1} sel={sel} active={active} expanded={expanded} onSelect={onSelect} onToggle={onToggle} onOpen={onOpen} onCtx={onCtx} dnd={dnd} sort={sort} />}
           </Fragment>
@@ -485,13 +485,13 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                   <>
                     {showAux && pinnedNotes.length > 0 && (
                       <div className="tree-section">
-                        <div className="tree-head"><IconPin size={11} /> Pinned</div>
+                        <div className="wg-eyebrow tree-head"><IconPin size={11} /> Pinned</div>
                         {pinnedNotes.map((n) => <NoteRow key={'pin:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
                       </div>
                     )}
                     {showAux && recentNotes.length > 0 && (
                       <div className="tree-section">
-                        <div className="tree-head">Recent</div>
+                        <div className="wg-eyebrow tree-head">Recent</div>
                         {recentNotes.map((n) => <NoteRow key={'rec:' + n.path} n={n} active={openPath === n.path} paddingLeft={8} onOpen={setOpenPath} onCtx={openCtx} />)}
                       </div>
                     )}
@@ -554,10 +554,10 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                 />
               )
               : (
-                <div className="notes-main-empty">
-                  <div className="notes-empty-ic"><IconNote size={22} /></div>
-                  <div className="notes-empty-title">Select a note</div>
-                  <div className="notes-empty-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>
+                <div className="wg-empty notes-main-empty">
+                  <div className="wg-empty-icon"><IconNote size={22} /></div>
+                  <div className="wg-empty-title">Select a note</div>
+                  <div className="wg-empty-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>
                   <button className="btn primary sm" style={{ marginTop: 10 }} onClick={newNote}><IconPlus size={14} /> New note</button>
                 </div>
               )}
