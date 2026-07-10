@@ -29,6 +29,15 @@
      needs no light-theme override. */
   --on-accent: #fff;
 
+  /* Row-hover convention (intentionally two different backgrounds, not a bug —
+     do not merge): data rows you're scanning/skimming (tasks, feed items,
+     agenda entries) hover with --panel2, a neutral surface tint. Menu/nav/
+     selectable items (dropdown/menu rows, tree rows, palette rows — anything
+     that reads as "select this") hover with --accent-soft, tinted toward the
+     accent so the selectable-ness reads at a glance. When adding a new
+     hover-highlighted row, pick based on which category it is rather than
+     copying whichever is nearby. */
+
   --green: #34d399;
   --danger: #f4577a;
   --warn: #fbbf24;
