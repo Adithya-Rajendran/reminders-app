@@ -1,7 +1,66 @@
 /* Reminders widget — CSS for classes used only by RemindersWidget.
    The other .rem-* classes (.rem-add/.rem-text/.rem-group/.rem-err/.rem-head/
    .rem-chev) are shared with Daily/Upcoming/Focus and the widget-sdk TaskRow/
-   GroupPicker, so they stay in the global styles.css. */
-.rem-group-sec + .rem-group-sec { margin-top: 6px; }
-.rem-sortbar { display: flex; justify-content: flex-end; padding: 2px 8px 0; }
-.rem-sortbar .chip { cursor: pointer; }
+   GroupPicker, so their base rules stay in the global styles.css. Everything
+   below is scoped under .rem-widget (the widget's root, set in the JSX) so
+   these overrides never leak into the other consumers of those classes. */
+
+/* ---- quick-add: one instrument, not four floating controls ----
+   The base .add-row is border-on-hover-only, which leaves the input, the Group
+   picker, the Remind chip and the + button reading as unrelated scraps on the
+   paper surface. Give the whole capture line a persistent enclosure — a field
+   printed on the page — and let hover/focus only deepen it. */
+.rem-widget .rem-add {
+  border: 1px solid var(--line);
+  background: var(--panel-solid);
+}
+.rem-widget .rem-add:hover { background: var(--panel-solid); border-color: var(--line-strong); }
+.rem-widget .rem-add:focus-within { border-color: color-mix(in oklab, var(--accent) 45%, transparent); }
+/* Inside the enclosure, the empty "Remind" slot matches the Group trigger
+   (same fill, solid hairline, same vertical padding → equal control heights)
+   instead of the dashed empty-metadata treatment TaskRow chips use — here it
+   is a picker in a form, not a missing datum on a row. */
+.rem-widget .rem-add .due-chip { padding: 5px 8px; }
+.rem-widget .rem-add .due-chip.empty {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+/* The submit + is the one primary action on the line — anchor it with an
+   accent fill instead of a bare grey glyph that disappears at the far edge. */
+.rem-widget .rem-add .iconbtn.sm {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--r-chip);
+}
+.rem-widget .rem-add .iconbtn.sm:hover { background: var(--accent); color: var(--on-accent); }
+
+/* ---- tool line: hint left, sort right, one row ---- */
+.rem-widget .rem-toolrow {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-1) var(--sp-5) 0;
+}
+.rem-widget .rem-toolrow .qa-hint { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; }
+.rem-widget .rem-sort { margin-left: auto; flex: 0 0 auto; cursor: pointer; }
+.rem-widget .rem-sort:hover { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 45%, transparent); }
+
+/* ---- group sections ---- */
+.rem-group-sec + .rem-group-sec { margin-top: var(--sp-3); }
+/* The shared .group-head sticky wash is painted in --panel-solid, but this
+   widget's surface is --panel — on the paper skin the two differ enough that
+   the header reads as a mismatched band across the sheet. Blend with the
+   actual surface. */
+.rem-widget .group-head {
+  background: linear-gradient(var(--panel), color-mix(in oklab, var(--panel) 75%, transparent));
+}
+.rem-widget .rem-chev { color: var(--muted); }
+
+/* ---- wide tiers ---- */
+/* Task rows cap their text at --measure; keep the capture field and its tool
+   line on the same measure (+ the row's leading checkbox/gap offset) so the
+   entry line doesn't run edge-to-edge above measure-capped rows on an
+   ultrawide-filled widget. */
+.widget-body[data-wsize="xl"] .rem-widget .rem-add,
+.widget-body[data-wsize="xl"] .rem-widget .rem-toolrow {
+  max-width: calc(var(--measure) + 56px);
+}
