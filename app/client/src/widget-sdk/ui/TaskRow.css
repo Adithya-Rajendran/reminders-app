@@ -86,10 +86,20 @@
    Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
    intentionally NOT gated (scheduling is the primary triage action).
    Dim-but-visible at rest (was opacity 0 until hover — an affordance you had
-   to already know about); hover/focus-within below raise to full strength. */
+   to already know about, and going back to 0 is off the table).
+   .28 (was .45, then .38): three independent widget owners (Upcoming, Daily,
+   Reminders) separately flagged the three-empties-per-row noise in dense
+   groups as the loudest remaining fidelity issue — even at .38 the dashed
+   trio still competed with real content once a group had a few rows. Full
+   icon-only-at-rest (drop the "cue"/"est"/"+ subtask" text) would quiet it
+   further still but needs a TaskRow.jsx markup change (a label wrapper to
+   hide) outside this pass's CSS-only surface — left for whoever next touches
+   TaskRow.jsx. The dashed border itself stays: it's the shape-based signal
+   that this is a placeholder, not data (WCAG 1.4.1) — pure opacity would
+   have been color/luminance alone. Full-strength on hover/focus is unchanged. */
 .task .cue-chip.empty,
 .task .est-chip.empty,
-.task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
+.task .subtask-chip.empty { opacity: .28; transition: opacity 120ms ease; }
 .task:hover .cue-chip.empty,
 .task:hover .est-chip.empty,
 .task:hover .subtask-chip.empty,

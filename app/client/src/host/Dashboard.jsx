@@ -739,7 +739,10 @@ function WidgetFrame({ type, title, group, collapsed, onToggleCollapse, onRemove
     // pointer-only (react-grid-layout has no keyboard path); the keyboard route to
     // change the board is the toolbar — Add widget / Reset layout — and each
     // widget's Remove button, which are all reachable controls.
-    <div className={`widget${collapsed ? ' collapsed' : ''}`} role="group" aria-label={title}>
+    // data-wsize mirrors the same tier already stamped on .widget-body — the
+    // header lives outside that element, so a CSS-only fallback for the serif
+    // .widget-title at the narrowest tier (see styles.css) needs it up here too.
+    <div className={`widget${collapsed ? ' collapsed' : ''}`} data-wsize={size.w} role="group" aria-label={title}>
       <div className="widget-head" title="Drag to move (pointer); use the toolbar to change the layout">
         <span className="widget-title">
           <Ic size={17} />
