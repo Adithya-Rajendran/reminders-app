@@ -216,6 +216,400 @@
   --glow2: transparent;
 }
 
+/* ============================================================
+   Theme presets ("palettes") — host/palettes.js
+
+   Same mechanism as [data-theme] above (a plain attribute on <html>, read
+   here as a selector), not host/accents.js's inline-style overrides. "Paper
+   Planner" (the two blocks above, no attribute) is the DEFAULT preset; every
+   other preset gets its own [data-palette="<key>"] block (dark base) plus a
+   [data-palette="<key>"][data-theme="light"] companion (light overrides).
+
+   Each block below fully restates the complete palette-relevant token set —
+   surfaces, lines, text, accent/accent2/accent-soft + --on-accent, status +
+   softs, --swatch-6/7, glows, --glass-blur, radii, and the two font stacks —
+   even where a value doesn't change between the block's own dark/light pair.
+   That's deliberate, not copy-paste noise: test/css-tokens.test.mjs asserts
+   every [data-palette] rule declares the full set literally, so a token that
+   changes upstream (e.g. a future new status color) can't silently bleed the
+   DEFAULT preset's value through a preset that forgot to override it.
+
+   NOT overridden here (and not required by the completeness test): --accent-
+   grad and --swatch-1..5 are pure var()-references to other tokens in this
+   same file (e.g. `--swatch-1: var(--accent)`) — they re-resolve against
+   whatever --accent/--accent2 a preset sets without needing their own
+   declaration. Layout-only tokens (--canvas-max, --measure, --sp-*, --z-*,
+   --tracking-eyebrow, and every --fs-* except --fs-stat*) are shared app
+   chrome, not part of a preset's visual identity, and are intentionally left
+   to cascade from the default block above.
+
+   Values are lifted from real prior visual identities in git history, not
+   invented:
+     - classic:    git show 543a430:app/client/src/styles.css   (pre-Wave-2)
+     - instrument: git show e364451:app/client/src/styles.css   (branch refresh-instrument)
+     - aurora:     git show refresh-aurora:app/client/src/styles.css
+   Two adaptations were needed since those commits predate later tokens:
+     - --on-accent didn't exist yet; all three source palettes use the same
+       indigo/violet accent pair, so the value is taken from whichever later
+       branch (instrument/aurora) DOES carry --on-accent for that same pair
+       (#fff — indigo is dark enough in both themes to clear 4.5:1 with white).
+     - --font-serif didn't exist yet either (display type was still plain
+       sans everywhere pre-Wave-2's serif signature) — set to the sans stack
+       here so widget/modal titles render as they did historically, matching
+       the task's "sans display" framing for all three restored looks.
+   Aurora's source additionally used an animated ::before wash + --edge-top/
+   --shadow-lg tokens that never shipped to main — NOT ported here: only
+   --glow1/--glow2 feed the CURRENT (static, two-corner-radial) .app-bg
+   above, so Aurora reads as "deep base + a stronger corner glow", not the
+   animated drift its origin branch had.
+   ============================================================ */
+
+[data-palette="classic"] {
+  /* "Classic Indigo" — the pre-Wave-2 default: indigo-glass surfaces,
+     translucent panels, a real blur, and the old 16/10px radii. */
+  --bg: #0a0b14;
+  --bg2: #0e1020;
+
+  --panel: rgba(26, 29, 48, 0.72);
+  --panel-solid: #161a2e;
+  --panel2: #1d2138;
+
+  --line: rgba(120, 130, 170, 0.16);
+  --line-strong: rgba(120, 130, 170, 0.28);
+
+  --text: #eef0fa;
+  --muted: #9099bd;
+  --faint: #6b73a0;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.16);
+  --on-accent: #fff;
+
+  --green: #34d399;
+  --danger: #f4577a;
+  --warn: #fbbf24;
+
+  --green-soft: rgba(52, 211, 153, 0.15);
+  --danger-soft: rgba(244, 87, 122, 0.15);
+  --warn-soft: rgba(251, 191, 36, 0.15);
+
+  --swatch-6: #22d3ee;
+  --swatch-7: #fb923c;
+
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  --glow1: rgba(99, 91, 255, 0.22);  /* indigo top-left */
+  --glow2: rgba(168, 85, 247, 0.18); /* violet top-right */
+
+  --r-card: 16px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 12px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans); /* pre-dates the serif display signature */
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
+[data-palette="classic"][data-theme="light"] {
+  --bg: #f6f7fb;
+  --bg2: #eef0f7;
+
+  --panel: rgba(255, 255, 255, 0.74);
+  --panel-solid: #ffffff;
+  --panel2: #f1f3fa;
+
+  --line: rgba(20, 24, 50, 0.10);
+  --line-strong: rgba(20, 24, 50, 0.16);
+
+  --text: #1a1d2e;
+  --muted: #5b6480;
+  --faint: #8b93af;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.12);
+  --on-accent: #fff;
+
+  --green: #16a571;
+  --danger: #e23a60;
+  --warn: #d99413;
+
+  --green-soft: rgba(22, 165, 113, 0.12);
+  --danger-soft: rgba(226, 58, 96, 0.10);
+  --warn-soft: rgba(217, 148, 19, 0.12);
+
+  --swatch-6: #0891b2;
+  --swatch-7: #ea580c;
+
+  --shadow: 0 10px 40px rgba(40, 44, 90, 0.14);
+  --shadow-sm: 0 4px 16px rgba(40, 44, 90, 0.10);
+
+  --glow1: rgba(109, 108, 247, 0.12);
+  --glow2: rgba(168, 85, 247, 0.10);
+
+  --r-card: 16px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 12px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans);
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
+[data-palette="instrument"] {
+  /* "Instrument" — flight-deck refresh: solid cool-navy panels (raised
+     alpha), strong borders instead of glass/glow, near-off corner glow. */
+  --bg: #090b16;
+  --bg2: #0d0f21;
+
+  --panel: rgba(19, 24, 41, 0.93);
+  --panel-solid: #131829;
+  --panel2: #1a1f37;
+
+  --line: rgba(125, 136, 178, 0.22);
+  --line-strong: rgba(130, 142, 185, 0.38);
+
+  --text: #eef0fa;
+  --muted: #9099bd;
+  --faint: #6b73a0;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.16);
+  --on-accent: #fff;
+
+  --green: #34d399;
+  --danger: #f4577a;
+  --warn: #fbbf24;
+
+  --green-soft: rgba(52, 211, 153, 0.15);
+  --danger-soft: rgba(244, 87, 122, 0.15);
+  --warn-soft: rgba(251, 191, 36, 0.15);
+
+  --swatch-6: #22d3ee;
+  --swatch-7: #fb923c;
+
+  --shadow: 0 10px 40px rgba(4, 6, 14, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --glow1: rgba(99, 91, 255, 0.05);  /* near-off */
+  --glow2: rgba(168, 85, 247, 0.04); /* near-off */
+
+  --r-card: 12px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 6px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans);
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
+[data-palette="instrument"][data-theme="light"] {
+  --bg: #f5f7fc;
+  --bg2: #ecf0f7;
+
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-solid: #ffffff;
+  --panel2: #eef1f9;
+
+  --line: rgba(20, 28, 58, 0.15);
+  --line-strong: rgba(20, 28, 58, 0.24);
+
+  --text: #1a1d2e;
+  --muted: #5b6480;
+  --faint: #8b93af;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.12);
+  --on-accent: #fff;
+
+  --green: #16a571;
+  --danger: #e23a60;
+  --warn: #d99413;
+
+  --green-soft: rgba(22, 165, 113, 0.12);
+  --danger-soft: rgba(226, 58, 96, 0.10);
+  --warn-soft: rgba(217, 148, 19, 0.12);
+
+  --swatch-6: #0891b2;
+  --swatch-7: #ea580c;
+
+  --shadow: 0 10px 40px rgba(30, 34, 64, 0.16);
+  --shadow-sm: 0 1px 2px rgba(30, 34, 60, 0.10);
+
+  --glow1: rgba(109, 108, 247, 0.05);
+  --glow2: rgba(168, 85, 247, 0.04);
+
+  --r-card: 12px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 6px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans);
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
+[data-palette="aurora"] {
+  /* "Aurora" — deep #07080f base with more translucent panels (more of the
+     glow shows through) and a sharper blur (18px) than Classic's 12px. */
+  --bg: #07080f;
+  --bg2: #0b0d1b;
+
+  --panel: rgba(26, 29, 48, 0.64);
+  --panel-solid: #161a2e;
+  --panel2: #1d2138;
+
+  --line: rgba(120, 130, 170, 0.16);
+  --line-strong: rgba(120, 130, 170, 0.28);
+
+  --text: #eef0fa;
+  --muted: #9099bd;
+  --faint: #6b73a0;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.16);
+  --on-accent: #fff;
+
+  --green: #34d399;
+  --danger: #f4577a;
+  --warn: #fbbf24;
+
+  --green-soft: rgba(52, 211, 153, 0.15);
+  --danger-soft: rgba(244, 87, 122, 0.15);
+  --warn-soft: rgba(251, 191, 36, 0.15);
+
+  --swatch-6: #22d3ee;
+  --swatch-7: #fb923c;
+
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  /* Values as sourced (refresh-aurora's --glow1/--glow2), fed straight into
+     the CURRENT .app-bg's two-corner radial-gradient above, not the animated
+     upper-center wash the origin branch used (see the section header
+     comment) — same numbers, different (simpler) delivery mechanism. */
+  --glow1: rgba(99, 91, 255, 0.16);  /* indigo core */
+  --glow2: rgba(168, 85, 247, 0.12); /* violet edge */
+
+  --r-card: 16px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 18px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans);
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
+[data-palette="aurora"][data-theme="light"] {
+  --bg: #f2f4fa;
+  --bg2: #e9ecf6;
+
+  --panel: rgba(255, 255, 255, 0.66);
+  --panel-solid: #fbfcff;
+  --panel2: #f1f3fa;
+
+  --line: rgba(20, 24, 50, 0.10);
+  --line-strong: rgba(20, 24, 50, 0.16);
+
+  --text: #1a1d2e;
+  --muted: #5b6480;
+  --faint: #8b93af;
+
+  --accent: #6d6cf7;
+  --accent2: #a855f7;
+  --accent-soft: rgba(109, 108, 247, 0.12);
+  --on-accent: #fff;
+
+  --green: #16a571;
+  --danger: #e23a60;
+  --warn: #d99413;
+
+  --green-soft: rgba(22, 165, 113, 0.12);
+  --danger-soft: rgba(226, 58, 96, 0.10);
+  --warn-soft: rgba(217, 148, 19, 0.12);
+
+  --swatch-6: #0891b2;
+  --swatch-7: #ea580c;
+
+  --shadow: 0 10px 40px rgba(40, 44, 90, 0.14);
+  --shadow-sm: 0 4px 16px rgba(40, 44, 90, 0.10);
+
+  --glow1: rgba(109, 108, 247, 0.07);
+  --glow2: rgba(168, 85, 247, 0.055);
+
+  --r-card: 16px;
+  --r-btn: 10px;
+  --r-chip: 8px;
+  --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --glass-blur: 18px;
+  --glow-strength: 1;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: var(--font-sans);
+
+  --fs-stat: 26px;
+  --fs-stat-lg: 38px;
+  --fs-stat-xl: 40px;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -1303,6 +1697,20 @@ body {
 }
 .accent-swatch:hover { transform: scale(1.1); }
 .accent-swatch.active { outline-color: var(--text); }
+
+/* ===== Theme preset picker ===== */
+/* A coarser choice than the accent grid above (a whole [data-palette] token
+   block, not one hue), so it's a named list of menu-items rather than a
+   swatch grid — each row carries a small dot pair (surface + accent) as a
+   visual hint alongside the name. */
+.palette-pop { min-width: 200px; padding: 4px; }
+.palette-dots { display: inline-flex; flex: 0 0 auto; }
+.palette-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  margin-left: -4px;
+}
+.palette-dot:first-child { margin-left: 0; }
 
 /* ===== Date / time picker popover ===== */
 /* Native controls (the time input's UA glyphs/picker) follow the APP theme, not the OS. */
