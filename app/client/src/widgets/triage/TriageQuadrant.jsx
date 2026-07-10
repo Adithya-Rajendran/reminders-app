@@ -24,7 +24,7 @@ export default function TriageQuadrant({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="eq-head"><span className="eq-label">{quad.label}</span><span className="eq-count">{tasks.length}</span></div>
+      <div className="eq-head"><span className="wg-eyebrow eq-label">{quad.label}</span><span className="wg-count eq-count">{tasks.length}</span></div>
       {showSubtitle && <div className="eq-sub">{quad.sub}</div>}
       <div className="eq-list">
         {visible.map((task) => (
@@ -44,7 +44,7 @@ export default function TriageQuadrant({
             />
           </div>
         ))}
-        {extra > 0 && <div className="eq-more">+{extra} more</div>}
+        {extra > 0 && <div className="wg-footnote eq-more">+{extra} more</div>}
         {tasks.length === 0 && <div className="eq-empty">Drop a task here</div>}
       </div>
     </div>

@@ -2,8 +2,8 @@ import { IconCheck, IconTarget } from '../../widget-sdk'
 
 export default function MostImportantCard({ task, showWhy, why, onToggle }) {
   return (
-    <div className="tri-focus">
-      <div className="tri-focus-eyebrow"><IconTarget size={14} /> Most important</div>
+    <div className="wg-card wg-card--accent tri-focus">
+      <div className="wg-eyebrow wg-eyebrow--accent tri-focus-eyebrow"><IconTarget size={14} /> Most important</div>
       <button className="tri-focus-check" aria-label={`Complete: ${task.title}`} onClick={() => onToggle(task)}>
         <IconCheck size={16} />
       </button>
