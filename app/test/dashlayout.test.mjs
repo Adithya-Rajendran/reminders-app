@@ -31,6 +31,13 @@ for (const bp of byWidth) {
   const pitch = BREAKPOINTS[bp] / COLS[bp]
   ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
 }
+// The wide tiers must sit at least .grid-wrap's 48px horizontal padding below
+// their nominal monitor widths: breakpoints are matched against the MEASURED
+// grid width (viewport minus that padding and any scrollbar), so a display at
+// exactly 2560/3840/5120 has to land in its own tier, not one short.
+for (const [bp, nominal] of Object.entries({ xxl: 2560, xxxl: 3840, xxxxl: 5120 })) {
+  ok(BREAKPOINTS[bp] <= nominal - 48, `${bp}: breakpoint ${BREAKPOINTS[bp]} keeps a ${nominal}px display in-tier despite the 48px grid padding`)
+}
 
 // --- fillBreakpoints (scale-to-fill on WIDER tiers; constant-size repack on narrower) ---
 const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
