@@ -95,11 +95,11 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
 
   return (
     <div className={`inbox${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
-      {/* Count of what's left to clarify — the whole point of the surface is to
-          drive this to zero, so it leads. */}
+      {/* The widget chrome above already carries the icon + "Inbox" title, so this
+          inner line doesn't repeat it — it demotes to a plain eyebrow that leads
+          with the one thing worth restating: how much is left to clarify. */}
       {!short && <div className="ib-head">
-        <span className="ib-title"><IconInbox size={15} /> Inbox</span>
-        <span className="ib-count" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
+        <span className="ib-eyebrow" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
       </div>}
 
       {state === 'loading' && <SkeletonRows n={3} />}
