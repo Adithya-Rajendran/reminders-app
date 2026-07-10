@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, UndoBar, IconCue, NODE_W, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, edgeBetween, dropBase, dragTo, canvasExtent, uidFromPoint } from '../widget-sdk'
+import { useTaskList, selectFlowSource, cueTriggerOf, useWidgetSize, atMostW, atLeastW, GroupPicker, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, IconCue, NODE_W, CONTENT_W, CONTENT_H, edgePath, toContent, nodeOut, edgeBetween, dropBase, dragTo, canvasExtent, uidFromPoint } from '../widget-sdk'
 import './CuesWidget.css'
 
 // Cues as a mindmap/flowchart: pick a reminder "queue", drag cards onto the board
@@ -178,10 +178,14 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
   const allGroups = [...knownGroups].sort()
   const recent = groups.recent().filter((g) => allGroups.includes(g))
 
+  // A refresh failure with an already-loaded board keeps the queue/canvas
+  // visible (a ReconnectBanner is rendered alongside the toolbar below) instead
+  // of blanking to ErrorState — only a never-loaded failure does that.
+  const hasData = source.length > 0
   let body
   if (state === 'loading') body = <SkeletonRows />
-  else if (state === 'error') body = <ErrorState onRetry={load} />
-  else if (source.length === 0) {
+  else if (state === 'error' && !hasData) body = <ErrorState onRetry={load} />
+  else if (!hasData) {
     body = <EmptyState icon={IconCue} title="No reminders to map" sub="Reminders (and cued tasks) in the chosen queue show up here. Add one in the Reminders widget, then drag it onto the board." />
   } else if (compactBoard) {
     body = (
@@ -267,6 +271,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
           </button>
         )}
       </div>
+      {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
       {body}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>
