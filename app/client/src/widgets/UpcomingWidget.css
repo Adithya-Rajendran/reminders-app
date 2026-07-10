@@ -5,8 +5,39 @@
 
 /* Upcoming: a pinned, distinct Overdue group + a compact sort toggle */
 .up-overdue > .up-head .g-title { color: var(--danger); }
+/* The shared button.rem-head:hover rule (styles.css) is MORE specific than the
+   rule above (it adds a `button` type selector), so without this override
+   hovering the pinned Overdue header would flash its title from crimson to the
+   ordinary accent color — losing the "this is urgent" identity at the exact
+   moment a pointer lands on it. Every other danger-toned control in the app
+   (.btn.danger, .chip.overdue) stays red through hover; keep this one consistent. */
+.up-overdue > .up-head:hover .g-title { color: var(--danger); }
 
 /* Upcoming filter toggle */
-.up-filter { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.qw-filter { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
+.up-filter { display: flex; justify-content: flex-end; margin-bottom: var(--sp-4); }
+.qw-filter { display: inline-flex; align-items: center; gap: var(--sp-2); cursor: pointer; color: var(--muted); }
 .qw-filter.on { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 32%, transparent); }
+/* A clickable chip needs a hover cue before the click reveals its state — mirrors
+   .imp-chip/.due-chip elsewhere: --accent hints "interactive" at rest, and once
+   the filter is already on, its own warm tone deepens instead of jumping hue. */
+.qw-filter:hover { border-color: var(--accent); }
+.qw-filter.on:hover { border-color: color-mix(in oklab, var(--warn) 55%, transparent); }
+
+/* Compact mode's "+N more" footer — a quiet footnote below the preview rows.
+   Tokenized to match the sibling "+N more" affordances (InboxWidget's
+   .ib-upnext-more, FocusWidget's .focus-endpark-more: var(--faint) + a small
+   eyebrow-scale font), replacing an inline style that used --muted (too
+   prominent — it read almost as loud as a real row) and a raw 13px size. */
+.up-more { padding: var(--sp-3) var(--sp-5); color: var(--faint); font-size: var(--fs-2xs); }
+
+/* Empty states. The wrappers must grow (flex: 1) so the shared .state inside
+   keeps filling the body and centering vertically — as plain divs they'd
+   collapse to content height at the top of the widget. */
+.up-empty, .up-empty-filtered { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.up-empty > .state, .up-empty-filtered > .state { flex: 1; }
+/* "Nothing upcoming" = a clear runway, a small win — echo the app's positive-
+   moment icon treatment (.feed-ic.add: accent on accent-soft) instead of the
+   neutral gray shared with error/unconfigured states, so an empty agenda reads
+   as rewarding rather than broken. The filtered "no 2-min wins" case is just a
+   filter miss, not a win, and stays neutral. */
+.up-empty .state-ic { color: var(--accent); background: var(--accent-soft); }

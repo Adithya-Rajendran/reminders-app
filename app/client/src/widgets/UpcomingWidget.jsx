@@ -125,12 +125,20 @@ export default function UpcomingWidget({ tasks: tasksCap, projects, organizer, i
       {state === 'error' && shown.length === 0 && <ErrorState onRetry={load} />}
       {state === 'error' && shown.length > 0 && <ReconnectBanner onRetry={load} />}
       {(state === 'ready' || (state === 'error' && shown.length > 0)) && (shown.length === 0
-        ? <EmptyState icon={IconClock} title={quickOnly ? 'No 2-minute wins' : 'Nothing upcoming'} sub={quickOnly ? 'Tag short tasks with a “2min” label to collect them here.' : 'Scheduled tasks appear here, grouped by when they’re due.'} />
+        ? (
+          // A clear agenda is an achievement, not an error — the wrapper class
+          // lets our CSS warm the shared EmptyState up (accent, not neutral gray)
+          // for the "all clear" case only; the filtered no-2-min-wins case stays
+          // neutral since it's a filter miss, not a win.
+          <div className={quickOnly ? 'up-empty-filtered' : 'up-empty'}>
+            <EmptyState icon={IconClock} title={quickOnly ? 'No 2-minute wins' : 'Nothing upcoming'} sub={quickOnly ? 'Tag short tasks with a “2min” label to collect them here.' : 'Scheduled tasks appear here, grouped by when they’re due.'} />
+          </div>
+        )
         : compact
           ? (
             <>
               {rows(flatItems)}
-              {moreCount > 0 && <div className="up-more" style={{ padding: '6px 10px', color: 'var(--muted)', fontSize: 13 }}>+{moreCount} more</div>}
+              {moreCount > 0 && <div className="up-more">+{moreCount} more</div>}
             </>
           )
           : UPCOMING_ORDER.filter((k) => groups[k]).map((k) => {
