@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # deliberate: needs a Docker daemon (buildx build+push) — the reminders-ci cluster runners run plain-mode with no docker
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

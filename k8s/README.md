@@ -7,33 +7,49 @@ needs **block** storage (`ReadWriteOnce`), so the Deployment uses `Recreate` —
 `kubectl rollout status` may exceed its timeout while the volume detaches;
 verify with `kubectl get pods` + `/healthz` instead.
 
-## Continuous deployment (optional)
+## Continuous deployment
 
 CI already builds and pushes `ghcr.io/<owner>/reminders-app:latest` on every
-merge to `main` (`.github/workflows/docker.yml`). To also **roll the cluster
-automatically**, the `deploy` workflow (`.github/workflows/deploy.yml`) runs
-after each successful image push — it is a no-op until you add one repo secret:
+merge to `main` (`.github/workflows/docker.yml`). The `deploy` workflow
+(`.github/workflows/deploy.yml`) runs after each successful image push and
+rolls the cluster onto it — from an **in-cluster runner**, not a credential
+shipped to GitHub:
 
-- **`KUBE_CONFIG_DATA`** — a base64-encoded kubeconfig that can restart the
-  Deployment: `base64 -w0 kubeconfig.yaml` → repo → Settings → Secrets →
-  Actions.
+- A GitHub ARC (Actions Runner Controller) runner scale set named
+  `reminders-ci` (min 0 / max 3) runs its pods *inside* this cluster, in
+  namespace `arc-runners`, under PodSecurity `restricted` (no docker daemon,
+  no job-level `container:` support — see `runner/` in the repo root for the
+  custom image that bakes in kubectl/node/Playwright ahead of time).
+- Those pods run as ServiceAccount `reminders-ci-runner`, RoleBound
+  **namespace-scoped** in `reminders-app` (and in `reminders-dev`, for the
+  `live-visual` workflow) to exactly:
+  - `deployments`: `get`, `list`, `patch`
+  - `deployments/scale`: `get`, `patch`, `update`
+  - `pods`: `get`, `list`, `watch`
+- `kubectl` inside a job auto-authenticates via that pod's mounted
+  ServiceAccount token (in-cluster config) — **no kubeconfig, no
+  `KUBE_CONFIG_DATA` secret, and no cluster credential ever touches GitHub**.
+  Fork PRs already can't reach this runner set; on top of that, a leaked
+  Actions log or a compromised workflow run can at worst restart/scale two
+  namespaces' Deployments — nothing else in the cluster.
 
-Two ways to mint that kubeconfig, most-restricted first:
+**Paused-by-default:** this homelab habitually scales `reminders-app` (and
+the `reminders-dev` fixture stack) to 0 replicas as its steady state to save
+resources. `deploy.yml` reads the Deployment's current replica count before
+doing anything — if it's 0, it prints a notice and exits 0 without attempting
+a rollout, rather than fighting an intentional pause. Scale it back up to
+re-enable CD:
 
-1. **Namespace-scoped ServiceAccount** (recommended): create a ServiceAccount
-   in the app namespace bound to a Role allowing only
-   `get/list/patch deployments` + `get/list pods`, mint a long-lived token
-   (`kubectl create token --duration=…` or a service-account token Secret),
-   and build a kubeconfig around it pointing at your cluster's API endpoint.
-   A leak can bounce this one app — nothing else.
-2. **Rancher API token**: Rancher → Account & API Keys → create a token with a
-   long/no TTL scoped to the cluster, download the kubeconfig, replace the
-   token. Simpler, but cluster-wide — prefer (1) for a public repo.
+```bash
+kubectl scale deployment/reminders-app -n reminders-app --replicas=1
+```
 
-Fork PRs never see repo secrets, and the workflow only triggers from `main`
-or a manual dispatch. Without the secret, CI stays green and deployment stays
-manual (`kubectl rollout restart deployment/reminders-app -n reminders-app`).
+`reminders-dev` (used by `live-visual.yml`) intentionally has **no public
+route** at all — it runs with `ALLOW_DEV_BYPASS=1`, so any request carrying
+an `x-dev-user` header authenticates as that user. It's reachable only
+in-cluster, via its ClusterIP Service, which is exactly what the in-cluster
+runner uses; it must never get an HTTPRoute/Ingress.
 
 Pull-based alternative: run [Keel](https://keel.sh) (or Flux/Argo) in-cluster
-watching the GHCR tag instead — no cluster credentials ever leave the cluster;
-the trade-off is another controller to operate.
+watching the GHCR tag instead of a runner-driven rollout — the trade-off is
+another controller to operate.
