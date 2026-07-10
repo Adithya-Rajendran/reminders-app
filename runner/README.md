@@ -8,7 +8,9 @@ Node 22, and Playwright's Chromium + system deps
 (`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`) — see `Dockerfile` for why each
 is baked in rather than installed per-job.
 
-Rebuild and push whenever a pinned tool version needs to move:
+Rebuilt and pushed automatically by `.github/workflows/runner-image.yml` on
+any merge to `main` touching `runner/**` (or via workflow_dispatch) — it tags
+`:latest` plus a `YYYYMMDD-<sha>` tag for rollback. Manual fallback:
 
 ```bash
 docker build -t ghcr.io/adithya-rajendran/reminders-app-runner:latest runner/

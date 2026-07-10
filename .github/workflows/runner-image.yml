@@ -1,0 +1,60 @@
+# Builds and publishes the custom reminders-ci runner image (runner/Dockerfile)
+# whenever it changes on main, or on demand. Deliberately on ubuntu-latest:
+# it needs a Docker daemon the in-cluster reminders-ci runners don't have —
+# and the runner image could never rebuild itself anyway.
+name: runner-image
+
+on:
+  push:
+    branches: [main]
+    paths: ['runner/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  TZ: UTC
+
+# Serialize publishes; never cancel one mid-push.
+concurrency:
+  group: runner-image-publish
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest # deliberate: needs a Docker daemon (buildx build+push) — the reminders-ci cluster runners run plain-mode with no docker
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-runner
+          # :latest is what the reminders-ci scale set pulls; the date-sha tag
+          # pins each build so a bad :latest can be rolled back to a known-good
+          # image without digging through registry digests.
+          tags: |
+            type=raw,value=latest
+            type=raw,value={{date 'YYYYMMDD'}}-{{sha}}
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./runner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record pushed digest
+        run: |
+          echo "Published ghcr.io/${GITHUB_REPOSITORY,,}-runner@${{ steps.push.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Recycle the reminders-ci runner pods to pick it up." >> "$GITHUB_STEP_SUMMARY"

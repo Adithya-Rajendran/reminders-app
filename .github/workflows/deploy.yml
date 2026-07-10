@@ -43,6 +43,25 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
+      # Belt-and-braces: kubectl is baked into the custom runner image
+      # (runner/Dockerfile), but if the scale set is temporarily running the
+      # stock actions-runner image, fetch the same pinned binary into a
+      # user-writable dir (restricted PSA — no sudo) instead of failing.
+      # Keep the pinned minor in sync with runner/Dockerfile's KUBECTL_MINOR.
+      - name: Ensure kubectl
+        run: |
+          if command -v kubectl >/dev/null 2>&1; then
+            kubectl version --client=true
+            exit 0
+          fi
+          echo "::warning::kubectl not on PATH — runner is not on the custom reminders-ci image; fetching a pinned binary"
+          mkdir -p "$RUNNER_TEMP/bin"
+          KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable-1.30.txt)
+          curl -fsSLo "$RUNNER_TEMP/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x "$RUNNER_TEMP/bin/kubectl"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kubectl" version --client=true
+
       - name: Check current replica count
         id: replicas
         run: |

@@ -47,6 +47,39 @@ jobs:
     runs-on: reminders-ci
     timeout-minutes: 20
     steps:
+      # Belt-and-braces: kubectl is baked into the custom runner image
+      # (runner/Dockerfile), but if the scale set is temporarily running the
+      # stock actions-runner image, fetch the same pinned binary into a
+      # user-writable dir (restricted PSA — no sudo) instead of failing.
+      # Keep the pinned minor in sync with runner/Dockerfile's KUBECTL_MINOR.
+      - name: Ensure kubectl
+        run: |
+          if command -v kubectl >/dev/null 2>&1; then
+            kubectl version --client=true
+            exit 0
+          fi
+          echo "::warning::kubectl not on PATH — runner is not on the custom reminders-ci image; fetching a pinned binary"
+          mkdir -p "$RUNNER_TEMP/bin"
+          KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable-1.30.txt)
+          curl -fsSLo "$RUNNER_TEMP/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x "$RUNNER_TEMP/bin/kubectl"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kubectl" version --client=true
+
+      # Unlike kubectl, browsers are NOT worth fetching at job time (hundreds
+      # of MB plus apt system deps we can't install without root under the
+      # restricted PSA) — if they're missing, the scale set isn't on the
+      # custom image yet and the only fix is publishing it (runner-image
+      # workflow) and recycling the runner pods. Fail loud and early, before
+      # scaling anything up.
+      - name: Verify preinstalled Playwright browsers
+        run: |
+          if [ ! -d "$PLAYWRIGHT_BROWSERS_PATH" ] || [ -z "$(ls -A "$PLAYWRIGHT_BROWSERS_PATH" 2>/dev/null)" ]; then
+            echo "::error::$PLAYWRIGHT_BROWSERS_PATH is missing or empty — the reminders-ci scale set is not running the custom runner image (runner/Dockerfile). Publish it via the runner-image workflow and recycle the runner pods; this job never installs browsers itself."
+            exit 1
+          fi
+          ls "$PLAYWRIGHT_BROWSERS_PATH"
+
       - uses: actions/checkout@v4
 
       # Node 22 is preinstalled on the runner image — just install deps.
