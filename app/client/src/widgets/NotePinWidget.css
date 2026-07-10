@@ -11,9 +11,41 @@
 .notepin-pick { max-height: 260px; overflow-y: auto; min-width: 190px; max-width: 280px; }
 .notepin-pick .mini-item { width: 100%; }
 .notepin-pick-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The note's content, read-only, with its own scroll. pre-wrap keeps the Markdown's
-   line breaks (it's a glance surface — the editor is one click away). */
-.notepin-body { flex: 1; min-height: 0; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: var(--fs-ctrl); line-height: 1.6; color: var(--text); padding: 10px 4px 4px; }
-.notepin.compact .notepin-body { padding-top: 7px; font-size: 12.75px; line-height: 1.55; }
-.notepin.short .notepin-body { padding-top: 5px; font-size: 12.5px; line-height: 1.45; }
+
+/* Loading placeholder — same inset as the real prose below (.notepin-prose)
+   so the skeleton→content swap doesn't jog the text sideways. */
+.notepin-skel { flex: 1; min-height: 0; padding: var(--sp-5) var(--sp-5) var(--sp-6); box-sizing: border-box; }
+.notepin.compact .notepin-skel { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+.notepin.short .notepin-skel { padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+
+/* The note's content, read-only, with its own scroll. .notepin-scroll is a sized
+   positioning context (not the flex chain directly) so .notepin-body can fill it
+   with position:absolute — a more reliable "scrollable pane fills its parent"
+   idiom than a percentage-height flex chain, and it's what lets .notepin-fade
+   below pin exactly to the pane's true bottom edge regardless of content length. */
+.notepin-scroll { position: relative; flex: 1; min-height: 0; }
+.notepin-body { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; }
 .notepin-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-sm); }
+/* pre-wrap keeps the Markdown's line breaks (it's a glance surface — the editor
+   is one click away). Measure-capped like other list/text bodies (--measure) so
+   a wide/ultrawide card doesn't stretch prose edge-to-edge; left-aligned (no
+   auto margin) to match that same convention, not centered like a full page. */
+.notepin-prose { max-width: var(--measure); box-sizing: border-box; white-space: pre-wrap; word-break: break-word; font-size: var(--fs-ctrl); line-height: 1.6; color: var(--text); padding: var(--sp-5) var(--sp-5) var(--sp-6); }
+.notepin.compact .notepin-prose { padding: var(--sp-3) var(--sp-4) var(--sp-4); font-size: 12.75px; line-height: 1.55; }
+.notepin.short .notepin-prose { padding: var(--sp-2) var(--sp-3) var(--sp-3); font-size: 12.5px; line-height: 1.45; }
+
+/* A pinned index card reads like paper with a hard edge, not an app pane with an
+   obvious scrollbar — and this app's scrollbar is a thin, low-opacity line that's
+   easy to miss at a glance anyway. When there's unseen text below the fold
+   (tracked in JS — see NotePinWidget.jsx's moreBelow/checkOverflow), fade the
+   last lines into the surrounding paper instead of hard-clipping mid-sentence,
+   and let it dissolve once scrolling reaches the true end. Decorative only:
+   pointer-events off (never eats the scroll/click underneath), aria-hidden. */
+.notepin-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
+  background: linear-gradient(to bottom, transparent, var(--panel) 88%);
+  pointer-events: none; opacity: 1; transition: opacity 150ms ease;
+}
+.notepin-fade.hide { opacity: 0; }
+.notepin.compact .notepin-fade { height: 26px; }
+.notepin.short .notepin-fade { height: 20px; }
