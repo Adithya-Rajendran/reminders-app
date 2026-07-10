@@ -1,5 +1,5 @@
-# CD: roll the cluster deployment onto the freshly pushed :latest after the
-# docker workflow succeeds on main (or on demand via workflow_dispatch).
+# CD: pin the cluster deployment to the digest just pushed as :latest after
+# the docker workflow succeeds on main (or on demand via workflow_dispatch).
 #
 # Runs on the `reminders-ci` GitHub ARC runner scale set — a runner pod living
 # INSIDE the cluster (namespace arc-runners), not a GitHub-hosted box. kubectl
@@ -106,26 +106,32 @@ jobs:
         env:
           EXPECTED_DIGEST: ${{ steps.expected.outputs.digest }}
         run: |
-          kubectl rollout restart deployment/reminders-app -n reminders-app
-          # Recreate strategy: wait for the replacement pod to be Running/Ready.
-          pod=""
+          # Pin the pod to the immutable digest resolved above rather than
+          # rollout-restarting :latest: during a merge train the node can pull
+          # a different "latest" than the one this run verified, which both
+          # deploys the wrong build and fails the digest check. Pinning makes
+          # the deploy and its verification refer to the same artifact; a
+          # same-digest re-deploy is a clean no-op (pod template unchanged).
+          kubectl set image deployment/reminders-app -n reminders-app \
+            "app=ghcr.io/${GITHUB_REPOSITORY,,}@${EXPECTED_DIGEST}"
+          # Recreate strategy: converge on "one pod, Ready, running the pinned
+          # digest" instead of a one-shot check that can race the old pod.
+          ok=""
           for i in $(seq 1 60); do
             total=$(kubectl get pods -n reminders-app -l app=reminders-app --no-headers 2>/dev/null | wc -l)
-            pod=$(kubectl get pods -n reminders-app -l app=reminders-app -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1)
-            [ -n "$pod" ] && [ "$total" -eq 1 ] && { echo "pod ready: $pod"; break; }
+            image_id=$(kubectl get pods -n reminders-app -l app=reminders-app -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.status.containerStatuses[0].imageID}{"\n"}{end}' 2>/dev/null | head -n1)
+            if [ "$total" -eq 1 ] && [ -n "$image_id" ]; then
+              case "$image_id" in
+                *"@$EXPECTED_DIGEST") ok=1; echo "pod ready on $image_id"; break ;;
+              esac
+            fi
             sleep 5
           done
           kubectl get pods -n reminders-app -l app=reminders-app
-          if [ -z "$pod" ]; then
-            echo "::error::replacement pod did not become ready"
+          if [ -z "$ok" ]; then
+            echo "::error::pod did not become Ready on the expected digest $EXPECTED_DIGEST"
             exit 1
           fi
-          image_id=$(kubectl get pod "$pod" -n reminders-app -o jsonpath='{.status.containerStatuses[0].imageID}')
-          echo "Running image: $image_id"
-          case "$image_id" in
-            *"@$EXPECTED_DIGEST") echo "digest verified: $EXPECTED_DIGEST" ;;
-            *) echo "::error::running image digest $image_id does not match expected $EXPECTED_DIGEST"; exit 1 ;;
-          esac
 
       - name: Verify the app answers
         if: steps.replicas.outputs.replicas != '0'
