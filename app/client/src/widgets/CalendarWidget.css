@@ -51,7 +51,7 @@
 .cal-wrap .fc .fc-button-primary:disabled { opacity: .5; }
 .cal-wrap .fc .fc-button-primary:not(:disabled).fc-button-active,
 .cal-wrap .fc .fc-button-primary:not(:disabled):active {
-  background: var(--accent-grad);
+  background: var(--accent);
   border-color: transparent; color: var(--on-accent);
 }
 .cal-wrap .fc .fc-button-group > .fc-button { border-radius: 0; }

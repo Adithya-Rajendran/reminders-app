@@ -22,9 +22,9 @@
 .ov-metrics { display: flex; gap: 10px; }
 .ov-metric { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; border-radius: var(--r-btn); background: var(--panel2); border: 1px solid var(--line); }
 .ov-metric.warn { background: var(--danger-soft, color-mix(in oklab, var(--danger) 12%, transparent)); border-color: color-mix(in oklab, var(--danger) 32%, transparent); }
-.ov-metric-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--text); }
+.ov-metric-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
 .ov-metric.warn .ov-metric-num { color: var(--danger); }
-.ov-metric-lbl { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+.ov-metric-lbl { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); }
 .ov.compact .ov-metrics { gap: 7px; }
 .ov.compact .ov-metric { padding: 7px 9px; }
 .ov.compact .ov-metric-num { font-size: 21px; }
@@ -33,7 +33,7 @@
 .ov-metrics-mini .warn { color: var(--danger); }
 
 /* Section label shared by "most important" and "next event". */
-.ov-sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); display: flex; align-items: center; gap: 5px; }
+.ov-sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); display: flex; align-items: center; gap: 5px; }
 
 /* Today's most important task — a single row with a real complete checkbox. */
 .ov-focus { display: flex; flex-direction: column; gap: 5px; }

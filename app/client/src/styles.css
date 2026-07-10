@@ -35,11 +35,15 @@
   --on-accent: #1a140d;
 
   --green: #8bab5c;
-  --danger: #e2604f;
+  /* Was #e2604f (H7°) — sat/lit unchanged, hue rotated ~18° toward crimson
+     (H349°) so it reads distinct from --warn's amber (H38°) at a glance:
+     hue separation 31°→49°. Still 4.7:1 (panel) / 4.5:1 (panel-solid) as
+     text — see the light-theme override below for the full ratio table. */
+  --danger: #e24f6a;
   --warn: #e0a542;
 
   --green-soft: rgba(139, 171, 92, 0.15);
-  --danger-soft: rgba(226, 96, 79, 0.15);
+  --danger-soft: rgba(226, 79, 106, 0.15);
   --warn-soft: rgba(224, 165, 66, 0.15);
 
   /* Identity/categorical colors for account swatches (swatchFor in
@@ -89,6 +93,16 @@
      body/controls stay on the sans stack — no webfonts either way. */
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
   --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+
+  /* Uppercase "eyebrow" tracking — every small-caps section/group label
+     (group headers, menu labels, sidebar section heads, the calendar's
+     day-of-week row, …) shares this one wide tracking value instead of each
+     rule picking its own .02–.08em. Paired app-wide with --muted as the
+     one eyebrow color (see the affected rules below) — the badges that stay
+     accent/type-colored (callout types, focus "up next" tags) are a
+     deliberately different role (an emphasis chip, not a quiet label) and
+     keep their own color. */
+  --tracking-eyebrow: 0.06em;
 
   /* glass tuning — blur is off (paper-flat surfaces); kept as a token rather
      than deleted so a future candidate can dial it back in. */
@@ -164,11 +178,15 @@
   --on-accent: #ffffff;
 
   --green: #557024;
-  --danger: #b23a2a;
+  /* Same rotation as the dark override above (H7°→H348°, sat/lit held) —
+     4.3:1 danger-vs-warn separation goal is about hue distance, not per-
+     theme tuning, so both themes get the identical ~18-19° turn. Contrast
+     as text: 5.8:1 (panel) / 6.2:1 (panel-solid), both up from the H7° original. */
+  --danger: #b22a45;
   --warn: #93610f;
 
   --green-soft: rgba(85, 112, 36, 0.12);
-  --danger-soft: rgba(178, 58, 42, 0.10);
+  --danger-soft: rgba(178, 42, 69, 0.10);
   --warn-soft: rgba(147, 97, 15, 0.12);
 
   /* --swatch-1..5 alias the semantic tokens above, so they follow this block's
@@ -267,9 +285,11 @@ body {
 .btn .ic { flex: 0 0 auto; }
 
 .btn.primary {
-  background: var(--accent-grad);
+  /* Flat single copper, not the two-tone gradient — ink-on-paper chrome is
+     matte. The gradient is reserved for the brand mark (.logo/.login-logo),
+     the one shape allowed to read as a burnished, glowing object. */
+  background: var(--accent);
   color: var(--on-accent);
-  box-shadow: 0 6px 18px -6px var(--accent);
 }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.primary:disabled:hover { filter: none; }
@@ -333,6 +353,9 @@ body {
   border-radius: var(--r-chip);
   background: var(--panel2);
   color: var(--muted);
+  /* Every chip is a small gauge (a due-time, a duration, a count) — digits
+     must line up instead of jittering as they change. */
+  font-variant-numeric: tabular-nums;
   border: 1px solid var(--line);
   white-space: nowrap;
 }
@@ -392,7 +415,7 @@ body {
 }
 .check:hover { border-color: var(--accent); }
 .check:checked {
-  background: var(--accent-grad);
+  background: var(--accent);
   border-color: transparent;
 }
 .check:checked::after {
@@ -431,7 +454,7 @@ body {
   transition: transform 150ms ease, background 150ms ease;
 }
 .switch:checked {
-  background: var(--accent-grad);
+  background: var(--accent);
   border-color: transparent;
 }
 .switch:checked::after {
@@ -504,7 +527,7 @@ body {
 .menu-item:hover .ic { color: var(--accent); }
 .menu-item .chev { margin-left: auto; color: var(--faint); }
 .menu-sep { height: 1px; background: var(--line); margin: 6px 4px; }
-.menu-label { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 8px 10px 4px; }
+.menu-label { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); padding: 8px 10px 4px; }
 
 /* ============================================================
    Animations
@@ -570,7 +593,7 @@ body {
 .mobile-tab.on { color: var(--accent); background: var(--accent-soft); }
 .mobile-tab:active { background: var(--panel2); }
 .mobile-tab-label { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.02em; }
-.mobile-fab { position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 52px; height: 52px; border-radius: 50%; border: none; color: var(--on-accent); background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 68%, #000)); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.mobile-fab { position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 52px; height: 52px; border-radius: 50%; border: none; color: var(--on-accent); background: var(--accent); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .mobile-fab:active { transform: scale(0.94); }
 
 /* ---------- Top bar ---------- */
@@ -588,6 +611,12 @@ body {
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 11px; }
+/* The one shape allowed to glow: every other accent surface in the app is
+   flat ink-on-paper, but the wordmark's copper badge keeps the two-tone
+   --accent->--accent2 gradient + inset highlight — a burnished nameplate,
+   not a UI control. It reads once per session (top-left, small), so it
+   doesn't compete with the flat chrome it sits beside. .login-logo (below)
+   repeats the same treatment for the same reason. */
 .logo {
   width: 34px; height: 34px;
   border-radius: var(--r-btn);
@@ -609,7 +638,7 @@ body {
 }
 .avatar {
   width: 28px; height: 28px; border-radius: 50%;
-  background: var(--accent-grad);
+  background: var(--accent);
   color: var(--on-accent); font-size: var(--fs-meta); font-weight: 700;
   display: grid; place-items: center; flex: 0 0 auto;
 }
@@ -636,7 +665,7 @@ body {
 .toolbar h1 {
   font-size: var(--fs-meta);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   color: var(--muted);
   margin: 0;
@@ -655,7 +684,7 @@ body {
 .board-filter { display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--canvas-max); margin: 0 auto; padding: 4px 24px 2px; box-sizing: border-box; font-size: 12.5px; color: var(--muted); }
 .board-filter-ic { color: var(--accent); flex: none; }
 .board-filter-label b { color: var(--text); font-weight: 700; }
-.board-filter-kind { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+.board-filter-kind { font-size: var(--fs-micro); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
 .board-filter-clear { margin-left: 2px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-strong); background: var(--panel2); color: var(--text); border-radius: var(--r-pill); padding: 3px 10px; font: inherit; font-size: var(--fs-meta); cursor: pointer; }
 .board-filter-clear:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -736,7 +765,10 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px;
+  /* Density contrast: the structural inset around a widget's content is
+     roomier than before; individual data rows (.task/.cd-task below) are
+     tighter — the frame breathes, the rows themselves pack. */
+  padding: 8px;
   min-height: 0;
 }
 
@@ -745,7 +777,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: var(--r-btn);
   transition: background 120ms ease;
 }
@@ -791,16 +823,19 @@ body {
 /* group headers (Upcoming) */
 .group-head {
   display: flex; align-items: baseline; gap: 8px;
-  padding: 12px 10px 5px;
+  /* Structural gap: one --sp step roomier above a new section than before
+     (12px -> --sp-7/16px), so a section break reads as a break against the
+     tighter .task rows above/below it. */
+  padding: var(--sp-7) 10px 5px;
   position: sticky; top: -6px;
   background: linear-gradient(var(--panel-solid), color-mix(in oklab, var(--panel-solid) 75%, transparent));
 }
-.group-head:first-child { padding-top: 6px; }
-/* Small-caps-style eyebrow: muted rather than full-text-color, wider tracking
-   — a quiet section label, not a second title. */
-.group-head .g-title { font-size: var(--fs-meta); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
-.group-head .g-date { font-size: 11.5px; color: var(--faint); }
-.group-head .g-count { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+.group-head:first-child { padding-top: var(--sp-4); }
+/* Small-caps eyebrow: quiet muted label, not a second title — sized and
+   tracked to match the app-wide eyebrow treatment (see --tracking-eyebrow). */
+.group-head .g-title { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); }
+.group-head .g-date { font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.group-head .g-count { margin-left: auto; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 
 /* ---------- Reminders feed ---------- */
 .feed-item {
@@ -826,7 +861,7 @@ body {
 .feed-time { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
 
 /* ---------- CalDAV tasks ---------- */
-.cd-task { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--r-btn); }
+.cd-task { display: flex; align-items: flex-start; gap: 10px; padding: 6px 10px; border-radius: var(--r-btn); }
 .cd-task:hover { background: var(--panel2); }
 .cd-bar { width: 3px; align-self: stretch; border-radius: 2px; flex: 0 0 auto; min-height: 28px; }
 .source-tag {
@@ -855,12 +890,12 @@ body {
   transition: background 150ms ease, color 150ms ease;
 }
 .seg button:hover { color: var(--text); }
-.seg button.on { background: var(--accent-grad); color: var(--on-accent); box-shadow: 0 2px 8px -3px var(--accent); }
+.seg button.on { background: var(--accent); color: var(--on-accent); }
 
 /* month grid */
 .month { display: flex; flex-direction: column; height: 100%; }
 .dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
-.dow span { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); text-align: center; }
+.dow span { font-size: 10.5px; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); text-align: center; }
 .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 4px; flex: 1; min-height: 0; }
 .day-cell {
   border-radius: var(--r-chip);
@@ -873,7 +908,7 @@ body {
 }
 .day-cell.out { opacity: 0.4; }
 .day-cell.today { border-color: var(--accent); background: var(--accent-soft); }
-.day-num { font-size: var(--fs-2xs); font-weight: 600; color: var(--muted); align-self: flex-start; }
+.day-num { font-size: var(--fs-2xs); font-weight: 600; color: var(--muted); align-self: flex-start; font-variant-numeric: tabular-nums; }
 .day-cell.today .day-num { color: var(--accent); font-weight: 700; }
 .evt-pill {
   font-size: 10.5px; font-weight: 600;
@@ -881,6 +916,7 @@ body {
   color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 .evt-more { font-size: var(--fs-micro); color: var(--faint); padding-left: 2px; }
 
@@ -896,7 +932,7 @@ body {
 }
 .tg-dayhead.today { color: var(--accent); }
 .tg-times { display: flex; flex-direction: column; }
-.tg-hour { height: 44px; font-size: 10.5px; color: var(--faint); text-align: right; padding-right: 6px; transform: translateY(-6px); }
+.tg-hour { height: 44px; font-size: 10.5px; color: var(--faint); text-align: right; padding-right: 6px; transform: translateY(-6px); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); }
 .tg-col .hourline { height: 44px; border-bottom: 1px solid var(--line); }
 .tg-evt {
@@ -907,7 +943,7 @@ body {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
-.tg-evt .te-time { font-size: var(--fs-micro); font-weight: 500; opacity: 0.85; }
+.tg-evt .te-time { font-size: var(--fs-micro); font-weight: 500; opacity: 0.85; font-variant-numeric: tabular-nums; }
 
 /* agenda */
 .agenda-day { padding: 8px 4px 4px; }
@@ -915,7 +951,7 @@ body {
 .agenda-date .ad-sub { font-size: var(--fs-2xs); font-weight: 500; color: var(--faint); }
 .agenda-evt { display: flex; gap: 10px; padding: 8px 8px; border-radius: 9px; align-items: flex-start; }
 .agenda-evt:hover { background: var(--panel2); }
-.agenda-time { font-size: 11.5px; color: var(--muted); width: 64px; flex: 0 0 auto; padding-top: 1px; }
+.agenda-time { font-size: 11.5px; color: var(--muted); width: 64px; flex: 0 0 auto; padding-top: 1px; font-variant-numeric: tabular-nums; }
 .agenda-bar { width: 3px; align-self: stretch; border-radius: 2px; min-height: 30px; }
 .agenda-title { font-size: var(--fs-ctrl); font-weight: 500; }
 
@@ -1108,7 +1144,7 @@ body {
 .react-grid-item.resizing { transition: none; z-index: 3; will-change: width, height; }
 .react-grid-item.react-draggable-dragging { transition: none; z-index: 4; will-change: transform; }
 .react-grid-item.react-grid-placeholder {
-  background: var(--accent-grad);
+  background: var(--accent);
   opacity: 0.22; border-radius: var(--r-card); transition-duration: 100ms; z-index: 2; user-select: none;
 }
 /* the widget frame fills the grid item */
@@ -1161,7 +1197,7 @@ body {
   cursor: pointer; position: relative; transition: background .15s, border-color .15s, transform .1s;
 }
 .check-btn:hover { border-color: var(--accent); }
-.check-btn.on { background: var(--accent-grad); border-color: transparent; }
+.check-btn.on { background: var(--accent); border-color: transparent; }
 .check-btn.on::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 9px; border: solid var(--on-accent); border-width: 0 2.5px 2.5px 0; transform: rotate(43deg); }
 .check-btn.burst { animation: checkPop .42s cubic-bezier(.2,.8,.3,1); }
 @keyframes checkPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
@@ -1244,11 +1280,11 @@ body {
 }
 .dt-day:hover { background: var(--accent-soft); }
 .dt-day.today { font-weight: 800; color: var(--accent); }
-.dt-day.sel { background: var(--accent-grad); color: var(--on-accent); font-weight: 700; }
+.dt-day.sel { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .dt-time-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
 .dt-time-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .dt-time-lbl svg { opacity: .8; }
-.dt-time { width: 120px; padding: 6px 8px; font-size: var(--fs-ctrl); }
+.dt-time { width: 120px; padding: 6px 8px; font-size: var(--fs-ctrl); font-variant-numeric: tabular-nums; }
 .dt-remind { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .dt-remind span { display: inline-flex; align-items: center; gap: 5px; }
 .dt-remind span svg { opacity: .8; }
@@ -1287,8 +1323,8 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .dash-tab { display: inline-flex; align-items: center; }
 .dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 6px 14px; font-size: var(--fs-ctrl); font-weight: 600; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
 .dash-tab-btn:hover { color: var(--text); }
-.dash-tab.on .dash-tab-btn { color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
-/* Sits on the active tab's accent-grad fill — follow --on-accent (not a
+.dash-tab.on .dash-tab-btn { color: var(--on-accent); background: var(--accent); border-color: transparent; }
+/* Sits on the active tab's flat accent fill — follow --on-accent (not a
    hardcoded white) so it stays legible now that dark/light themes disagree
    on whether accent needs light or ink text. */
 .dash-tab-x { margin-left: -4px; background: none; border: none; color: color-mix(in oklab, var(--on-accent) 85%, transparent); font-size: var(--fs-title); line-height: 1; cursor: pointer; padding: 0 8px 0 2px; }
@@ -1346,7 +1382,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-empty-q { color: var(--muted); font-size: var(--fs-meta); padding: 12px; text-align: center; }
 
 /* Full-text "Found in contents" results under the sidebar search */
-.note-search-head { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 10px 8px 4px; }
+.note-search-head { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); padding: 10px 8px 4px; }
 .note-hit-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .note-hit-snip { font-size: var(--fs-2xs); color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .note-hit-snip mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; font-weight: 600; }
@@ -1358,7 +1394,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-folder-in:focus { border-color: var(--accent); }
 .note-tags-bar { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 2px 8px; }
 .note-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--accent-soft); color: var(--accent); border: none; border-radius: var(--r-pill); padding: 2px 8px; font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; line-height: 1.6; }
-.note-tag.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--on-accent); }
+.note-tag.on { background: var(--accent); color: var(--on-accent); }
 .note-tag-x { background: none; border: none; color: inherit; cursor: pointer; font-size: var(--fs-micro); padding: 0 0 0 2px; opacity: .8; }
 .note-tag-x:hover { opacity: 1; }
 .note-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
@@ -1376,7 +1412,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .rg-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .rg-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
 .rg-name { font-size: var(--fs-ctrl); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.rg-count { font-size: var(--fs-micro); color: var(--muted); background: var(--accent-soft); border-radius: var(--r-pill); padding: 1px 7px; font-weight: 700; }
+.rg-count { font-size: var(--fs-micro); color: var(--muted); background: var(--accent-soft); border-radius: var(--r-pill); padding: 1px 7px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .rg-actions { display: inline-flex; align-items: center; gap: 6px; }
 .rg-cal { font-size: var(--fs-meta); padding: 5px 8px; max-width: 190px; }
 .rg-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1409,7 +1445,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .gp-item.on { background: var(--accent-soft); font-weight: 600; }
 .gp-item .gp-dot-sp { width: 14px; height: 1px; flex: 0 0 auto; }
 .gp-new { color: var(--accent); font-weight: 600; }
-.gp-sec { font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); padding: 6px 9px 2px; }
+.gp-sec { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); padding: 6px 9px 2px; }
 .gp-sep { height: 1px; background: var(--line); margin: 5px 4px; }
 .gp-empty { font-size: var(--fs-meta); color: var(--muted); padding: 8px 9px; }
 
@@ -1422,7 +1458,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-edit-body { flex: 1; min-height: 0; display: flex; }
 /* Outline / table-of-contents rail */
 .note-outline { width: 200px; flex: none; border-left: 1px solid var(--line); overflow-y: auto; padding: 10px 6px; }
-.note-outline-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); padding: 2px 6px 8px; }
+.note-outline-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); padding: 2px 6px 8px; }
 .note-outline-head > span { flex: 1; }
 .note-outline-x { background: none; border: none; color: var(--faint); cursor: pointer; display: inline-flex; padding: 2px; border-radius: 5px; }
 .note-outline-x:hover { color: var(--text); background: var(--accent-soft); }
@@ -1435,7 +1471,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Sort menu (sidebar) + editor info bar */
 .note-sort { position: relative; display: inline-flex; }
 .note-sort-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-dropdown-lg); min-width: 160px; animation: menuIn 150ms ease; }
-.note-info-bar { display: flex; flex-wrap: wrap; align-items: center; padding: 6px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+.note-info-bar { display: flex; flex-wrap: wrap; align-items: center; padding: 6px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .note-pane .note-info-bar { padding: 7px 2px 2px; }
 .note-info-bar span { display: inline-flex; align-items: center; }
 .note-info-bar span:not(:first-child)::before { content: '·'; margin: 0 8px; color: var(--faint); }
@@ -1470,7 +1506,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .notes-chip.on, .notes-chip:hover { color: var(--text); border-color: var(--accent); }
 
 /* Widget connections viewer (Settings) — read-only Snap/Juju-style wiring map */
-.conn-subhead { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 12px 0 6px; }
+.conn-subhead { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); margin: 12px 0 6px; }
 .conn-slots { display: flex; flex-direction: column; gap: 4px; }
 .conn-slot { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-chip); }
 .conn-iface { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-meta); color: var(--text); }
@@ -1570,12 +1606,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .slash-item.sel { background: var(--accent-soft); }
 .slash-item-title { font-size: 13.5px; flex: 1; }
 .slash-item.sel .slash-item-title { color: var(--accent); }
-.slash-item-group { font-size: var(--fs-micro); color: var(--faint); text-transform: uppercase; letter-spacing: .03em; }
+.slash-item-group { font-size: var(--fs-micro); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 
 /* Callout (Obsidian admonition) */
 .tiptap-content .callout { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: var(--r-btn); padding: 8px 14px 10px; }
 .callout-head { display: flex; align-items: center; margin-bottom: 2px; position: relative; }
-.callout-type { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2px 0; }
+.callout-type { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2px 0; }
 .callout-body > * + * { margin-top: .5em; }
 .callout-body > *:first-child { margin-top: 0; }
 .callout-body > *:last-child { margin-bottom: 0; }
@@ -1598,7 +1634,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .backlinks { border-top: 1px solid var(--line); padding: 8px 14px 12px; }
 .backlinks-head { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; color: var(--muted); font-size: var(--fs-meta); font-weight: 700; letter-spacing: .02em; cursor: pointer; padding: 4px 0; }
 .backlinks-head .ic { color: var(--faint); }
-.backlinks-count { background: var(--accent-soft); color: var(--accent); border-radius: var(--r-pill); font-size: var(--fs-2xs); padding: 0 7px; font-weight: 700; }
+.backlinks-count { background: var(--accent-soft); color: var(--accent); border-radius: var(--r-pill); font-size: var(--fs-2xs); padding: 0 7px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .backlinks-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 .backlinks-item { display: flex; flex-direction: column; gap: 1px; text-align: left; background: none; border: none; border-radius: var(--r-btn); padding: 6px 8px; cursor: pointer; color: var(--text); }
 .backlinks-item:hover { background: var(--accent-soft); }
@@ -1738,7 +1774,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* '?' keyboard cheat sheet. */
 .kbd-help { display: flex; gap: 28px; flex-wrap: wrap; }
 .kbd-help-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
-.kbd-help-title { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.kbd-help-title { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
 .kbd-help-row { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-ctrl); }
 .kbd-help-keys { display: inline-flex; gap: 3px; flex: 0 0 108px; }
 .kbd-help-keys kbd { display: inline-flex; align-items: center; padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: var(--fs-2xs); color: var(--muted); }
