@@ -15,6 +15,10 @@ export const ACCENTS = [
   // main.jsx/App.jsx apply before this list is ever consulted.
   { key: 'copper', name: 'Copper', a: '#c07a45', b: '#d9a066' },
   { key: 'indigo', name: 'Indigo', a: '#6d6cf7', b: '#a855f7' },
+  // Flat single-hue variant of 'indigo' (a === b, no two-tone gradient) — the
+  // Instrument preset's default accent (host/palettes.js), matching that
+  // preset's "flight-deck, single indigo, not the two-tone gradient" ethos.
+  { key: 'indigo-flat', name: 'Indigo (Flat)', a: '#6d6cf7', b: '#6d6cf7' },
   { key: 'violet', name: 'Violet', a: '#8b5cf6', b: '#d946ef' },
   { key: 'blue', name: 'Blue', a: '#3b82f6', b: '#22d3ee' },
   { key: 'emerald', name: 'Emerald', a: '#10b981', b: '#34d399' },
