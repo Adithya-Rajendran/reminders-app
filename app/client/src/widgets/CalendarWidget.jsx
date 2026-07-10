@@ -117,7 +117,7 @@ function MiniAgenda({ rangeStart, rangeEnd, items, loading, error, onRetry, onPr
         {!loading && nothingToShow && <ErrorState onRetry={onRetry} />}
         {!loading && !nothingToShow && days.length === 0 && <div className="cal-mini-empty">Nothing scheduled this week.</div>}
         {!loading && !nothingToShow && days.map(({ day, items: dayItems }) => (
-          <section className="cal-mini-day" key={day.toISOString()}>
+          <section className={`cal-mini-day${sameDay(day, new Date()) ? ' today' : ''}`} key={day.toISOString()}>
             <div className="cal-mini-day-head">
               <span>{fmtDay(day)}</span>
               {sameDay(day, new Date()) && <span>Today</span>}
