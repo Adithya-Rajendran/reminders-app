@@ -4,14 +4,26 @@
 .daily.short { gap: 2px; }
 .daily-toggle { display: inline-flex; gap: 4px; align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 2px; margin: 2px 0 4px; }
 .daily-seg { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: var(--fs-meta); font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
-.daily-seg.on { color: var(--text); background: var(--panel-solid); box-shadow: var(--shadow-sm); }
+/* Match the app-wide "selected segment" convention (Calendar's Month/Week .seg,
+   the dashboard tabs, note-tag picks, …): a flat accent fill, not a same-family
+   panel tone. A neutral on-panel tone very nearly matches the track's own color
+   in the dark theme (--panel-solid sits between --panel and --panel2 on the same
+   warm-neutral ramp), so the mode you're in was reading as a coin-flip guess
+   instead of a glance. */
+.daily-seg.on { color: var(--on-accent); background: var(--accent); }
 .daily.compact .daily-toggle { margin-bottom: 2px; }
 .daily.compact .daily-seg { padding: 4px 9px; }
 .daily.short .daily-seg { font-size: 11.5px; padding: 3px 8px; }
 .daily-secline { position: static; background: none; }
 .daily-budget { color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
-.daily-budget.over { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 45%, transparent); }
+/* Same warn-soft pairing every other warning affordance in the app uses
+   (.chip.due-soon, .reconnect-banner, .callout-warning) — text-color-only
+   was a much fainter signal than the app's other warn states for what's
+   meant to flag an overcommitted day. */
+.daily-budget.over { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 45%, transparent); }
 .daily-empty { font-size: 12.5px; color: var(--muted); padding: 8px 10px; }
+.daily-empty-done { display: flex; align-items: center; gap: 6px; }
+.daily-empty-done .ic { color: var(--accent); flex: 0 0 auto; }
 .daily.short .daily-empty { padding: 5px 8px; }
 .daily-row { display: flex; align-items: center; gap: 4px; }
 .daily-row-main { flex: 1; min-width: 0; }

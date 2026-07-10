@@ -194,7 +194,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
 
               <div className="group-head daily-secline"><span className="g-title">Carry over</span><span className="g-count">{chosen.length}</span></div>
               {chosen.length === 0
-                ? <div className="daily-empty">Today’s focus is all done — close the day. 🌙</div>
+                ? <div className="daily-empty daily-empty-done"><IconMoon size={13} /> Today’s focus is all done — close the day.</div>
                 : <div className="task-stream">{chosen.map((t) => (
                   <div key={t.id} className="daily-row">
                     <div className="daily-row-main">{taskRow(t)}</div>
