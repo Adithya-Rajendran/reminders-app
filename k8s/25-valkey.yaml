@@ -1,0 +1,92 @@
+# Optional: a Valkey cache so the CalDAV/VEVENT read cache (server/cache.js,
+# server/readcache.js) survives a pod restart instead of re-REPORTing every
+# list on the next cold load. Entirely optional — unset VALKEY_URL in
+# 30-app.yaml and the app falls back to its in-process cache with no
+# behavior change (dev/CI need no Valkey at all).
+#
+# SECURITY: cached values are parsed task/event payloads in PLAINTEXT (no
+# separate encryption — the CalDAV credentials that produced them are
+# encrypted at rest in SQLite, but the task titles/descriptions/etc. cached
+# here are not). This Service has NO route (ClusterIP only, no HTTPRoute) and
+# should live in the app's own namespace so nothing outside the cluster, and
+# nothing outside this namespace by default NetworkPolicy (if you run one),
+# can reach it. Do not reuse a shared/multi-tenant Valkey for this.
+#
+# No persistence (no PVC, no --save/AOF) — it's a cache, not a store; losing
+# it just means the next read pays a cold REPORT again, same as today.
+apiVersion: v1
+kind: Service
+metadata:
+  name: reminders-valkey
+  namespace: reminders-app
+  labels: { app: reminders-valkey }
+spec:
+  type: ClusterIP
+  selector: { app: reminders-valkey }
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reminders-valkey
+  namespace: reminders-app
+  labels: { app: reminders-valkey }
+spec:
+  replicas: 1
+  strategy: { type: Recreate } # no persistence, no state to hand off — just don't run two
+  selector:
+    matchLabels: { app: reminders-valkey }
+  template:
+    metadata:
+      labels: { app: reminders-valkey, app.kubernetes.io/part-of: reminders-app }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: valkey
+          image: valkey/valkey:8
+          imagePullPolicy: IfNotPresent
+          args:
+            - valkey-server
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - allkeys-lru
+            - --save
+            - ""            # no RDB snapshots — cache only, nothing worth persisting
+            - --appendonly
+            - "no"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp     # valkey wants a writable /tmp even with no persistence
+            - name: run
+              mountPath: /run
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 160Mi } # headroom over --maxmemory 128mb for client buffers/overhead
+          readinessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 5
+            periodSeconds: 20
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+        - name: run
+          emptyDir: { sizeLimit: 4Mi }

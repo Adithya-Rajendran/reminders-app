@@ -51,6 +51,13 @@ spec:
             # dashboard layout (+ sessions) live in this SQLite file on the volume.
             - name: CONFIG_DB_PATH
               value: /data/config.db
+            # Optional: point the read cache (server/cache.js) at the Valkey
+            # instance in 25-valkey.yaml so it survives a pod restart instead
+            # of re-REPORTing every CalDAV list cold. Remove this env var (or
+            # the 25-valkey.yaml Deployment) and the app falls back to its
+            # in-process cache with no other change — see k8s/README.md.
+            - name: VALKEY_URL
+              value: redis://reminders-valkey.reminders-app.svc.cluster.local:6379
           envFrom:
             - secretRef: { name: reminders-app-env }
           volumeMounts:
