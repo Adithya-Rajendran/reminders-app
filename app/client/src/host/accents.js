@@ -9,6 +9,11 @@ function softFromHex(hex, a = 0.16) {
 }
 
 export const ACCENTS = [
+  // First = default (see DEFAULT_ACCENT below). "Paper Planner"'s copper —
+  // matches --accent/--accent2 in styles.css' dark-theme token block, so a
+  // fresh install (no stored preference) renders identically to what
+  // main.jsx/App.jsx apply before this list is ever consulted.
+  { key: 'copper', name: 'Copper', a: '#c07a45', b: '#d9a066' },
   { key: 'indigo', name: 'Indigo', a: '#6d6cf7', b: '#a855f7' },
   { key: 'violet', name: 'Violet', a: '#8b5cf6', b: '#d946ef' },
   { key: 'blue', name: 'Blue', a: '#3b82f6', b: '#22d3ee' },
@@ -19,7 +24,7 @@ export const ACCENTS = [
   { key: 'cyan', name: 'Cyan', a: '#06b6d4', b: '#3b82f6' },
 ]
 
-export const DEFAULT_ACCENT = 'indigo'
+export const DEFAULT_ACCENT = 'copper'
 
 export function applyAccent(key) {
   const acc = ACCENTS.find((x) => x.key === key) || ACCENTS[0]
