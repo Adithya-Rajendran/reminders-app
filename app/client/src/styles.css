@@ -1024,7 +1024,7 @@ body {
   color: var(--on-accent);
   box-shadow: 0 12px 30px -10px var(--accent), inset 0 1px 0 rgba(255,255,255,0.3);
 }
-.login-card h1 { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.login-card h1 { font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
 .login-card p.lede { font-size: var(--fs-body); color: var(--muted); margin: 0 0 26px; }
 .login-foot { margin-top: 22px; font-size: var(--fs-meta); color: var(--faint); line-height: 1.5; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .sso-detail { margin-top: 14px; font-size: var(--fs-meta); color: var(--faint); display: flex; align-items: center; justify-content: center; gap: 6px; }
