@@ -98,3 +98,30 @@ test('edit and delete an event from the grid', async ({ page, request }) => {
   await expect(modal).toBeHidden()
   await expect(frame.getByText('New title', { exact: true })).toBeHidden()
 })
+
+test('surfaces a retry-able error state when the calendar events API is unreachable', async ({ page, request }) => {
+  await seedLayout(request, [{ type: 'calendar' }])
+
+  // Intercept only the GET (event list) calls the widget's veventSource makes —
+  // route interception is scoped to `page`'s browser context, so the `request`
+  // fixture's own setup/teardown calls (clearEvents et al.) are unaffected.
+  let broken = true
+  await page.route('**/api/calendar/events**', (route) => {
+    if (route.request().method() !== 'GET' || !broken) return route.continue()
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) })
+  })
+
+  await gotoApp(page)
+  const frame = widget(page, 'Calendar')
+
+  // Nothing has ever loaded for this instance, so the failure gets the full-body
+  // ErrorState (not a silently-empty grid) — while FullCalendar's own chrome
+  // (mounted throughout, per the widget's overlay-not-replace design) stays put.
+  await expect(frame.getByRole('alert')).toContainText(/Couldn.t reach your server/)
+  await expect(frame.locator('.fc-toolbar')).toBeVisible()
+
+  // Retry, now that the API is healthy again, clears the error and renders normally.
+  broken = false
+  await frame.getByRole('button', { name: 'Retry' }).click()
+  await expect(frame.getByRole('alert')).toBeHidden()
+})
