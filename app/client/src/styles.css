@@ -24,6 +24,10 @@
   --accent2: #a855f7;
   --accent-soft: rgba(109, 108, 247, 0.16);
   --accent-grad: linear-gradient(135deg, var(--accent), var(--accent2));
+  /* Text/glyphs on accent-colored surfaces (buttons, active swatches, the
+     login logo). --accent/--accent2 are identical in both themes, so this
+     needs no light-theme override. */
+  --on-accent: #fff;
 
   --green: #34d399;
   --danger: #f4577a;
@@ -55,6 +59,23 @@
   --r-btn: 10px;
   --r-chip: 8px;
   --r-menu: 14px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* Type scale. Backs the existing role names below (.meta/.h-ctrl/.h-title/
+     .h-modal already sit at --fs-meta/--fs-ctrl/--fs-title/--fs-modal) —
+     introduced here so new/migrated CSS has a shared ladder instead of each
+     rule picking its own px literal. */
+  --fs-micro: 10px;
+  --fs-2xs: 11px;
+  --fs-meta: 12px;
+  --fs-ctrl: 13px;
+  --fs-body: 14px;
+  --fs-title: 16px;
+  --fs-lg: 18px;
+  --fs-modal: 20px;
+  --fs-display: 22px;
 
   /* glass tuning (tweakable) */
   --glass-blur: 12px;
@@ -71,6 +92,36 @@
      Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it
      keeps content left-aligned at a readable measure instead of 150-char lines. */
   --measure: 66ch;
+
+  /* Spacing scale — layout-level macro spacing (gaps, margins, section padding)
+     only. Micro control padding (button/chip/input insets) is intentionally
+     hand-tuned per component and NOT meant to snap to this scale. */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 10px;
+  --sp-6: 12px;
+  --sp-7: 16px;
+  --sp-8: 24px;
+
+  /* Z-index scale. Values match the de-facto stacking already in use below
+     (app-bg 0, .app 1, sticky calendar headers 3, .callout-menu 20, note
+     menus 30, .menu 60, .mini-menu/.link-popover 70, .dtpick/.slash-menu 80,
+     .overlay 100, #tweaks-root 200) — introduced as read-only names for now,
+     existing declarations are untouched. The vendored react-grid-layout block
+     (.react-grid-item.resizing etc., below) has its own small internal
+     stacking order and is deliberately excluded from this scale. */
+  --z-base: 0;
+  --z-raised: 1;
+  --z-sticky: 3;
+  --z-dropdown: 20;
+  --z-dropdown-lg: 30;
+  --z-menu: 60;
+  --z-popover: 70;
+  --z-popover-lg: 80;
+  --z-modal: 100;
+  --z-devtools: 200;
 }
 
 [data-theme="light"] {
