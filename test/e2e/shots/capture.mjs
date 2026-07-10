@@ -68,6 +68,18 @@ async function waitSettled(page) {
   }
   // No skeleton left anywhere on the page (SkeletonRows use `.skeleton`).
   await page.locator('.skeleton').first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {})
+  // The wide tiers are DERIVED on load (fillBreakpoints) and react-grid-layout
+  // compacts asynchronously, so at 2560/5120 the page height can keep changing
+  // after widgets are visible — a fixed sleep raced this and produced
+  // dimension-mismatched full-page shots between otherwise-identical runs.
+  // Wait until page + grid heights are stable for 4 consecutive 150ms samples.
+  await page.waitForFunction(() => {
+    const h = document.body.scrollHeight + ':' + (document.querySelector('.layout')?.offsetHeight || 0)
+    const s = (window.__settle = window.__settle || { last: '', n: 0 })
+    if (s.last === h) s.n += 1
+    else { s.last = h; s.n = 0 }
+    return s.n >= 4
+  }, { timeout: 20000, polling: 150 }).catch(() => console.warn('  (settle: height never stabilized — shooting anyway)'))
   // FullCalendar / the Cues canvas / hover-out transitions settle a beat later.
   await page.waitForTimeout(500)
 }
