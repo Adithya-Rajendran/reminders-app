@@ -42,20 +42,45 @@
 .tree-row.note-hit { align-items: flex-start; height: auto; padding-top: 5px; padding-bottom: 5px; }
 .tree-row.note-hit > .ic { margin-top: 2px; }
 
-/* Split workspace: tree sidebar + note open in the main pane (Obsidian/VSCode). */
+/* Split workspace: tree sidebar + note open in the main pane (Obsidian/VSCode).
+   The sidebar is the "instrument" rail — its own panel2 surface holds the
+   tree + controls console — and the main pane stays the plain --panel "page"
+   the note is written on, so the master-detail split reads as two distinct
+   paper/instrument surfaces rather than one flat panel cut by a hairline. */
 .notes-split { flex-direction: row; gap: 0; align-items: stretch; }
-.notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); padding-right: 8px; }
+.notes-sidebar { width: 240px; flex: 0 0 240px; display: flex; flex-direction: column; min-height: 0; background: var(--panel2); border-right: 1px solid var(--line); padding-right: 8px; }
 .notes-sidebar .notes-tree { width: auto; flex: 1; border-right: none; padding-right: 0; }
 .notes-sidebar .note-toolbar { min-width: 0; }
-.notes-sidebar .note-search { min-width: 0; }
+/* Ellipsize rather than hard-clip: the sidebar's default 240px leaves the
+   search box very little room once the toolbar's icon buttons claim theirs,
+   which was cutting "Search notes…" off mid-word (e.g. "Search note") with
+   no visual cue that it's truncated. */
+.notes-sidebar .note-search { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notes-sidebar .note-toolbar.compact { gap: 5px; padding-right: 0; }
 .notes-sidebar .note-toolbar.compact .note-search { padding-left: 8px; padding-right: 8px; }
+/* iconbtn's own hover fill (panel2) would be invisible on the now-panel2
+   rail — wash it in accent-soft instead, matching the tree rows' own
+   hover/select idiom so the toolbar stays legibly interactive. */
+.notes-sidebar .iconbtn:hover, .notes-sidebar .iconbtn:focus-visible { background: var(--accent-soft); color: var(--accent); }
+/* The tag-scoped search banner is panel2 in styles.css too — restate it on
+   panel-solid here so it doesn't disappear into the rail behind it. */
+.notes-sidebar .note-search-scope { background: var(--panel-solid); }
 .notes-split .notes-main { padding-left: 12px; }
 /* On a very wide widget, give the tree more room so deep paths don't truncate. */
 .notes-split.notes-wide .notes-sidebar { width: 320px; flex: 0 0 320px; }
 .notes-main-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
-.notes-main-empty .state-ic { margin-bottom: 4px; }
-.notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); font-size: 10.5px; color: var(--muted); }
+/* Mirror styles.css's shared .state treatment (icon pill + weighted title +
+   capped-width sub) under names scoped to this file. The shared .state-ic/
+   -title/-sub rules only fire under a `.state` ancestor class, which this
+   hand-built empty pane never had — it was rendering as a bare icon plus
+   plain-weight text with no pill and no size/weight hierarchy, unlike every
+   other empty state in the app (loading/error/EmptyState all use `.state`). */
+.notes-empty-ic { width: 44px; height: 44px; border-radius: var(--r-lg); display: grid; place-items: center; background: var(--panel2); color: var(--faint); margin-bottom: 4px; }
+.notes-empty-title { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); }
+.notes-empty-sub { font-size: var(--fs-meta); color: var(--muted); line-height: 1.5; max-width: 220px; }
+/* panel-solid (not the pane's own --panel background) so the kbd hint reads
+   as a raised key instead of an invisible fill-on-fill outline. */
+.notes-main-empty kbd { display: inline-flex; align-items: center; padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel-solid); font-size: 10.5px; color: var(--muted); }
 .notes-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; background: none; border: none; color: var(--muted); font: inherit; font-size: var(--fs-ctrl); cursor: pointer; padding: 2px 4px 8px; }
 .notes-back:hover { color: var(--text); }
 .tree-row.tree-note.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
