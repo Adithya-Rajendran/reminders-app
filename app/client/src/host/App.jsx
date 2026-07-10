@@ -21,7 +21,7 @@ import {
   IconBell, IconSun, IconMoon, IconMonitor, IconGear, IconLogout,
   IconShield, IconKey, IconSpinner, IconPalette, IconSearch,
 } from '../widget-sdk/icons.jsx'
-import { ACCENTS, applyAccent } from './accents.js'
+import { ACCENTS, DEFAULT_ACCENT, applyAccent } from './accents.js'
 import { effectiveTheme, normalizeThemePref, nextThemePref } from './theme.js'
 
 // Human label + glyph for a theme preference (light / dark / system).
@@ -272,7 +272,10 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'login' | 'ready'
   const [theme, setTheme] = useState(() => normalizeThemePref(localStorage.getItem('reminders-theme')))
-  const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || 'indigo')
+  // Falls back to DEFAULT_ACCENT (not a hardcoded key) — main.jsx applies the
+  // same fallback pre-paint, and this effect's applyAccent(accent) below would
+  // otherwise stomp that first-paint color back to whatever was hardcoded here.
+  const [accent, setAccent] = useState(() => localStorage.getItem('reminders-accent') || DEFAULT_ACCENT)
   const [settings, setSettings] = useState(null) // null = closed | { createGroup? }
   // Accepts an optional { createGroup } to open Settings with the group create form
   // prefilled; called as a plain onClick handler elsewhere, so ignore event args.

@@ -148,11 +148,13 @@ async function main() {
           extraHTTPHeaders: { 'x-dev-user': USER },
         })
         // Pre-paint theme/accent init, same localStorage keys main.jsx reads
-        // before first render (see app/client/src/main.jsx).
+        // before first render (see app/client/src/main.jsx). Pinned (not left
+        // to DEFAULT_ACCENT) so a stored accent never varies the gates —
+        // 'copper' matches the app's current default (host/accents.js).
         await context.addInitScript(({ theme, accent }) => {
           localStorage.setItem('reminders-theme', theme)
           localStorage.setItem('reminders-accent', accent)
-        }, { theme, accent: 'indigo' })
+        }, { theme, accent: 'copper' })
         const page = await context.newPage()
         await page.goto(BASE + '/')
         await waitSettled(page)
