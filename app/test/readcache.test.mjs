@@ -2,7 +2,7 @@
 // the /api/calendar/events handler, and the fresh/ctag/report decision shared
 // with the VTODO cache (whose behavior stays covered by ctagcache.test.mjs
 // through the tasks_caldav re-export). Run with: node test/readcache.test.mjs
-import { coalesce, cacheDecision } from '../server/readcache.js'
+import { coalesce, cacheDecision, asRehydrated } from '../server/readcache.js'
 
 let pass = 0, fail = 0
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('  ✗ ' + m) } }
@@ -82,6 +82,22 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
   ok(cacheDecision(entry(1000, 'x'), 1000 + TTL - 1, TTL) === 'fresh', 'inside TTL -> fresh')
   ok(cacheDecision(entry(1000, 'x'), 1000 + TTL + 1, TTL) === 'ctag', 'past TTL with ctag -> probe')
   ok(cacheDecision(entry(1000, null), 1000 + TTL + 1, TTL) === 'report', 'past TTL without ctag -> report')
+}
+
+// --- asRehydrated: a persisted-store entry never earns 'fresh' on its first
+// use after hydration — it must clear a ctag check first, which is what
+// makes read-through-Valkey safe without cross-process invalidation ---
+{
+  const TTL = 12000
+  const now = 1_000_000
+  ok(asRehydrated(null, now, TTL) === null, 'a missing entry hydrates to null (passthrough)')
+  const justWritten = { parsed: ['x'], ctag: 'c1', at: now } // as if `at` were "just now"
+  const rehydrated = asRehydrated(justWritten, now, TTL)
+  ok(cacheDecision(rehydrated, now, TTL) !== 'fresh', 'a just-hydrated entry never decides fresh, even if its original `at` was recent')
+  ok(cacheDecision(rehydrated, now, TTL) === 'ctag', 'it earns a cheap ctag check instead (assuming a ctag is present)')
+  ok(rehydrated.parsed === justWritten.parsed && rehydrated.ctag === justWritten.ctag, 'the payload itself is passed through unchanged, only `at` is rewritten')
+  const noCtag = asRehydrated({ parsed: [], ctag: null, at: now }, now, TTL)
+  ok(cacheDecision(noCtag, now, TTL) === 'report', 'without a ctag, a rehydrated entry falls open to a full report, same as any other entry')
 }
 
 console.log(`readcache: ${pass} passed, ${fail} failed`)
