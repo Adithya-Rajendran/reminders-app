@@ -223,7 +223,10 @@ export default function OverviewWidget({ tasks: tasksCap, calendar, organizer })
                 <span className="ov-event-title"><IconCheck size={11} className="ov-task-ic" /> {nextTask.title}</span>
               </div>
             )}
-            {!nextEvent && !nextTask && !compact && <div className="ov-event-none">Nothing scheduled today.</div>}
+            {/* Mirrors ov-focus-none: an honest empty fallback always renders when the
+                section itself renders (gated by !short above), so "Next up" never
+                collapses to a blank void the way "Most important" never does. */}
+            {!nextEvent && !nextTask && <div className="ov-event-none">Nothing scheduled today.</div>}
           </div>
           )}
 

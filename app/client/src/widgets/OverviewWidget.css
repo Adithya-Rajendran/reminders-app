@@ -32,8 +32,10 @@
 .ov-metrics-mini span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-metrics-mini .warn { color: var(--danger); }
 
-/* Section label shared by "most important" and "next event". */
-.ov-sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); display: flex; align-items: center; gap: 5px; }
+/* Section label shared by "most important" and "next event". Same eyebrow
+   token as the metric labels (.ov-metric-lbl) below, so the two label styles
+   inside this card read as one system rather than two slightly different sizes. */
+.ov-sec-label { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--muted); display: flex; align-items: center; gap: 5px; }
 
 /* Today's most important task — a single row with a real complete checkbox. */
 .ov-focus { display: flex; flex-direction: column; gap: 5px; }
@@ -58,7 +60,12 @@
 .ov-event-task { margin-top: 4px; }
 .ov-event-task .ov-event-title { display: inline-flex; align-items: center; gap: 5px; }
 .ov-task-ic { color: var(--accent); flex: none; }
-.ov-event.compact .ov-sec-label { display: none; }
+/* Compact used to drop this label entirely (display: none), which — since the
+   default board renders Overview at exactly this tier — meant "Next up" lost
+   its eyebrow while "Most important" kept its own (.ov-sec-label above), and an
+   empty compact day showed no "Next up" content at all (label AND fallback both
+   gone): a silent, inconsistent void. Keeping the label at every size the
+   section renders at fixes both. */
 .ov-event.compact .ov-event-row { padding: 6px 9px; }
 .ov-event.compact .ov-event-time { max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
