@@ -41,7 +41,7 @@
 /* Transient "Done ✓ — next: …" acknowledgment after completing the current task.
    Entry animation only — and none at all under reduced motion (the chip still
    appears/disappears; only the slide is dropped). */
-.focus-beat { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; color: var(--green); background: color-mix(in oklab, var(--green) 12%, transparent); border: 1px solid color-mix(in oklab, var(--green) 35%, transparent); border-radius: 999px; padding: 4px 12px; animation: focusBeatIn .25s ease; }
+.focus-beat { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; color: var(--green); background: color-mix(in oklab, var(--green) 12%, transparent); border: 1px solid color-mix(in oklab, var(--green) 35%, transparent); border-radius: var(--r-pill); padding: 4px 12px; animation: focusBeatIn .25s ease; }
 @keyframes focusBeatIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .focus-beat { animation: none; } }
 

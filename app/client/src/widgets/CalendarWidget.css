@@ -69,7 +69,7 @@
 
 /* Event chips */
 .cal-wrap .fc .fc-event {
-  border-radius: 6px; padding: 1px 5px; font-size: 11.5px; font-weight: 600;
+  border-radius: var(--r-sm); padding: 1px 5px; font-size: 11.5px; font-weight: 600;
   cursor: pointer; border: 1px solid transparent; overflow: hidden;
 }
 .cal-wrap .fc .fc-event .fc-event-main,

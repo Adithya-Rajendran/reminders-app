@@ -40,7 +40,7 @@
 .rv-done-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* Now a BUTTON (opens the reflections history) — button chrome reset here so the
    clamped two-line look is unchanged; a hover wash signals it's clickable. */
-.rv-last-reflect { font-size: 11.5px; font-family: inherit; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: transparent; border: 0; padding: 3px 5px; margin: -3px -5px; border-radius: 8px; cursor: pointer; text-align: left; }
+.rv-last-reflect { font-size: 11.5px; font-family: inherit; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: transparent; border: 0; padding: 3px 5px; margin: -3px -5px; border-radius: var(--r-chip); cursor: pointer; text-align: left; }
 .rv-last-reflect:hover { background: var(--panel2); }
 .rv-last-label { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 10px; color: var(--faint); margin-right: 4px; }
 .rv-hist-wrap { display: block; position: relative; }
