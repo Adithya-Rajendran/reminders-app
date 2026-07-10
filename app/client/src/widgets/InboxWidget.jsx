@@ -99,7 +99,7 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
           inner line doesn't repeat it — it demotes to a plain eyebrow that leads
           with the one thing worth restating: how much is left to clarify. */}
       {!short && <div className="ib-head">
-        <span className="ib-eyebrow" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
+        <span className="wg-eyebrow" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
       </div>}
 
       {state === 'loading' && <SkeletonRows n={3} />}
@@ -110,7 +110,7 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
         focused ? (
           <>
             {/* The focused item + its four clarify controls, all in reach. */}
-            <div className="ib-card">
+            <div className="wg-card ib-card">
               <div className="ib-card-title">{focused.title}</div>
 
               <div className="ib-controls">
@@ -181,13 +181,13 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
                   </div>
                 ) : (
                   <>
-                    <div className="ib-upnext-head">Up next</div>
+                    <div className="wg-eyebrow">Up next</div>
                     <ul className="ib-upnext-list">
                       {upNext.map((t) => (
                         <li key={t.id} className="ib-upnext-item">{t.title}</li>
                       ))}
                     </ul>
-                    {tasks.length > 5 && <div className="ib-upnext-more">+{tasks.length - 5} more</div>}
+                    {tasks.length > 5 && <div className="wg-footnote">+{tasks.length - 5} more</div>}
                   </>
                 )}
               </div>
