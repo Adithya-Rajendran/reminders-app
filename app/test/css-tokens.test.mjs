@@ -36,11 +36,26 @@
 //   - the dead selectors .widget-count, .gi, bare .grid (not .grid-wrap),
 //     .habit, .habit-main, .habit-title — deleted as dead code (PR #141)
 //
+// THEME PRESET ([data-palette]) COMPLETENESS (host/palettes.js, Wave 3)
+//   Every non-default preset in PALETTES gets a `[data-palette="<key>"]`
+//   block (dark base) and a `[data-palette="<key>"][data-theme="light"]`
+//   companion in styles.css. Both must EXPLICITLY declare the full set of
+//   "palette-relevant" custom properties — derived from what the default
+//   (`:root, [data-theme="dark"]`) block itself declares, minus tokens that
+//   are either pure var()-aliases of other tokens (they re-resolve
+//   automatically — no redeclaration needed) or shared app-chrome constants
+//   with no visual-identity role (spacing/z-index/type-scale/etc — see
+//   PALETTE_DERIVED/PALETTE_STRUCTURAL below). A token missing from a preset
+//   block doesn't error — it silently falls through to the DEFAULT preset's
+//   value, which is exactly the "half-applied preset, one color bleeding
+//   through" bug class this check exists to catch before a screenshot does.
+//
 // Run: `npm test` (auto-discovered) or directly with `node test/css-tokens.test.mjs`.
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative } from 'node:path'
+import { PALETTES, DEFAULT_PALETTE } from '../client/src/host/palettes.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const SRC_ROOT = join(here, '../client/src')
@@ -226,6 +241,128 @@ for (const file of cssFiles) {
     `${rel}: declares a .wg-* selector locally (${[...offenders].join(', ')}) — ` +
     `.wg-* is the shared widget-sdk/ui/primitives.css vocabulary; add/extend the ` +
     `look there and reference it from JSX, don't redeclare it in a widget's own CSS`)
+}
+
+// ---- theme preset ([data-palette]) completeness ----
+//
+// Tokens declared in the default block that are pure var()-references to
+// OTHER tokens in the same block (e.g. `--swatch-1: var(--accent)`,
+// `--accent-grad: linear-gradient(135deg, var(--accent), var(--accent2))`) —
+// these re-resolve against whatever a preset sets for --accent/etc without
+// needing their own redeclaration, so they're not part of the required set.
+const PALETTE_DERIVED = new Set(['--accent-grad', '--swatch-1', '--swatch-2', '--swatch-3', '--swatch-4', '--swatch-5'])
+// Shared app-chrome constants (spacing scale, z-index scale, the general type
+// ladder, canvas/measure caps, eyebrow tracking) — identical across every
+// preset by design, not part of a preset's visual identity. --fs-stat* is the
+// one type-scale exception (the "dial-face numerals" Wave 1/2 tokenized
+// specifically so palettes COULD restate it) and stays required.
+const PALETTE_STRUCTURAL = new Set([
+  '--canvas-max', '--measure', '--tracking-eyebrow',
+  '--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8',
+  '--z-base', '--z-raised', '--z-sticky', '--z-dropdown', '--z-dropdown-lg',
+  '--z-menu', '--z-popover', '--z-popover-lg', '--z-modal', '--z-devtools',
+  '--fs-micro', '--fs-2xs', '--fs-meta', '--fs-ctrl', '--fs-body', '--fs-title', '--fs-lg', '--fs-modal', '--fs-display',
+])
+
+// Extract the { ... } body following the first match of `needle` in `css`,
+// via brace-depth counting (declarations in this file never contain literal
+// braces, so this is safe without a real CSS parser). Returns null if
+// `needle` isn't found.
+function blockBodyAfter(css, needle) {
+  const at = css.indexOf(needle)
+  if (at === -1) return null
+  const open = css.indexOf('{', at)
+  if (open === -1) return null
+  let depth = 1
+  let i = open + 1
+  for (; i < css.length && depth > 0; i++) {
+    if (css[i] === '{') depth++
+    else if (css[i] === '}') depth--
+  }
+  return css.slice(open + 1, i - 1)
+}
+
+// Every `--custom-property` NAME declared directly in a block body (values
+// ignored — this only checks presence, not correctness).
+function customPropNames(block) {
+  const names = new Set()
+  const re = /(--[\w-]+)\s*:/g
+  let m
+  while ((m = re.exec(block))) names.add(m[1])
+  return names
+}
+
+// Find every `[data-palette="<key>"]` rule (base + the `[data-theme="light"]`
+// companion) in `css`, paired with its declared token names.
+function findPaletteBlocks(css) {
+  const out = []
+  const re = /\[data-palette="([\w-]+)"\](\[data-theme="light"\])?\s*\{/g
+  let m
+  while ((m = re.exec(css))) {
+    const openBrace = re.lastIndex - 1 // regex ends right after the '{' it matched
+    let depth = 1
+    let i = openBrace + 1
+    for (; i < css.length && depth > 0; i++) {
+      if (css[i] === '{') depth++
+      else if (css[i] === '}') depth--
+    }
+    const body = css.slice(openBrace + 1, i - 1)
+    out.push({ key: m[1], theme: m[2] ? 'light' : 'dark', tokens: customPropNames(body) })
+  }
+  return out
+}
+
+// Self-test the checker itself against a synthetic snippet, so a bug in
+// blockBodyAfter/customPropNames/findPaletteBlocks can't silently pass every
+// real preset by never actually detecting a gap. Plant a block missing one
+// required token, confirm the miss is caught, then confirm the same block
+// WITH the token present is clean — proves both the failure and success
+// paths, not just "it didn't crash".
+{
+  const required = new Set(['--bg', '--accent'])
+  const missingCase = findPaletteBlocks('[data-palette="synthetic-test"] { --bg: #000; }')
+  const gotMissing = [...required].filter((t) => !missingCase[0]?.tokens.has(t))
+  ok(missingCase.length === 1 && gotMissing.length === 1 && gotMissing[0] === '--accent',
+    'palette-completeness self-test: planting a block missing --accent should be caught (it was not — the checker itself is broken)')
+
+  const completeCase = findPaletteBlocks('[data-palette="synthetic-test"] { --bg: #000; --accent: #111; }')
+  const gotComplete = [...required].filter((t) => !completeCase[0]?.tokens.has(t))
+  ok(completeCase.length === 1 && gotComplete.length === 0,
+    'palette-completeness self-test: a block declaring every required token should be clean (it was not — the checker itself is broken)')
+}
+
+const stylesFile = join(SRC_ROOT, 'styles.css')
+if (existsSync(stylesFile)) {
+  const rawStyles = readFileSync(stylesFile, 'utf8')
+  const css = stripComments(rawStyles)
+  const defaultBody = blockBodyAfter(css, ':root,')
+  if (!defaultBody) {
+    fail++
+    console.error('  ✗ styles.css: could not locate the default `:root, [data-theme="dark"]` token block')
+  } else {
+    const requiredTokens = [...customPropNames(defaultBody)]
+      .filter((t) => !PALETTE_DERIVED.has(t) && !PALETTE_STRUCTURAL.has(t))
+      .sort()
+    ok(requiredTokens.length > 20, `styles.css: derived an implausibly small required-token set (${requiredTokens.length}) — PALETTE_DERIVED/PALETTE_STRUCTURAL may be over-excluding`)
+
+    const found = findPaletteBlocks(css)
+    const nonDefaultPresets = PALETTES.filter((p) => p.key !== DEFAULT_PALETTE)
+
+    for (const preset of nonDefaultPresets) {
+      for (const theme of ['dark', 'light']) {
+        const block = found.find((b) => b.key === preset.key && b.theme === theme)
+        ok(block != null, `styles.css: missing [data-palette="${preset.key}"]${theme === 'light' ? '[data-theme="light"]' : ''} block for the "${preset.name}" preset (host/palettes.js)`)
+        if (!block) continue
+        const missing = requiredTokens.filter((t) => !block.tokens.has(t))
+        ok(missing.length === 0,
+          `styles.css: [data-palette="${preset.key}"]${theme === 'light' ? '[data-theme="light"]' : ''} is missing ${missing.length} required token(s): ${missing.join(', ')} — ` +
+          `an omitted token silently falls back to the default (Paper Planner) preset's value instead of this preset's own identity`)
+      }
+    }
+  }
+} else {
+  fail++
+  console.error(`  ✗ ${stylesFile} not found`)
 }
 
 // ---- ratchet ----
