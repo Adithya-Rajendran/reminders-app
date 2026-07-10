@@ -665,17 +665,25 @@ body {
 .widget-title .t-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .widget-title .ic { color: var(--accent); flex: 0 0 auto; }
 .widget-head-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
-.widget-remove { opacity: 0; transition: opacity 150ms ease; }
+/* Shared reveal-on-hover treatment: hidden (or dimmed, see per-site overrides)
+   until the row/parent is hovered or focused-within. Touch/pointer-less devices
+   have no hover — without the fallback below these controls would be
+   permanently unreachable there, so `@media (hover: none)` always shows them.
+   Each site still supplies its own per-parent trigger rule (the parent selector
+   varies per site, so that part can't be shared). */
+.hover-reveal { opacity: 0; transition: opacity 150ms ease; }
+@media (hover: none) { .hover-reveal { opacity: 1; } }
+
 .widget:hover .widget-remove,
 .widget:focus-within .widget-remove { opacity: 1; }
-/* Touch / pointer-less devices have no hover — the Remove (X) would otherwise be
-   permanently invisible. Mirror the .task-del / .feed-actions touch overrides. */
-@media (hover: none) { .widget-remove { opacity: 1; } }
 
 /* Collapse chevron: a PRIMARY, always-visible control (unlike the hover-only
    Remove) — its presence advertises that the header is interactive, so the
-   drag-to-move and Remove affordances get discovered too. */
-.widget-collapse { opacity: 0.55; transition: opacity 150ms ease; }
+   drag-to-move and Remove affordances get discovered too. Dimmed (not fully
+   hidden) at rest, and — unlike the other hover-reveal sites — was missing the
+   touch fallback before this pass, so it's a deliberate reachability fix, not
+   just a class rename. */
+.widget-collapse { opacity: 0.55; }
 .widget:hover .widget-collapse, .widget:focus-within .widget-collapse, .widget.collapsed .widget-collapse { opacity: 1; }
 /* Collapsed = header only: hide the body and drop the header's bottom border so the
    minimized widget reads as a single compact bar. */
@@ -732,9 +740,8 @@ body {
 .task .task-title .t.t-actions:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .task .task-sub { display: flex; align-items: center; gap: 7px; margin-top: 5px; flex-wrap: wrap; }
 .task-meta { font-size: var(--fs-meta); color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
-.task .task-del { align-self: center; flex: 0 0 auto; opacity: 0; transition: opacity 120ms ease; }
+.task .task-del { align-self: center; flex: 0 0 auto; transition: opacity 120ms ease; }
 .task:hover .task-del, .task:focus-within .task-del { opacity: 1; }
-@media (hover: none) { .task .task-del { opacity: 1; } }
 
 .add-row {
   display: flex; align-items: center; gap: 9px;
@@ -1540,7 +1547,9 @@ button.rem-head:hover .g-title { color: var(--accent); }
 
 /* Code block node view (language picker) */
 .cb-wrap { position: relative; }
-.cb-lang { position: absolute; top: 8px; right: 10px; z-index: 1; background: var(--panel-solid); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-2xs); padding: 2px 4px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+/* Missing the touch fallback until this pass (deliberate reachability fix, not
+   just a rename) — .hover-reveal now supplies it. */
+.cb-lang { position: absolute; top: 8px; right: 10px; z-index: 1; background: var(--panel-solid); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-2xs); padding: 2px 4px; cursor: pointer; }
 .cb-wrap:hover .cb-lang, .cb-lang:focus { opacity: 1; }
 
 /* Syntax highlight tokens (highlight.js classes via lowlight) — the one place a
@@ -1625,10 +1634,12 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .note-img-wrap { position: relative; display: inline-block; max-width: 100%; line-height: 0; vertical-align: bottom; }
 .note-img-wrap .note-img { width: 100%; height: auto; display: block; border-radius: var(--r-chip); border: 1px solid var(--line); cursor: pointer; }
 .note-img-wrap.sel { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-btn); }
-.img-resize { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); cursor: nwse-resize; opacity: 0; transition: opacity .15s; }
+/* Missing the touch fallback until this pass — .hover-reveal now supplies it. */
+.img-resize { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); cursor: nwse-resize; }
 .note-img-wrap:hover .img-resize, .note-img-wrap.sel .img-resize { opacity: 1; }
 /* "Edit" affordance on a drawing image (double-click also works) */
-.img-edit { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-meta); font-weight: 600; line-height: 1; padding: 5px 9px; border: none; border-radius: 7px; background: var(--accent); color: var(--on-accent); cursor: pointer; opacity: 0; transition: opacity .15s; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+/* Missing the touch fallback until this pass — .hover-reveal now supplies it. */
+.img-edit { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-meta); font-weight: 600; line-height: 1; padding: 5px 9px; border: none; border-radius: 7px; background: var(--accent); color: var(--on-accent); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .note-img-wrap.is-drawing:hover .img-edit, .note-img-wrap.is-drawing.sel .img-edit { opacity: 1; }
 .excali-overlay { align-items: stretch; }
 .excali-modal { width: min(96vw, 1240px); height: min(92vh, 920px); margin: auto; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, .5); }
@@ -1736,10 +1747,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 }
 
 /* === Quieter resting rows: empty placeholder controls reveal on hover/focus === */
-/* Mirrors .task-del. Value-bearing chips read first; the due "Schedule" chip is
-   intentionally NOT gated (scheduling is the primary triage action). */
-/* Dim-but-visible at rest (was opacity 0 until hover — an affordance you had
-   to already know about); hover/focus-within below raise to full strength. */
+/* Mirrors .task-del (both build on .hover-reveal). Value-bearing chips read
+   first; the due "Schedule" chip is intentionally NOT gated (scheduling is the
+   primary triage action). Dim-but-visible at rest (.45, not .hover-reveal's
+   default 0 — an affordance you had to already know about); hover/focus-within
+   below raise to full strength. The touch fallback comes from .hover-reveal. */
 .task .cue-chip.empty,
 .task .est-chip.empty,
 .task .subtask-chip.empty { opacity: .45; transition: opacity 120ms ease; }
@@ -1749,10 +1761,6 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .task:focus-within .cue-chip.empty,
 .task:focus-within .est-chip.empty,
 .task:focus-within .subtask-chip.empty { opacity: 1; }
-@media (hover: none) {
-  .task .cue-chip.empty, .task .est-chip.empty,
-  .task .subtask-chip.empty { opacity: 1; }
-}
 
 /* === Reconnect banner: stale-list-visible on a sync blip (vs full ErrorState) === */
 .reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; padding: 5px 10px; border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent); background: var(--warn-soft); color: var(--warn); border-radius: var(--r-chip); font-size: var(--fs-meta); }

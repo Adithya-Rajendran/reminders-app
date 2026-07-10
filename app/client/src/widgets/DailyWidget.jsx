@@ -144,7 +144,7 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
             : <div className="task-stream">{chosen.map((t) => (
               <div key={t.id} className="daily-row">
                 <div className="daily-row-main">{taskRow(t)}</div>
-                <button className="iconbtn sm daily-x" title="Remove from today" aria-label="Remove from today" onClick={() => removeFromToday(t.id)}><IconX size={14} /></button>
+                <button className="iconbtn sm hover-reveal daily-x" title="Remove from today" aria-label="Remove from today" onClick={() => removeFromToday(t.id)}><IconX size={14} /></button>
               </div>
             ))}</div>}
 

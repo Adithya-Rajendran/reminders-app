@@ -758,7 +758,7 @@ function WidgetFrame({ type, title, group, collapsed, onToggleCollapse, onRemove
               remove) so the header's controls are discoverable at a glance. */}
           {onToggleCollapse && (
             <button
-              className="iconbtn sm widget-collapse"
+              className="iconbtn sm hover-reveal widget-collapse"
               aria-label={collapsed ? `Expand ${title} widget` : `Collapse ${title} widget`}
               aria-expanded={!collapsed}
               title={collapsed ? 'Expand' : 'Collapse'}
@@ -768,7 +768,7 @@ function WidgetFrame({ type, title, group, collapsed, onToggleCollapse, onRemove
             </button>
           )}
           <button
-            className="iconbtn sm danger-hover widget-remove"
+            className="iconbtn sm danger-hover hover-reveal widget-remove"
             aria-label={`Remove ${title} widget`}
             title="Remove widget"
             onClick={onRemove}

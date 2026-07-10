@@ -29,9 +29,9 @@ function ImageView({ node, updateAttributes, selected, extension }) {
     <NodeViewWrapper className={`note-img-wrap${selected ? ' sel' : ''}${drawing ? ' is-drawing' : ''}`} style={{ width: width ? width + 'px' : undefined }}>
       <img ref={imgRef} src={src} alt={node.attrs.alt || ''} className="note-img" draggable={false} onDoubleClick={onEdit ? edit : undefined} />
       {drawing && onEdit && (
-        <button type="button" className="img-edit" onMouseDown={(e) => e.preventDefault()} onClick={edit} contentEditable={false} title="Edit drawing">✏️ Edit</button>
+        <button type="button" className="hover-reveal img-edit" onMouseDown={(e) => e.preventDefault()} onClick={edit} contentEditable={false} title="Edit drawing">✏️ Edit</button>
       )}
-      <span className="img-resize" onMouseDown={startResize} title="Drag to resize" contentEditable={false} />
+      <span className="hover-reveal img-resize" onMouseDown={startResize} title="Drag to resize" contentEditable={false} />
     </NodeViewWrapper>
   )
 }

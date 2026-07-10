@@ -28,7 +28,7 @@ function NoteRow({ n, active, paddingLeft, onOpen, onCtx, dnd }) {
       {n.pinned && <IconPin size={11} className="tree-pin-mark" />}
       <span className="tree-name">{n.title}</span>
       {(n.tags || []).slice(0, 2).map((t) => <span key={t} className="note-tag mini">#{t}</span>)}
-      <button type="button" className="tree-row-menu" aria-label="Note actions" title="Note actions"
+      <button type="button" className="hover-reveal tree-row-menu" aria-label="Note actions" title="Note actions"
         onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); onCtx(n, r.right, r.bottom) }}>
         <IconDots size={14} />
       </button>
