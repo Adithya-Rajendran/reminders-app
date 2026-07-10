@@ -1151,7 +1151,7 @@ body {
 
 .mini-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-popover);
-  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-menu);
   box-shadow: var(--shadow); padding: 5px; min-width: 150px; animation: menuIn 120ms ease;
 }
 .mini-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; font-size: var(--fs-ctrl); color: var(--text); padding: 7px 9px; border: 0; background: transparent; border-radius: var(--r-chip); cursor: pointer; }
