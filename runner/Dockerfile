@@ -27,9 +27,9 @@ RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable-${KUBECTL_MIN
 # Tarball straight into /usr/local rather than nvm — nvm is a shell-profile
 # hack for interactive use; a build layer just needs the binaries on PATH.
 ARG NODE_VERSION=22.11.0
-RUN curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
-    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
-    && rm /tmp/node.tar.xz \
+RUN curl -fsSLo /tmp/node.tar.gz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" \
+    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.gz \
     && node --version && npm --version
 
 # --- Playwright Chromium + system deps --------------------------------------
