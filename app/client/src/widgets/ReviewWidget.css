@@ -1,40 +1,79 @@
 /* Weekly Review widget — co-located with the widget (moved out of styles.css).
    All theme-token driven so light/dark + accents follow. */
-.review { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; }
-.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+/* height/box-sizing match the other stat-card widgets (.ov/.focus/.tasklist) so
+   this fills .widget-body instead of shrink-wrapping its content — needed both
+   so .rv-footer's margin-top: auto has room to push into (see below) and so the
+   guided-flow's .rv-flow-body flex:1 has a real box to grow/scroll within. */
+.review { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; height: 100%; min-height: 0; box-sizing: border-box; }
+/* The rule under the headline reads as a ledger line — it ties the "done this
+   week" figure to the trend chart below as one instrument reading instead of
+   two unrelated blocks, and gives the compact (no-trend) tier a clean stopping
+   point before the CTA. */
+.rv-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .rv-stat { display: flex; flex-direction: column; line-height: 1.05; }
+/* Deliberately SANS + tabular, not serif: this is an instrument reading (like
+   .focus-clock 40px/800 and .ov-metric-num 26px/800), and the big-number gauges
+   must read as one family across widgets. Serif is reserved for headings/prose
+   ("written in"); measured figures stay on the dial face. */
 .rv-big { font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
 .rv-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-.rv-delta { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); text-align: right; }
-.rv-delta.rv-up { color: var(--green); }
-.rv-delta.rv-down { color: var(--danger); }
-.rv-spark { display: flex; align-items: flex-end; gap: 6px; height: 88px; }
-.rv-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; }
-.rv-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+/* A real delta is a measured reading — give it the same chip chrome every other
+   gauge value in the app gets (see .chip). rv-note (below) opts back out for the
+   "nothing to compare against yet" caption, which isn't a reading at all. */
+.rv-delta { display: inline-flex; align-items: center; font-size: var(--fs-meta); font-weight: 700; color: var(--muted); text-align: right; padding: 3px 9px; border-radius: var(--r-chip); background: var(--panel2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.rv-delta.rv-up { color: var(--green); background: var(--green-soft); border-color: color-mix(in oklab, var(--green) 30%, transparent); }
+.rv-delta.rv-down { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
+/* "first week tracked" / "no completions yet": an explanatory caption, not a
+   gauge value — drop the chip chrome so it reads as a note, not a stat. */
+.rv-delta.rv-note { background: transparent; border-color: transparent; padding: 3px 2px; color: var(--faint); font-weight: 600; }
+/* Stacked plot + tick row. The plot is the SOLE positioning box for the dashed
+   average (its bottom-% must be measured against bar heights alone — see the
+   JSX comment), and it carries one continuous ruled zero-axis under all the
+   columns: graph-paper ruling that gives a sparse week's lone bar (and the 4px
+   empty-week marks) something to sit ON instead of floating in blank panel. */
+.rv-spark { display: flex; flex-direction: column; gap: 5px; height: 88px; }
+.rv-plot { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 6px; border-bottom: 1px solid var(--line-strong); }
+.rv-bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.rv-ticks { display: flex; gap: 6px; }
 .rv-bar { width: 70%; max-width: 22px; border-radius: 5px 5px 2px 2px; background: var(--accent); min-height: 4px; transition: height .2s ease; }
-.rv-bar.empty { background: var(--line-strong); }
-.rv-bar-lbl { font-size: 10.5px; color: var(--faint); font-weight: 600; }
+/* One step softer than the axis rule: a week with nothing tracked is a faint
+   mark ON the ruled baseline, not a competing data bar. */
+.rv-bar.empty { background: var(--line); }
+.rv-bar-lbl { flex: 1; text-align: center; font-size: 10.5px; color: var(--faint); font-weight: 600; }
 .rv-spark-cap { font-size: 10.5px; color: var(--faint); margin-top: -8px; }
 
-/* Multi-week trend. The track is the positioning context for the dashed average
-   baseline; the current (in-progress) week is emphasized so it reads as "where
-   you are now" against the trailing bars. */
-.rv-trend { position: relative; }
+/* Multi-week trend. The plot row is the positioning context for the dashed
+   average baseline; the current (in-progress) week is emphasized so it reads as
+   "where you are now" against the trailing bars. */
+.rv-trend .rv-plot { position: relative; }
 /* Prior-weeks average, drawn as a dashed rule across the plot. Meaning is carried
    by the dash pattern + "avg" tag (NOT color) so it survives color-blindness and
    the accent theme. Sits behind the bars via a lower stacking order. */
 .rv-trend-base { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line-strong); pointer-events: none; z-index: 0; }
-.rv-trend-base-lbl { position: absolute; right: 0; top: -6px; font-size: 9px; line-height: 1; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); background: var(--panel); padding: 0 2px; }
+/* Left, not right: the current/"now" bar is the emphasized, widened one and it
+   always sits on the right (see .rv-bar-now) — a right-anchored tag would sit
+   in its column and get painted over by the opaque bar. Left is always clear
+   history territory (those bars stay at .55 opacity). */
+.rv-trend-base-lbl { position: absolute; left: 0; top: -6px; font-size: 9px; line-height: 1; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--muted); background: var(--panel); padding: 0 2px; }
 .rv-trend .rv-bar-col { position: relative; z-index: 1; } /* bars over the baseline */
 /* Endpoint emphasis: the trailing weeks read as muted history, the current week
    as the live figure — a wider, fully-opaque bar plus a bold "now" tick. */
 .rv-trend .rv-bar { opacity: .55; }
 .rv-trend .rv-bar-now { opacity: 1; width: 84%; box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
-.rv-trend .rv-now .rv-bar-lbl { color: var(--accent); font-weight: 800; }
+.rv-trend .rv-bar-lbl.rv-now { color: var(--accent); font-weight: 800; }
 .rv-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Pins the CTA (+ last-reflection trigger) to the bottom of the widget body
+   when there's spare vertical room, instead of leaving it stranded right below
+   the trend with a dead gap under it — a sparse/early-tracking week otherwise
+   reads as an unfinished card rather than a deliberately quiet one. Harmless at
+   taller tiers/more content: margin-top: auto only absorbs POSITIVE free space,
+   so it's a no-op once the footer already has neighbors filling the column. */
+.rv-footer { margin-top: auto; display: flex; flex-direction: column; gap: 14px; }
 .rv-prompt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: var(--r-btn); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); }
 .rv-prompt-body { flex: 1; min-width: 0; }
-.rv-prompt-title { font-size: var(--fs-ctrl); font-weight: 700; color: var(--text); }
+/* Serif: a card headline (like .h-title/.h-modal/.fc-toolbar-title), not a
+   control label — the "written in, not operated" thesis applies here too. */
+.rv-prompt-title { font-size: var(--fs-ctrl); font-weight: 700; color: var(--text); font-family: var(--font-serif); }
 .rv-prompt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .rv-reviewed { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-meta); font-weight: 600; color: var(--green); }
 .rv-done-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -62,11 +101,24 @@
 
 /* guided review flow */
 .rv-flowwrap { gap: 8px; }
-.rv-flow-head { display: flex; align-items: baseline; gap: 8px; }
-.rv-flow-step { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--accent); }
-.rv-flow-title { font-size: var(--fs-title); font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+/* Ruled off from the body like .rv-top on the stats face — the step header is
+   this face's headline row and gets the same ledger-line treatment. */
+.rv-flow-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rv-flow-step { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--accent); font-variant-numeric: tabular-nums; }
+/* Serif at title weight — "Get clear / current / creative" are the planner's
+   page headings (same role as .h-title / the widget title), not control text. */
+.rv-flow-title { font-size: var(--fs-title); font-weight: 700; letter-spacing: -.01em; color: var(--text); font-family: var(--font-serif); }
 .rv-flow-sub { font-size: var(--fs-meta); color: var(--muted); line-height: 1.4; }
 .rv-flow-body { flex: 1; min-height: 0; overflow-y: auto; margin: 2px 0; }
-.rv-flow-empty { font-size: 12.5px; color: var(--muted); padding: 14px 6px; text-align: center; }
+/* A cleared step is a positive reading, not an absence — the ✓ sentence gets a
+   quiet dashed "nothing owed here" card so the pass feels checked off, matching
+   the dashed empty-chip idiom used app-wide (.cue-chip.empty/.imp-chip.empty). */
+.rv-flow-empty { font-size: 12.5px; color: var(--green); font-weight: 600; padding: 14px 10px; text-align: center; border: 1px dashed color-mix(in oklab, var(--green) 35%, transparent); border-radius: var(--r-btn); background: var(--green-soft); }
 .rv-reflect { width: 100%; min-height: 96px; resize: vertical; font: inherit; font-size: var(--fs-ctrl); line-height: 1.5; padding: 8px 10px; }
 .rv-flow-nav { display: flex; justify-content: space-between; gap: 8px; padding-top: 2px; }
+
+/* Narrow-tier polish (the JSX already trims the delta text at xs via
+   compactDelta): tighten the frame so the headline + chip fit on one line
+   without the roomy standard-tier inset forcing a wrap. */
+[data-wsize="xs"] .review { padding: 12px; gap: 10px; }
+[data-wsize="xs"] .rv-top { padding-bottom: 8px; }

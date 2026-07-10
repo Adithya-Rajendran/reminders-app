@@ -128,7 +128,9 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
   const up = review.deltaPct >= 0
   // No comparable last week (baseline 0) means no honest percentage — fall back
   // to an absolute, first-week-tracked label instead of a divide-by-zero "100%".
-  const deltaCls = !review.hasBaseline ? '' : review.thisWeek === review.lastWeek ? '' : up ? 'rv-up' : 'rv-down'
+  // That fallback is an explanatory caption, not a measured reading, so it gets
+  // a plain-text treatment (rv-note) rather than the chip look a real delta gets.
+  const deltaCls = !review.hasBaseline ? 'rv-note' : review.thisWeek === review.lastWeek ? '' : up ? 'rv-up' : 'rv-down'
 
   // Content grows with vertical room (the layout stacks top -> trend -> meta ->
   // prompt). Very short: just the headline number + delta. A bit taller: add the
@@ -173,28 +175,44 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
           className="rv-spark rv-trend" role="img"
           aria-label={`Weekly completions over the last ${weekly.length} weeks: ${weekly.map((w) => w.count).join(', ')}. This week ${review.thisWeek}${prior.length ? `, prior weekly average ${baseline.toFixed(1)}` : ''}.`}
         >
-          {/* Faint dashed baseline = the prior-weeks average. Positioned by height
-              so a bar clearing it reads as "above trend" without relying on color;
-              the dashed style + label carry the meaning for color-blind users. */}
-          {prior.length > 0 && (
-            <div className="rv-trend-base" style={{ bottom: `${baselinePct}%` }} aria-hidden="true">
-              <span className="rv-trend-base-lbl">avg</span>
-            </div>
-          )}
-          {weekly.map((w, i) => {
-            const last = i === weekly.length - 1 // the current, in-progress week
-            return (
-              <div className={`rv-bar-col${last ? ' rv-now' : ''}`} key={w.weekStart} title={`${weekLabel(w.weekStart)}: ${w.count}`}>
-                <div className="rv-bar-track">
+          {/* Plot (bars + baseline) and the week-tick row are SIBLING boxes: the
+              dashed average is placed by bottom-% and must share its box with the
+              bars ALONE — when the tick labels lived inside the same box, the
+              percentage was measured against bars+labels and the line drifted
+              above the true bar heights as the average grew. The split also lets
+              .rv-plot carry one continuous ruled zero-axis under all columns. */}
+          <div className="rv-plot">
+            {/* Faint dashed baseline = the prior-weeks average. Positioned by height
+                so a bar clearing it reads as "above trend" without relying on color;
+                the dashed style + label carry the meaning for color-blind users.
+                Only drawn when that average is actually nonzero — a baseline of 0
+                (every prior week untracked) has nothing honest to compare against
+                and would just double-strike the zero-axis rule. */}
+            {baseline > 0 && (
+              <div className="rv-trend-base" style={{ bottom: `${baselinePct}%` }} aria-hidden="true">
+                <span className="rv-trend-base-lbl">avg</span>
+              </div>
+            )}
+            {weekly.map((w, i) => {
+              const last = i === weekly.length - 1 // the current, in-progress week
+              return (
+                <div className={`rv-bar-col${last ? ' rv-now' : ''}`} key={w.weekStart} title={`${weekLabel(w.weekStart)}: ${w.count}`}>
                   <div
                     className={`rv-bar${w.count === 0 ? ' empty' : ''}${last ? ' rv-bar-now' : ''}`}
                     style={{ height: `${w.count === 0 ? 4 : Math.round((w.count / wkMax) * 100)}%` }}
                   />
                 </div>
-                {showDetails && <div className="rv-bar-lbl">{last ? 'now' : weekTick(w.weekStart)}</div>}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          {showDetails && (
+            <div className="rv-ticks" aria-hidden="true">
+              {weekly.map((w, i) => {
+                const last = i === weekly.length - 1
+                return <div className={`rv-bar-lbl${last ? ' rv-now' : ''}`} key={w.weekStart}>{last ? 'now' : weekTick(w.weekStart)}</div>
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -209,53 +227,62 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
         </div>
       )}
 
-      {showPrompt ? (review.promptDue ? (
-        <div className="rv-prompt">
-          <div className="rv-prompt-body">
-            <div className="rv-prompt-title">Weekly review &amp; re-plan</div>
-            <div className="rv-prompt-sub">A guided pass: clear overdue, give stalled items a next step, then reflect.</div>
-          </div>
-          <button className="btn primary sm" onClick={() => { setDraft(''); setStep(0) }}><IconChart size={14} /> Start review</button>
-        </div>
-      ) : (
-        <div className="rv-done-row">
-          <span className="rv-reviewed"><IconCheck size={14} /> Reviewed this week</span>
-          <button className="btn ghost sm" onClick={() => { setDraft(''); setStep(0) }}>Review again</button>
-        </div>
-      )) : (
-        // Below the md height tier the full prompt card doesn't fit — but the
-        // DEFAULT widget size is below md, so without this compact row the guided
-        // review would be unreachable for anyone who never resizes the widget.
-        <div className="rv-entry-compact">
-          <button className="btn ghost sm" onClick={() => { setDraft(''); setStep(0) }}>
-            <IconChart size={13} /> {review.promptDue ? 'Weekly review' : 'Review again'}
-          </button>
-        </div>
-      )}
-
-      {showDetails && lastReflection && (
-        // The row is a button now: past reflections used to be written and never
-        // seen again — this opens the full history, newest first.
-        <span className="inline-ctl rv-hist-wrap" ref={histRef}>
-          <button
-            type="button" className="rv-last-reflect rv-hist-btn" title={lastReflection.text}
-            aria-haspopup="dialog" aria-expanded={histOpen}
-            onClick={() => setHistOpen((o) => !o)}
-          >
-            <span className="rv-last-label">Last reflection</span> {lastReflection.text}
-          </button>
-          {histOpen && (
-            <div className="mini-menu rv-hist-menu" role="dialog" aria-label="Past reflections">
-              {reflections.map((r) => (
-                <div className="rv-hist-item" key={r.iso}>
-                  <div className="rv-hist-date">{new Date(r.iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
-                  <div className="rv-hist-text">{r.text}</div>
-                </div>
-              ))}
+      {/* Footer group (CTA + last-reflection trigger): pinned to the bottom of the
+          widget body (see .rv-footer's margin-top: auto) instead of trailing
+          right after the trend with the rest of the height left dead below it —
+          on a sparse/early-tracking week the widget is mostly whitespace, and an
+          anchored footer reads as a deliberately quiet card, not an unfinished one. */}
+      <div className="rv-footer">
+        {showPrompt ? (review.promptDue ? (
+          <div className="rv-prompt">
+            <div className="rv-prompt-body">
+              <div className="rv-prompt-title">Weekly review &amp; re-plan</div>
+              <div className="rv-prompt-sub">A guided pass: clear overdue, give stalled items a next step, then reflect.</div>
             </div>
-          )}
-        </span>
-      )}
+            <button className="btn primary sm" onClick={() => { setDraft(''); setStep(0) }}><IconChart size={14} /> Start review</button>
+          </div>
+        ) : (
+          <div className="rv-done-row">
+            <span className="rv-reviewed"><IconCheck size={14} /> Reviewed this week</span>
+            <button className="btn ghost sm" onClick={() => { setDraft(''); setStep(0) }}>Review again</button>
+          </div>
+        )) : (
+          // Below the md height tier the full prompt card doesn't fit — but the
+          // DEFAULT widget size is below md, so without this compact row the guided
+          // review would be unreachable for anyone who never resizes the widget.
+          // Primary/ghost mirrors the full-tier card: due-for-review is the widget's
+          // one primary action here, "review again" (already done) is secondary.
+          <div className="rv-entry-compact">
+            <button className={`btn sm ${review.promptDue ? 'primary' : 'ghost'}`} onClick={() => { setDraft(''); setStep(0) }}>
+              <IconChart size={13} /> {review.promptDue ? 'Weekly review' : 'Review again'}
+            </button>
+          </div>
+        )}
+
+        {showDetails && lastReflection && (
+          // The row is a button now: past reflections used to be written and never
+          // seen again — this opens the full history, newest first.
+          <span className="inline-ctl rv-hist-wrap" ref={histRef}>
+            <button
+              type="button" className="rv-last-reflect rv-hist-btn" title={lastReflection.text}
+              aria-haspopup="dialog" aria-expanded={histOpen}
+              onClick={() => setHistOpen((o) => !o)}
+            >
+              <span className="rv-last-label">Last reflection</span> {lastReflection.text}
+            </button>
+            {histOpen && (
+              <div className="mini-menu rv-hist-menu" role="dialog" aria-label="Past reflections">
+                {reflections.map((r) => (
+                  <div className="rv-hist-item" key={r.iso}>
+                    <div className="rv-hist-date">{new Date(r.iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                    <div className="rv-hist-text">{r.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </span>
+        )}
+      </div>
 
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
     </div>
