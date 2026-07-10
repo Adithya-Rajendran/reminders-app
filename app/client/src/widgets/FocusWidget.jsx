@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, PriorityDot, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, UndoBar, useWidgetSize, atMostW, atMostH, IconTarget, IconBell, IconChevR } from '../widget-sdk'
+import { useTaskList, byImportanceThenDue, dueBucket, isRealDate, dueChip, timeLabel, PriorityDot, PRIORITIES, partitionByTier, widgetStore, orderPlanFirst, announce, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, useWidgetSize, atMostW, atMostH, IconTarget, IconBell, IconChevR } from '../widget-sdk'
 import './FocusWidget.css'
 
 const DUR_KEY = 'focus-duration'
@@ -139,36 +139,43 @@ export default function FocusWidget({ tasks: tasksCap, events, plan, instanceId 
     }, 800)
   }
 
-  if (state === 'loading') return <div className="tasklist"><SkeletonRows n={3} /></div>
-  if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
-
+  // Only the "now task" card is data-dependent — the timer, session banners and
+  // park-a-thought box are all local UI state, so they stay mounted through
+  // loading/error instead of vanishing with the rest of the widget.
+  const hasData = tasks.length > 0
   const chip = nowTask && dueChip(nowTask.due_date)
   const done = remaining === 0 && !running
 
   return (
     <div className={`focus${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
-      {nowTask ? (
-        <div className="focus-now">
-          <div className="focus-eyebrow">
-            <IconTarget size={14} /> {compact ? 'Focus' : 'Focus on'}
-            {nowIsFromPlan && !short && (
-              <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
-            )}
+      {state === 'loading' && <SkeletonRows n={3} />}
+      {state === 'error' && !hasData && <ErrorState onRetry={load} />}
+      {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
+
+      {(state === 'ready' || (state === 'error' && hasData)) && (
+        nowTask ? (
+          <div className="focus-now">
+            <div className="focus-eyebrow">
+              <IconTarget size={14} /> {compact ? 'Focus' : 'Focus on'}
+              {nowIsFromPlan && !short && (
+                <span className="chip focus-plan-chip">From today's plan · {planRemaining} left</span>
+              )}
+            </div>
+            <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={completeNow} />
+            <div className="focus-now-body">
+              <div className="focus-title">{nowTask.title}</div>
+              {!short && <div className="focus-meta">
+                <PriorityDot value={nowTask.priority || 0} />
+                <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
+                {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
+                {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}
+                {ranked.length > 1 && <button className="focus-skip" title="Show another task" onClick={() => setSkip((s) => s + 1)}>skip <IconChevR size={11} /></button>}
+              </div>}
+            </div>
           </div>
-          <button className="focus-check" role="checkbox" aria-checked={false} aria-label={`Complete: ${nowTask.title}`} onClick={completeNow} />
-          <div className="focus-now-body">
-            <div className="focus-title">{nowTask.title}</div>
-            {!short && <div className="focus-meta">
-              <PriorityDot value={nowTask.priority || 0} />
-              <span className="sr-only">Priority: {(PRIORITIES.find((p) => p.v === (nowTask.priority || 0)) || PRIORITIES[0]).label}</span>
-              {chip && <span className={`chip ${chip.cls}`}>{chip.label}{timeLabel(nowTask.due_date) ? ' · ' + timeLabel(nowTask.due_date) : ''}</span>}
-              {nowTask.cue && <span className="chip cue-chip"><span className="cue-arrow">→</span> {nowTask.cue}</span>}
-              {ranked.length > 1 && <button className="focus-skip" title="Show another task" onClick={() => setSkip((s) => s + 1)}>skip <IconChevR size={11} /></button>}
-            </div>}
-          </div>
-        </div>
-      ) : (
-        <EmptyState icon={IconTarget} title="Nothing to focus on" sub="No open tasks right now — enjoy the clear runway." />
+        ) : (
+          <EmptyState icon={IconTarget} title="Nothing to focus on" sub="No open tasks right now — enjoy the clear runway." />
+        )
       )}
 
       {/* Transient completion acknowledgment (plain div — announce() covers SRs).

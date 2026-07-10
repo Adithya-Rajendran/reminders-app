@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useTaskList, computeReview, selectStalled, applyOrganizer, useOrganizerFilter, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, UndoBar, IconChart, IconCheck } from '../widget-sdk'
+import { useTaskList, computeReview, selectStalled, applyOrganizer, useOrganizerFilter, dueBucket, isRealDate, widgetStore, useWidgetSize, usePopover, atLeastH, atMostW, TaskRow, SkeletonRows, EmptyState, ErrorState, ReconnectBanner, UndoBar, IconChart, IconCheck } from '../widget-sdk'
 import './ReviewWidget.css'
 
 const REVIEWED_KEY = 'review-last-reviewed'
@@ -63,15 +63,20 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
     setDraft(''); setStep(-1); markReviewed()
   }
 
+  // A refresh failure keeps the last-good stats/flow on screen (via
+  // ReconnectBanner below) instead of wiping the widget — only an INITIAL-load
+  // failure (no tasks ever loaded) falls back to the full ErrorState card.
+  const hasData = tasks.length > 0
   if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
-  if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
-  if (tasks.length === 0) {
+  if (state === 'error' && !hasData) return <div className="tasklist"><ErrorState onRetry={load} /></div>
+  if (!hasData) {
     return (
       <div className="tasklist">
         <EmptyState icon={IconChart} title="Nothing to review yet" sub="Complete a few tasks and your weekly progress shows up here." />
       </div>
     )
   }
+  const reconnect = state === 'error' ? <ReconnectBanner onRetry={load} /> : null
 
   // ---- guided review flow ----
   if (step >= 0) {
@@ -79,6 +84,7 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
     const rowFor = (t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} />
     return (
       <div className="review rv-flowwrap">
+        {reconnect}
         <div className="rv-flow-head">
           <span className="rv-flow-step">Step {step + 1} / {STEPS.length}</span>
           <span className="rv-flow-title">{s.title}</span>
@@ -137,6 +143,7 @@ export default function ReviewWidget({ tasks: tasksCap, organizer, instanceId })
 
   return (
     <div className="review">
+      {reconnect}
       <div className="rv-top">
         <div className="rv-stat">
           <div className="rv-big">{review.thisWeek}</div>

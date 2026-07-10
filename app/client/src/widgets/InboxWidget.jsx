@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   useTaskList, selectInbox,
   AreaPicker, ContextPicker, ImportanceControl, DateTimePicker,
-  EmptyState, ErrorState, SkeletonRows, UndoBar, announce,
+  EmptyState, ErrorState, ReconnectBanner, SkeletonRows, UndoBar, announce,
   dueChip, timeLabel, isRealDate,
   IconInbox, IconTrash, IconMoon, IconClock, IconCheck,
   useWidgetSize, atMostW, atMostH,
@@ -84,21 +84,14 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
     announce(`Someday: ${task.title}`)
   }, [onPatch])
 
-  if (state === 'loading') return <div className="inbox"><SkeletonRows n={3} /></div>
-  if (state === 'error') return <div className="inbox"><ErrorState onRetry={load} /></div>
-
-  if (!focused) {
-    return (
-      <div className={`inbox${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
-        <EmptyState icon={IconInbox} title="Inbox zero — nothing to clarify." sub="New captures land here for a quick decide." />
-        {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
-      </div>
-    )
-  }
-
-  const chip = dueChip(focused.due_date)
-  const dated = isRealDate(focused.due_date)
-  const focusContexts = contextsOf(focused)
+  // hasData mirrors the reference widgets: a background refresh failure keeps
+  // whatever was already clarified-queue in view (via ReconnectBanner) instead of
+  // wiping the card; only a failure with nothing ever loaded gets the full
+  // ErrorState. Loading always shows the skeleton, same as Overview/Reminders.
+  const hasData = tasks.length > 0
+  const chip = focused && dueChip(focused.due_date)
+  const dated = focused && isRealDate(focused.due_date)
+  const focusContexts = focused ? contextsOf(focused) : []
 
   return (
     <div className={`inbox${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
@@ -109,88 +102,100 @@ export default function InboxWidget({ tasks: tasksCap, organizer }) {
         <span className="ib-count" aria-label={`${tasks.length} to clarify`}>{tasks.length} to clarify</span>
       </div>}
 
-      {/* The focused item + its four clarify controls, all in reach. */}
-      <div className="ib-card">
-        <div className="ib-card-title">{focused.title}</div>
+      {state === 'loading' && <SkeletonRows n={3} />}
+      {state === 'error' && !hasData && <ErrorState onRetry={load} />}
+      {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
 
-        <div className="ib-controls">
-          <AreaPicker
-            value={focused.area || ''}
-            areas={areas}
-            onSet={(id) => onPatch(focused, { area: id })}
-          />
-          <ContextPicker
-            value={focusContexts}
-            options={contexts}
-            onSet={(next) => patchContexts(focused, next)}
-            // Enable type-to-create: on a fresh account the derived context list is
-            // empty, so without this you could never assign a context during Clarify.
-            // The actual create+assign happens through onSet (which writes the label);
-            // onCreate just flips the create affordance on.
-            onCreate={() => {}}
-          />
-          <ImportanceControl
-            value={!!focused.important}
-            onSet={(v) => onPatch(focused, { important: v })}
-          />
-          {/* Date chip doubles as the picker anchor: shows the current due date
-              (or "Add date"), opens the DateTimePicker on click. */}
-          <button
-            type="button" ref={dateAnchor}
-            className={`chip ib-date${dated ? ' on' : ' empty'}`}
-            aria-haspopup="dialog" aria-expanded={dateOpen}
-            onClick={() => setDateOpen((o) => !o)}
-          >
-            <IconClock size={13} />
-            {chip ? `${chip.label}${timeLabel(focused.due_date) ? ' · ' + timeLabel(focused.due_date) : ''}` : 'Add date'}
-          </button>
-          {dateOpen && (
-            <DateTimePicker
-              anchorRef={dateAnchor}
-              value={focused.due_date}
-              hasReminder={Array.isArray(focused.reminders) && focused.reminders.length > 0}
-              onApply={({ due_date, reminder }) => { onSchedule(focused, { due_date, reminder }); setDateOpen(false) }}
-              onClose={() => setDateOpen(false)}
-            />
-          )}
-        </div>
+      {(state === 'ready' || (state === 'error' && hasData)) && (
+        focused ? (
+          <>
+            {/* The focused item + its four clarify controls, all in reach. */}
+            <div className="ib-card">
+              <div className="ib-card-title">{focused.title}</div>
 
-        <div className="ib-actions">
-          {/* Primary: move it out of the Inbox. */}
-          <button type="button" className="btn primary sm ib-clarify" onClick={() => clarify(focused)}>
-            <IconCheck size={14} /> Clarify
-          </button>
-          {/* Someday: decide NOT to act now without losing it. */}
-          <button type="button" className="btn ghost sm" onClick={() => someday(focused)} title="Defer to Someday/Maybe — leaves the Inbox, no date">
-            <IconMoon size={13} /> Someday
-          </button>
-          {/* Delete: it was noise. Undoable via the bar. */}
-          <button type="button" className="iconbtn sm ib-del" aria-label={`Delete: ${focused.title}`} title="Delete" onClick={() => onDelete(focused)}>
-            <IconTrash size={14} />
-          </button>
-        </div>
-      </div>
+              <div className="ib-controls">
+                <AreaPicker
+                  value={focused.area || ''}
+                  areas={areas}
+                  onSet={(id) => onPatch(focused, { area: id })}
+                />
+                <ContextPicker
+                  value={focusContexts}
+                  options={contexts}
+                  onSet={(next) => patchContexts(focused, next)}
+                  // Enable type-to-create: on a fresh account the derived context list is
+                  // empty, so without this you could never assign a context during Clarify.
+                  // The actual create+assign happens through onSet (which writes the label);
+                  // onCreate just flips the create affordance on.
+                  onCreate={() => {}}
+                />
+                <ImportanceControl
+                  value={!!focused.important}
+                  onSet={(v) => onPatch(focused, { important: v })}
+                />
+                {/* Date chip doubles as the picker anchor: shows the current due date
+                    (or "Add date"), opens the DateTimePicker on click. */}
+                <button
+                  type="button" ref={dateAnchor}
+                  className={`chip ib-date${dated ? ' on' : ' empty'}`}
+                  aria-haspopup="dialog" aria-expanded={dateOpen}
+                  onClick={() => setDateOpen((o) => !o)}
+                >
+                  <IconClock size={13} />
+                  {chip ? `${chip.label}${timeLabel(focused.due_date) ? ' · ' + timeLabel(focused.due_date) : ''}` : 'Add date'}
+                </button>
+                {dateOpen && (
+                  <DateTimePicker
+                    anchorRef={dateAnchor}
+                    value={focused.due_date}
+                    hasReminder={Array.isArray(focused.reminders) && focused.reminders.length > 0}
+                    onApply={({ due_date, reminder }) => { onSchedule(focused, { due_date, reminder }); setDateOpen(false) }}
+                    onClose={() => setDateOpen(false)}
+                  />
+                )}
+              </div>
 
-      {/* A tight peek at what's next — enough to gauge the pile without inviting
-          out-of-order editing (only the focused item is actionable). */}
-      {upNext.length > 0 && !short && (
-        <div className="ib-upnext">
-          {compact ? (
-            <div className="ib-upnext-compact" aria-label={`${tasks.length - 1} more inbox items`}>
-              Up next: {upNext[0].title}{tasks.length > 2 ? ` · +${tasks.length - 2} more` : ''}
+              <div className="ib-actions">
+                {/* Primary: move it out of the Inbox. */}
+                <button type="button" className="btn primary sm ib-clarify" onClick={() => clarify(focused)}>
+                  <IconCheck size={14} /> Clarify
+                </button>
+                {/* Someday: decide NOT to act now without losing it. */}
+                <button type="button" className="btn ghost sm" onClick={() => someday(focused)} title="Defer to Someday/Maybe — leaves the Inbox, no date">
+                  <IconMoon size={13} /> Someday
+                </button>
+                {/* Delete: it was noise. Undoable via the bar. */}
+                <button type="button" className="iconbtn sm ib-del" aria-label={`Delete: ${focused.title}`} title="Delete" onClick={() => onDelete(focused)}>
+                  <IconTrash size={14} />
+                </button>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="ib-upnext-head">Up next</div>
-              <ul className="ib-upnext-list">
-                {upNext.map((t) => (
-                  <li key={t.id} className="ib-upnext-item">{t.title}</li>
-                ))}
-              </ul>
-              {tasks.length > 5 && <div className="ib-upnext-more">+{tasks.length - 5} more</div>}
-            </>
-          )}
-        </div>
+
+            {/* A tight peek at what's next — enough to gauge the pile without inviting
+                out-of-order editing (only the focused item is actionable). */}
+            {upNext.length > 0 && !short && (
+              <div className="ib-upnext">
+                {compact ? (
+                  <div className="ib-upnext-compact" aria-label={`${tasks.length - 1} more inbox items`}>
+                    Up next: {upNext[0].title}{tasks.length > 2 ? ` · +${tasks.length - 2} more` : ''}
+                  </div>
+                ) : (
+                  <>
+                    <div className="ib-upnext-head">Up next</div>
+                    <ul className="ib-upnext-list">
+                      {upNext.map((t) => (
+                        <li key={t.id} className="ib-upnext-item">{t.title}</li>
+                      ))}
+                    </ul>
+                    {tasks.length > 5 && <div className="ib-upnext-more">+{tasks.length - 5} more</div>}
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <EmptyState icon={IconInbox} title="Inbox zero — nothing to clarify." sub="New captures land here for a quick decide." />
+        )
       )}
 
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}

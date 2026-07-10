@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, UndoBar, QuickAddPreview, useWidgetSize, atMostW, atMostH, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
+import { useTaskList, selectStalled, selectTriagedThisWeek, dueBucket, byImportanceThenDue, isRealDate, parseQuickAdd, completionDays, widgetStore, TaskRow, SkeletonRows, ErrorState, ReconnectBanner, UndoBar, QuickAddPreview, useWidgetSize, atMostW, atMostH, IconSun, IconMoon, IconPlus, IconCheck, IconX } from '../widget-sdk'
 import './DailyWidget.css'
 
 const NOTE_KEY = 'daily-note' // { date, text }
@@ -105,8 +105,12 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
     return completionDays(tasks, start, end).length
   }, [tasks])
 
-  if (state === 'loading') return <div className="tasklist"><SkeletonRows n={4} /></div>
-  if (state === 'error') return <div className="tasklist"><ErrorState onRetry={load} /></div>
+  // Loading/error only ever gate the today/suggestions (or carry-over) data
+  // region below — the mode toggle, add-form and quick-add hint are stable
+  // chrome that stays mounted so the widget doesn't flash in and out on a
+  // background refresh. A refresh failure with a plan already loaded keeps it
+  // visible plus a ReconnectBanner; only a never-loaded failure blanks to ErrorState.
+  const hasData = tasks.length > 0
 
   const toggle = (
     <div className="daily-toggle" role="tablist">
@@ -116,6 +120,12 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
   )
   const taskRow = (t) => <TaskRow task={t} onToggle={onToggle} onDelete={onDelete} onSchedule={onSchedule} onSetPriority={onSetPriority} onSetCue={onSetCue} onPatch={onPatch} dense={compact} />
   const visibleSuggestions = compact ? suggestions.slice(0, short ? 0 : 3) : suggestions
+
+  const loadingOrError = state === 'loading' ? <SkeletonRows n={4} />
+    : state === 'error' && !hasData ? <ErrorState onRetry={load} />
+    : null
+  const reconnect = state === 'error' && hasData ? <ReconnectBanner onRetry={load} /> : null
+  const showData = state === 'ready' || (state === 'error' && hasData)
 
   return (
     <div className={`tasklist daily${compact ? ' compact' : ''}${short ? ' short' : ''}`}>
@@ -133,58 +143,72 @@ export default function DailyWidget({ tasks: tasksCap, projects, plan, instanceI
           {err && <div role="alert" className="rem-err">{err}</div>}
           {inboxId && !short && <QuickAddPreview text={draft} />}
 
-          <div className="group-head daily-secline">
-            <span className="g-title">Today’s focus</span>
-            <span className={`chip daily-budget${over ? ' over' : ''}`} title={over ? 'More planned than a typical focused day — consider trimming' : 'Estimated time vs a ~6h focused day'}>
-              {plannedMin > 0 ? `${fmtMin(plannedMin)} / ${fmtMin(DAY_BUDGET_MIN)}` : `0 / ${fmtMin(DAY_BUDGET_MIN)}`}
-            </span>
-          </div>
-          {chosen.length === 0
-            ? <div className="daily-empty">Pick 1–3 things to focus on today from the suggestions below.</div>
-            : <div className="task-stream">{chosen.map((t) => (
-              <div key={t.id} className="daily-row">
-                <div className="daily-row-main">{taskRow(t)}</div>
-                <button className="iconbtn sm daily-x" title="Remove from today" aria-label="Remove from today" onClick={() => removeFromToday(t.id)}><IconX size={14} /></button>
-              </div>
-            ))}</div>}
+          {loadingOrError}
+          {reconnect}
 
-          {!short && <div className="group-head daily-secline"><span className="g-title">Suggestions</span><span className="g-count">{suggestions.length}</span></div>}
-          {suggestions.length === 0
-            ? <div className="daily-empty">Nothing overdue or unscheduled — you’re on top of it.</div>
-            : short
-              ? <div className="daily-suggest-compact">{suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'} ready when you expand.</div>
-              : <div className="daily-suggest">{visibleSuggestions.map((t) => {
-              const b = isRealDate(t.due_date) ? dueBucket(t.due_date) : null
-              return (
-                <button key={t.id} type="button" className="daily-sg" onClick={() => addToToday(t)} title="Add to today">
-                  <IconPlus size={13} />
-                  <span className="daily-sg-t">{t.title}</span>
-                  {b && <span className={`chip ${b.k === 'overdue' ? 'overdue' : 'due-soon'}`}>{b.label}</span>}
-                </button>
-              )
-            })}{compact && suggestions.length > visibleSuggestions.length && (
-              <div className="daily-suggest-compact">+{suggestions.length - visibleSuggestions.length} more suggestions hidden until there is more room.</div>
-            )}</div>}
+          {showData && (
+            <>
+              <div className="group-head daily-secline">
+                <span className="g-title">Today’s focus</span>
+                <span className={`chip daily-budget${over ? ' over' : ''}`} title={over ? 'More planned than a typical focused day — consider trimming' : 'Estimated time vs a ~6h focused day'}>
+                  {plannedMin > 0 ? `${fmtMin(plannedMin)} / ${fmtMin(DAY_BUDGET_MIN)}` : `0 / ${fmtMin(DAY_BUDGET_MIN)}`}
+                </span>
+              </div>
+              {chosen.length === 0
+                ? <div className="daily-empty">Pick 1–3 things to focus on today from the suggestions below.</div>
+                : <div className="task-stream">{chosen.map((t) => (
+                  <div key={t.id} className="daily-row">
+                    <div className="daily-row-main">{taskRow(t)}</div>
+                    <button className="iconbtn sm daily-x" title="Remove from today" aria-label="Remove from today" onClick={() => removeFromToday(t.id)}><IconX size={14} /></button>
+                  </div>
+                ))}</div>}
+
+              {!short && <div className="group-head daily-secline"><span className="g-title">Suggestions</span><span className="g-count">{suggestions.length}</span></div>}
+              {suggestions.length === 0
+                ? <div className="daily-empty">Nothing overdue or unscheduled — you’re on top of it.</div>
+                : short
+                  ? <div className="daily-suggest-compact">{suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'} ready when you expand.</div>
+                  : <div className="daily-suggest">{visibleSuggestions.map((t) => {
+                  const b = isRealDate(t.due_date) ? dueBucket(t.due_date) : null
+                  return (
+                    <button key={t.id} type="button" className="daily-sg" onClick={() => addToToday(t)} title="Add to today">
+                      <IconPlus size={13} />
+                      <span className="daily-sg-t">{t.title}</span>
+                      {b && <span className={`chip ${b.k === 'overdue' ? 'overdue' : 'due-soon'}`}>{b.label}</span>}
+                    </button>
+                  )
+                })}{compact && suggestions.length > visibleSuggestions.length && (
+                  <div className="daily-suggest-compact">+{suggestions.length - visibleSuggestions.length} more suggestions hidden until there is more room.</div>
+                )}</div>}
+            </>
+          )}
         </>
       ) : (
         <>
-          <div className="daily-recap"><IconCheck size={16} /> <b>{doneToday}</b> done today</div>
+          {loadingOrError}
+          {reconnect}
 
-          <div className="group-head daily-secline"><span className="g-title">Carry over</span><span className="g-count">{chosen.length}</span></div>
-          {chosen.length === 0
-            ? <div className="daily-empty">Today’s focus is all done — close the day. 🌙</div>
-            : <div className="task-stream">{chosen.map((t) => (
-              <div key={t.id} className="daily-row">
-                <div className="daily-row-main">{taskRow(t)}</div>
-                <button className="btn ghost sm daily-carry" title="Move to tomorrow" onClick={() => carryTomorrow(t)}>→ Tomorrow</button>
-              </div>
-            ))}</div>}
-          {planIds.length > 0 && <button className="btn ghost sm daily-clear" onClick={() => savePlan([])}>Clear today’s plan</button>}
-
-          {!short && (
+          {showData && (
             <>
-              <div className="group-head daily-secline"><span className="g-title">Note to tomorrow</span></div>
-              <textarea className="input daily-note" value={note} onChange={(e) => saveNote(e.target.value)} placeholder="Where did you leave off? What’s first tomorrow?" />
+              <div className="daily-recap"><IconCheck size={16} /> <b>{doneToday}</b> done today</div>
+
+              <div className="group-head daily-secline"><span className="g-title">Carry over</span><span className="g-count">{chosen.length}</span></div>
+              {chosen.length === 0
+                ? <div className="daily-empty">Today’s focus is all done — close the day. 🌙</div>
+                : <div className="task-stream">{chosen.map((t) => (
+                  <div key={t.id} className="daily-row">
+                    <div className="daily-row-main">{taskRow(t)}</div>
+                    <button className="btn ghost sm daily-carry" title="Move to tomorrow" onClick={() => carryTomorrow(t)}>→ Tomorrow</button>
+                  </div>
+                ))}</div>}
+              {planIds.length > 0 && <button className="btn ghost sm daily-clear" onClick={() => savePlan([])}>Clear today’s plan</button>}
+
+              {!short && (
+                <>
+                  <div className="group-head daily-secline"><span className="g-title">Note to tomorrow</span></div>
+                  <textarea className="input daily-note" value={note} onChange={(e) => saveNote(e.target.value)} placeholder="Where did you leave off? What’s first tomorrow?" />
+                </>
+              )}
             </>
           )}
         </>
