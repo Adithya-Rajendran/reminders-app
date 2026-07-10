@@ -232,8 +232,13 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
     body = <>{habitsSec}{groupKeys.map((g) => renderSection(g || '__none', g || 'No group', groups[g], false))}</>
   }
 
+  // `rem-widget` scopes RemindersWidget.css: most classnames in here (.rem-add/
+  // .group-head/.qa-hint/…) are shared with Daily/Upcoming/Overview, so this
+  // widget's visual overrides must not leak into those widgets.
+  const showHint = !!inboxId && !compact
+  const showSort = !compact && reminders.length > 1
   return (
-    <div className="tasklist">
+    <div className="tasklist rem-widget">
       {inboxId && (
         <form className="add-row qa rem-add" onSubmit={add}>
           <IconBell size={16} />
@@ -262,15 +267,20 @@ export default function RemindersWidget({ tasks: tasksCap, events, projects, gro
         </form>
       )}
       {inboxId && <QuickAddPreview text={draft} />}
-      {inboxId && !compact && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
-      {err && <div role="alert" className="rem-err">{err}</div>}
-      {!compact && reminders.length > 1 && (
-        <div className="rem-sortbar">
-          <button type="button" className="chip" onClick={cycleSort} title="Change sort order">
-            <IconSort size={12} /> {sortMode === 'priority' ? 'Priority' : 'Soonest'}
-          </button>
+      {/* One shared tool line under the entry field: syntax hint left, sort
+          right — instead of each floating on its own row between the quick-add
+          and the first group (two loose rows of dead vertical rhythm). */}
+      {(showHint || showSort) && (
+        <div className="rem-toolrow">
+          {showHint && <div className="qa-hint">tomorrow · 9am · !1–5 · *label · -&gt; cue</div>}
+          {showSort && (
+            <button type="button" className="chip rem-sort" onClick={cycleSort} title="Change sort order">
+              <IconSort size={12} /> {sortMode === 'priority' ? 'Priority' : 'Soonest'}
+            </button>
+          )}
         </div>
       )}
+      {err && <div role="alert" className="rem-err">{err}</div>}
       {state === 'error' && hasData && <ReconnectBanner onRetry={load} />}
       {body}
       {undo && <UndoBar undo={undo} dismiss={dismissUndo} />}
