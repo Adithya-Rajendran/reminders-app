@@ -133,8 +133,25 @@ async function expectPrimary(frame, type) {
   }
 }
 
+// ---- partial-occlusion thresholds ----
+// The bug this closes (the Focus widget's eyebrow/plan-chip sitting half
+// behind the now-card's edge, see #176/8fa21dc) was invisible to the
+// existing checks below because they only compare a control/leak's rect to
+// the OUTER .widget-head/.widget-body box — an element clipped by some
+// NESTED ancestor (e.g. a `.focus-now { overflow: hidden }` card inside the
+// body) never crosses that outer boundary, so it read as fully fine.
+//
+// A fully-hidden element (ratio 0) is frequently legitimate: content
+// scrolled out of a real scroll container, a collapsed/animated-out state,
+// etc. A fully-visible element (ratio 1) is obviously fine. The defect
+// signature is the BAND in between — a chip or button visibly sliced by an
+// ancestor's `overflow: hidden` edge. Values are fractions of the element's
+// own bounding-box area.
+const OCCLUSION_MIN_RATIO = 0.15 // below this, treat as "effectively hidden" (legit collapse), not a visual half-cut
+const OCCLUSION_MAX_RATIO = 0.85 // above this, treat as "effectively fully shown" (rounding/subpixel slack), not a defect
+
 async function auditWidget(page, frame, widgetType, widgetLabel) {
-  return page.evaluate(({ label, type }) => {
+  return page.evaluate(({ label, type, occlusionMin, occlusionMax }) => {
     const root = document.querySelector(`.widget[aria-label="${label}"]`)
     const body = root?.querySelector('.widget-body')
     const head = root?.querySelector('.widget-head')
@@ -151,6 +168,68 @@ async function auditWidget(page, frame, widgetType, widgetLabel) {
     const issues = []
     const warnings = []
     if (!root || !body || !head) return { ok: false, issues: ['widget frame missing'], warnings, metrics: {} }
+
+    // ---- partial-occlusion: element sliced by a NESTED overflow:hidden
+    // ancestor (not just the outer widget box). Deliberately ignores
+    // overflow: auto/scroll ancestors — content scrolled out of view there
+    // is a legitimate state, not a layout defect, and flagging it would be
+    // a false positive on every widget with a scrollable list/canvas.
+    const describe = (el) => el.getAttribute('aria-label') || el.getAttribute('title')
+      || el.textContent.trim().slice(0, 48) || el.tagName.toLowerCase()
+    const occlusionIssues = []
+    const candidates = new Set([
+      ...root.querySelectorAll('button,input,textarea,select,[role="button"],[role="checkbox"],a[href]'),
+      // "text-bearing leaf": no element children of its own, i.e. it's the
+      // actual node carrying the text/label (chips, titles, meta bits) —
+      // walking every ancestor div as well would just re-report the same cut.
+      ...[...root.querySelectorAll('*')].filter((el) => el.children.length === 0 && el.textContent.trim().length > 0),
+    ].filter(visible))
+    for (const el of candidates) {
+      const r = rectOf(el)
+      const ownArea = r.width * r.height
+      if (ownArea <= 0) continue
+      let vis = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+      let node = el.parentElement
+      while (node) {
+        const cs = getComputedStyle(node)
+        const scrollable = (v) => v === 'auto' || v === 'scroll'
+        if (scrollable(cs.overflowX) || scrollable(cs.overflowY)) {
+          // getBoundingClientRect reports true LAYOUT position, not the
+          // visually-clipped extent — an element scrolled below a real
+          // scroll container's viewport legitimately reports a rect past
+          // that container's box (and past every ancestor further out, since
+          // it's simply further down the unscrolled document flow). Once we
+          // hit a real scroll boundary, that scroll container is the thing
+          // that resolves this element's visibility (in-view vs
+          // scrolled-away, both legitimate) — continuing to intersect
+          // against OUTER, non-scrollable ancestors from here on just
+          // re-measures the same scrolled-away geometry against unrelated
+          // boxes and manufactures a bogus partial-visibility ratio (this is
+          // exactly how `.cal-mini`'s outer `overflow: hidden` produced a
+          // "65% visible" reading for a calendar row that in reality is
+          // simply scrolled out of `.cal-mini-list`, and renders perfectly
+          // fine — see fidelity screenshots). So: stop walking here.
+          break
+        }
+        const clipX = cs.overflowX === 'hidden'
+        const clipY = cs.overflowY === 'hidden'
+        if (clipX || clipY) {
+          const ar = rectOf(node)
+          if (clipX) { vis.left = Math.max(vis.left, ar.left); vis.right = Math.min(vis.right, ar.right) }
+          if (clipY) { vis.top = Math.max(vis.top, ar.top); vis.bottom = Math.min(vis.bottom, ar.bottom) }
+        }
+        if (node === root) break
+        node = node.parentElement
+      }
+      const visW = Math.max(0, vis.right - vis.left)
+      const visH = Math.max(0, vis.bottom - vis.top)
+      const ratio = (visW * visH) / ownArea
+      if (ratio > occlusionMin && ratio < occlusionMax) {
+        occlusionIssues.push(`partially occluded by an ancestor's overflow:hidden (${Math.round(ratio * 100)}% visible): ${describe(el)}`)
+      }
+    }
+    // De-dupe identical messages (e.g. the same chip text repeated across sibling rows).
+    issues.push(...new Set(occlusionIssues))
 
     const wr = rectOf(root)
     const br = rectOf(body)
@@ -204,7 +283,7 @@ async function auditWidget(page, frame, widgetType, widgetLabel) {
         visibleControls: controls.length,
       },
     }
-  }, { label: widgetLabel, type: widgetType })
+  }, { label: widgetLabel, type: widgetType, occlusionMin: OCCLUSION_MIN_RATIO, occlusionMax: OCCLUSION_MAX_RATIO })
 }
 
 async function contactSheet(page, viewport, rows) {
