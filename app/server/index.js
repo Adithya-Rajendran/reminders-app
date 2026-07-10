@@ -9,6 +9,7 @@ import * as tasks from './tasks_caldav.js'
 import { initOidc, loginUrl, handleCallback, logoutUrl, oidcConfigured } from './oidc.js'
 import { sseHandler } from './events.js'
 import { startValarmPoller } from './valarm-poller.js'
+import { prewarmOnBoot } from './prewarm.js'
 import * as caldav from './caldav.js'
 import { rateLimitMiddleware } from './ratelimit.js'
 import * as notes from './notes.js'
@@ -342,5 +343,6 @@ const start = async () => {
   await initOidc()
   startValarmPoller() // polls CalDAV VALARMs -> per-user SSE reminders
   app.listen(PORT, () => console.log('reminders-app BFF listening on :' + PORT))
+  prewarmOnBoot() // background-fire the task cache warm-up (see prewarm.js); never blocks listen
 }
 start().catch((e) => { console.error('fatal startup error:', e); process.exit(1) })

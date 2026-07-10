@@ -7,7 +7,8 @@ import net from 'node:net'
 import { createDAVClient } from 'tsdav'
 import ICAL from 'ical.js'
 import { baseOf, okPut, sanitizeCalDAVError } from './util.js'
-import { coalesce, cacheDecision } from './readcache.js'
+import { coalesce, cacheDecision, asRehydrated } from './readcache.js'
+import { getCache } from './cache.js'
 import {
   getAccount, listAccounts, insertAccount, deleteAccount, deleteAccountById,
   upsertList, pruneLists, listsForAccount, enabledListsForAccount, setListEnabled,
@@ -531,13 +532,39 @@ const evUserCache = (sub) => { let c = evCache.get(sub); if (!c) { c = new Map()
 // coalesced onto a pre-mutation fetch would otherwise return a snapshot missing
 // the user's own edit (the fetch itself isn't cancelled — it writes into its
 // now-orphaned map and is garbage-collected).
+// Also best-effort drops the persistent copy of every (list,range) key this
+// process has seen for the user — see the matching comment on
+// tasks_caldav.js's invalidateUserCache; same rationale, same single-replica
+// caveat (cross-replica invalidation is out of scope; the ctag check on every
+// hydrate bounds staleness regardless).
 export const invalidateUserEventCache = (sub) => {
+  const c = evCache.get(sub)
+  if (c && c.size) {
+    const keys = [...c.keys()]
+    getCache().then((adapter) => Promise.all(keys.map((k) => adapter.del(veventKey(sub, k))))).catch(() => {})
+  }
   evCache.delete(sub)
   for (const k of evInflight.keys()) { if (k.startsWith(sub + '|')) evInflight.delete(k) }
 }
 // Ranges the client stopped asking about (view switches, old weeks) would pile
 // up forever; drop anything untouched for a few minutes when a user map is used.
 function evEvictStale(c) { const cut = Date.now() - EV_EVICT_MS; for (const [k, e] of c) { if (e.at < cut) c.delete(k) } }
+
+// ---- persistent (Valkey-or-in-memory-adapter) read-through, survives restarts ----
+// Parsed VEVENTs are already plain JSON-safe objects (see parseVevents above),
+// so — unlike the VTODO cache — no raw-text round trip is needed here.
+const EV_TTL_SEC = 7 * 24 * 3600
+const veventKey = (sub, key) => `vevent:${sub}:${key}`
+
+async function hydrateEventEntry(sub, key) {
+  const adapter = await getCache()
+  const persisted = await adapter.get(veventKey(sub, key))
+  if (!persisted || !Array.isArray(persisted.events)) return null
+  return asRehydrated({ events: persisted.events, ctag: persisted.ctag ?? null, at: persisted.at || 0 }, Date.now(), EV_FRESH_TTL)
+}
+function persistEventEntry(sub, key, entry) {
+  getCache().then((adapter) => adapter.set(veventKey(sub, key), entry, EV_TTL_SEC)).catch(() => {})
+}
 
 export async function fetchEvents(userId, startISO, endISO) {
   const accs = await listAccounts(userId)
@@ -562,7 +589,13 @@ export async function fetchEvents(userId, startISO, endISO) {
         // re-added, entries keyed by URL alone would ctag-revalidate cleanly and
         // keep serving the DEAD account id, 404-ing every edit.
         const key = acc.id + '|' + list.url + '|' + startISO + '|' + endISO
-        const entry = c.get(key)
+        let entry = c.get(key)
+        if (!entry) {
+          // Cold in-process entry — try the persistent adapter (restart, or
+          // evicted by invalidateUserEventCache) before a full REPORT.
+          const hydrated = await hydrateEventEntry(userId, key)
+          if (hydrated) { entry = hydrated; c.set(key, entry) }
+        }
         const decision = cacheDecision(entry, Date.now(), EV_FRESH_TTL)
         if (decision === 'fresh') { events.push(...entry.events); return }
         let knownCtag = entry?.ctag || null
@@ -579,7 +612,9 @@ export async function fetchEvents(userId, startISO, endISO) {
         // Reuse the ctag the change-probe already fetched; only on a cold entry
         // do we pay one extra PROPFIND to seed it.
         const ctag = knownCtag != null ? knownCtag : await collectionCtag(acc, list.url).catch(() => null)
-        c.set(key, { events: parsed, ctag, at: Date.now() })
+        const fresh = { events: parsed, ctag, at: Date.now() }
+        c.set(key, fresh)
+        persistEventEntry(userId, key, fresh)
         events.push(...parsed)
       } catch { /* skip a failing / event-incapable list */ }
     }))
@@ -745,3 +780,8 @@ export async function deleteEventHandler(req, res) {
     res.status(502).json({ error: 'could not delete event' })
   }
 }
+
+// exported for tests only — the persistent VEVENT read-through (mirrors the
+// VTODO one in tasks_caldav.js: hydrate on a cold in-process entry, persist
+// after a real fetch, key format).
+export { veventKey as _veventKey, hydrateEventEntry as _hydrateEventEntry, persistEventEntry as _persistEventEntry }

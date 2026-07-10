@@ -7,6 +7,39 @@ needs **block** storage (`ReadWriteOnce`), so the Deployment uses `Recreate` —
 `kubectl rollout status` may exceed its timeout while the volume detaches;
 verify with `kubectl get pods` + `/healthz` instead.
 
+## Optional: Valkey read cache
+
+`server/cache.js` backs the CalDAV/VEVENT read cache (server/readcache.js,
+tasks_caldav.js, caldav.js) with either an in-process Map (the default — no
+extra infra, what CI/dev use) or [Valkey](https://valkey.io) when `VALKEY_URL`
+is set (`k8s/25-valkey.yaml` + the env var in `30-app.yaml`). Point of Valkey:
+the in-process cache is empty on every pod restart, so the first dashboard
+load after a deploy pays a full CalDAV REPORT fan-out for every list (~9s cold
+vs ~0.6s warm against a typical home CalDAV server); with Valkey, that
+survives the restart — the first post-restart read hydrates the cached
+payload and only pays a cheap ctag PROPFIND (or a full re-fetch if the data
+actually changed while the pod was down).
+
+- `VALKEY_URL` — e.g. `redis://reminders-valkey.reminders-app.svc.cluster.local:6379`.
+  Unset (default) → in-process cache only, identical behavior to before this
+  feature existed.
+- A Valkey outage never takes the app down: connection/command errors are
+  logged once and the adapter falls back to its in-process path for the
+  duration (see server/cache.js).
+- **Keep Valkey cluster-internal.** Cached values are task/event payloads in
+  plaintext (titles, descriptions, due dates — the CalDAV *credentials* that
+  produced them stay encrypted in SQLite, but the cached content itself is
+  not separately encrypted). `25-valkey.yaml`'s Service is ClusterIP with no
+  HTTPRoute, and it's deployed in the app's own namespace — don't add a route
+  to it, and don't point a shared/multi-tenant Valkey at this app.
+- This app runs single-replica (`Recreate` strategy, RWO SQLite volume), so
+  cross-replica cache invalidation (pub/sub, etc.) is explicitly out of
+  scope — there's only ever one writer. The ctag-revalidation-on-hydrate
+  design (server/readcache.js's `asRehydrated`) bounds staleness to one cheap
+  PROPFIND regardless, so this holds even if that assumption ever changes.
+- No persistence on the Valkey pod (no PVC, `--save ""`, `--appendonly no`):
+  it's a cache, not a store — losing it just means the next read is cold.
+
 ## Continuous deployment
 
 CI already builds and pushes `ghcr.io/<owner>/reminders-app:latest` on every

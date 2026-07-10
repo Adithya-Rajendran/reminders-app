@@ -29,3 +29,19 @@ export function cacheDecision(entry, now, ttl) {
   if (now - entry.at < ttl) return 'fresh'
   return entry.ctag ? 'ctag' : 'report'
 }
+
+// An entry hydrated from the persistent cache (Valkey, or seeded across a
+// process restart) may be from a previous process life, or may even predate
+// a write THIS process just made (e.g. an in-process entry was invalidated,
+// but a stale Valkey copy from before the write is still within its TTL).
+// Forcing `at` into the past means cacheDecision() can never return 'fresh'
+// for a just-hydrated entry — it always earns at least one cheap ctag
+// PROPFIND before being trusted, which is what makes read-through-Valkey
+// correct without any cross-process invalidation bookkeeping. This is the
+// stale-while-revalidate contract for the hot paths: serve the (possibly
+// stale) cached payload once the ctag confirms it's still current, at the
+// cost of one Depth:0 PROPFIND instead of a full REPORT+parse.
+export function asRehydrated(entry, now, ttl) {
+  if (!entry) return entry
+  return { ...entry, at: now - ttl - 1 }
+}

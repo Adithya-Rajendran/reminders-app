@@ -29,6 +29,7 @@
     "express-session": "^1.18.1",
     "fast-xml-parser": "^5.8.0",
     "ical.js": "^2.2.1",
+    "iovalkey": "^0.3.3",
     "js-yaml": "^4.2.0",
     "openid-client": "^6.8.4",
     "tsdav": "^2.3.0"
