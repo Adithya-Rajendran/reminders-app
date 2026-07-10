@@ -6,36 +6,41 @@
 
 :root,
 [data-theme="dark"] {
-  --bg: #0a0b14;
-  --bg2: #0e1020;
+  /* "Paper Planner" — warm charcoal desk, not blue-navy glass. Hue sits
+     around 30° (orange-brown) at low saturation throughout this block, so
+     bg/panel/panel2 read as one warm-neutral family at rising elevation. */
+  --bg: #14110d;
+  --bg2: #19140f;
 
-  --panel: rgba(26, 29, 48, 0.72);
-  --panel-solid: #161a2e;
-  --panel2: #1d2138;
+  --panel: #1d1712;
+  --panel-solid: #221b15;
+  --panel2: #2a2119;
 
-  --line: rgba(120, 130, 170, 0.16);
-  --line-strong: rgba(120, 130, 170, 0.28);
+  --line: rgba(196, 168, 138, 0.14);
+  --line-strong: rgba(196, 168, 138, 0.26);
 
-  --text: #eef0fa;
-  --muted: #9099bd;
-  --faint: #6b73a0;
+  --text: #f0e9df;
+  --muted: #a89a89;
+  --faint: #7d7061;
 
-  --accent: #6d6cf7;
-  --accent2: #a855f7;
-  --accent-soft: rgba(109, 108, 247, 0.16);
+  --accent: #c07a45;
+  --accent2: #d9a066;
+  --accent-soft: rgba(192, 122, 69, 0.16);
   --accent-grad: linear-gradient(135deg, var(--accent), var(--accent2));
   /* Text/glyphs on accent-colored surfaces (buttons, active swatches, the
-     login logo). --accent/--accent2 are identical in both themes, so this
-     needs no light-theme override. */
-  --on-accent: #fff;
+     login logo). Dark theme's copper is light enough that white text falls
+     short of 4.5:1 (~3.4:1) — an ink tone reads correctly against both
+     --accent and --accent2 (5.3:1 / 8.0:1). Light theme's deeper copper
+     goes the other way (see override below). */
+  --on-accent: #1a140d;
 
-  --green: #34d399;
-  --danger: #f4577a;
-  --warn: #fbbf24;
+  --green: #8bab5c;
+  --danger: #e2604f;
+  --warn: #e0a542;
 
-  --green-soft: rgba(52, 211, 153, 0.15);
-  --danger-soft: rgba(244, 87, 122, 0.15);
-  --warn-soft: rgba(251, 191, 36, 0.15);
+  --green-soft: rgba(139, 171, 92, 0.15);
+  --danger-soft: rgba(226, 96, 79, 0.15);
+  --warn-soft: rgba(224, 165, 66, 0.15);
 
   /* Identity/categorical colors for account swatches (swatchFor in
      host/settings/providers.jsx) — aliases semantic tokens where a match
@@ -48,15 +53,17 @@
   --swatch-6: #22d3ee;
   --swatch-7: #fb923c;
 
-  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
-  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+  /* One soft, low shadow — a sheet resting on a desk, not a floating panel. */
+  --shadow: 0 10px 28px rgba(8, 6, 3, 0.40);
+  --shadow-sm: 0 2px 8px rgba(8, 6, 3, 0.28);
 
-  --glow1: rgba(99, 91, 255, 0.22);  /* indigo top-left */
-  --glow2: rgba(168, 85, 247, 0.18); /* violet top-right */
+  /* Glass is dead: no glow blobs behind the canvas (paper-flat instead). */
+  --glow1: transparent;
+  --glow2: transparent;
 
   /* radii */
-  --r-card: 16px;
-  --r-btn: 10px;
+  --r-card: 18px;
+  --r-btn: 12px;
   --r-chip: 8px;
   --r-menu: 14px;
   --r-sm: 6px;
@@ -77,8 +84,15 @@
   --fs-modal: 20px;
   --fs-display: 22px;
 
-  /* glass tuning (tweakable) */
-  --glass-blur: 12px;
+  /* Font stacks. Display roles (widget titles, modal titles, the masthead)
+     switch to the system serif for the "written in, not operated" thesis;
+     body/controls stay on the sans stack — no webfonts either way. */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+
+  /* glass tuning — blur is off (paper-flat surfaces); kept as a token rather
+     than deleted so a future candidate can dial it back in. */
+  --glass-blur: 0px;
   --glow-strength: 1;
 
   /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). `none` lets
@@ -125,31 +139,37 @@
 }
 
 [data-theme="light"] {
-  --bg: #f6f7fb;
-  --bg2: #eef0f7;
+  /* Warm fog-gray paper — deliberately grayer than a cream/parchment
+     default (bg tops out well under #f2f0ed, and stays low-saturation
+     rather than yellow-warm). */
+  --bg: #ece9e4;
+  --bg2: #e6e2db;
 
-  --panel: rgba(255, 255, 255, 0.74);
-  --panel-solid: #ffffff;
-  --panel2: #f1f3fa;
+  --panel: #f7f5f2;
+  --panel-solid: #fefcfa;
+  --panel2: #efece6;
 
-  --line: rgba(20, 24, 50, 0.10);
-  --line-strong: rgba(20, 24, 50, 0.16);
+  --line: rgba(90, 70, 50, 0.12);
+  --line-strong: rgba(90, 70, 50, 0.20);
 
-  --text: #1a1d2e;
-  --muted: #5b6480;
-  --faint: #8b93af;
+  --text: #241f19;
+  --muted: #6b6053;
+  --faint: #948a7c;
 
-  --accent: #6d6cf7;
-  --accent2: #a855f7;
-  --accent-soft: rgba(109, 108, 247, 0.12);
+  --accent: #96562d;
+  --accent2: #b3703a;
+  --accent-soft: rgba(150, 86, 45, 0.12);
+  /* Light theme's copper is deep enough that white clears 4.5:1 against it
+     (5.7:1) — the dark-theme ink override above doesn't apply here. */
+  --on-accent: #ffffff;
 
-  --green: #16a571;
-  --danger: #e23a60;
-  --warn: #d99413;
+  --green: #557024;
+  --danger: #b23a2a;
+  --warn: #93610f;
 
-  --green-soft: rgba(22, 165, 113, 0.12);
-  --danger-soft: rgba(226, 58, 96, 0.10);
-  --warn-soft: rgba(217, 148, 19, 0.12);
+  --green-soft: rgba(85, 112, 36, 0.12);
+  --danger-soft: rgba(178, 58, 42, 0.10);
+  --warn-soft: rgba(147, 97, 15, 0.12);
 
   /* --swatch-1..5 alias the semantic tokens above, so they follow this block's
      overrides automatically. --swatch-6/7 are literals (no semantic token to
@@ -157,11 +177,11 @@
   --swatch-6: #0891b2;
   --swatch-7: #ea580c;
 
-  --shadow: 0 10px 40px rgba(40, 44, 90, 0.14);
-  --shadow-sm: 0 4px 16px rgba(40, 44, 90, 0.10);
+  --shadow: 0 10px 28px rgba(60, 46, 30, 0.14);
+  --shadow-sm: 0 2px 8px rgba(60, 46, 30, 0.08);
 
-  --glow1: rgba(109, 108, 247, 0.12);
-  --glow2: rgba(168, 85, 247, 0.10);
+  --glow1: transparent;
+  --glow2: transparent;
 }
 
 * { box-sizing: border-box; }
@@ -173,7 +193,7 @@ html, body {
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--fs-body);
   line-height: 1.5;
   color: var(--text);
@@ -199,8 +219,11 @@ body {
 /* ---------- typography helpers ---------- */
 .meta { font-size: var(--fs-meta); }
 .h-ctrl { font-size: var(--fs-ctrl); }
-.h-title { font-size: var(--fs-title); font-weight: 600; }
-.h-modal { font-size: var(--fs-modal); font-weight: 700; letter-spacing: -0.01em; }
+/* Display roles (.h-title/.h-modal + their real-markup equivalents
+   .widget-title/.modal-head h2 below) are serif — the planner's signature.
+   Body/controls above stay on the sans stack. */
+.h-title { font-size: var(--fs-title); font-weight: 600; font-family: var(--font-serif); }
+.h-modal { font-size: var(--fs-modal); font-weight: 700; letter-spacing: -0.01em; font-family: var(--font-serif); }
 
 /* ---------- focus ring ---------- */
 :focus-visible {
@@ -359,7 +382,9 @@ body {
   width: 18px; height: 18px;
   flex: 0 0 auto;
   border-radius: var(--r-sm);
-  border: 1.75px solid var(--line-strong);
+  /* A touch thicker than a default UI checkbox — hand-drawn-adjacent, like a
+     pen tick on a paper planner, not a vector glyph. */
+  border: 2px solid var(--line-strong);
   background: transparent;
   cursor: pointer;
   position: relative;
@@ -376,7 +401,7 @@ body {
   left: 5px; top: 1.5px;
   width: 4px; height: 9px;
   border: solid var(--on-accent);
-  border-width: 0 2px 2px 0;
+  border-width: 0 2.5px 2.5px 0;
   transform: rotate(43deg);
 }
 
@@ -572,7 +597,7 @@ body {
   box-shadow: 0 6px 16px -6px var(--accent), inset 0 1px 0 rgba(255,255,255,0.25);
   flex: 0 0 auto;
 }
-.wordmark { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; }
+.wordmark { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; font-family: var(--font-serif); }
 .topbar-spacer { flex: 1; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .user-email {
@@ -590,24 +615,39 @@ body {
 }
 .avatar-menu-btn { display: none; }
 
-/* ---------- Toolbar ---------- */
+/* ---------- Toolbar / masthead ---------- */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 24px 8px;
+  padding: 10px 24px 13px;
+  /* The fine rule under the planner masthead — one hairline, not a heavy
+     divider. Still a single compact row (see .toolbar-title below): this
+     costs ~5px over the old borderless toolbar, not the ~30px a stacked
+     title+date block would (see the "used to stack" history this replaces). */
+  border-bottom: 1px solid var(--line);
 }
-/* Title + date sit on ONE line (they used to stack) — the active dashboard tab
-   already names the board, so this heading stays small and reclaims ~30px of the
-   scarce vertical budget on a 14" laptop. */
+/* Title + date stay on ONE line (a past pass deliberately flattened this
+   from a stacked layout to reclaim ~30px of vertical budget on a 14" laptop
+   — still true here). What changes is which one reads as the headline: the
+   active dashboard tab above already names the board, so the dashboard
+   title demotes to a small eyebrow and the date becomes the masthead. */
 .toolbar-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .toolbar h1 {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-meta);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
   margin: 0;
 }
-.toolbar .sub { font-size: var(--fs-ctrl); color: var(--muted); }
+.toolbar .sub {
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
 .toolbar-spacer { flex: 1; }
 
 /* Active organizer-filter strip (Area/Context scope) below the toolbar. Matches the
@@ -653,6 +693,7 @@ body {
 .react-grid-item.react-draggable-dragging .widget-head { cursor: grabbing; }
 .widget-title {
   font-size: var(--fs-title); font-weight: 600;
+  font-family: var(--font-serif);
   display: flex; align-items: center; gap: 8px;
   min-width: 0;
 }
@@ -755,7 +796,9 @@ body {
   background: linear-gradient(var(--panel-solid), color-mix(in oklab, var(--panel-solid) 75%, transparent));
 }
 .group-head:first-child { padding-top: 6px; }
-.group-head .g-title { font-size: var(--fs-meta); font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text); }
+/* Small-caps-style eyebrow: muted rather than full-text-color, wider tracking
+   — a quiet section label, not a second title. */
+.group-head .g-title { font-size: var(--fs-meta); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
 .group-head .g-date { font-size: 11.5px; color: var(--faint); }
 .group-head .g-count { margin-left: auto; font-size: 11.5px; color: var(--faint); }
 
@@ -926,7 +969,7 @@ body {
   border-bottom: 1px solid var(--line);
 }
 .modal-head .ic { color: var(--accent); }
-.modal-head h2 { margin: 0; font-size: var(--fs-modal); font-weight: 700; letter-spacing: -0.01em; }
+.modal-head h2 { margin: 0; font-size: var(--fs-modal); font-weight: 700; letter-spacing: -0.01em; font-family: var(--font-serif); }
 /* Settings section tabs — sit under the head, above the scrolling body, so switching
    sections keeps each view short instead of one long scroll. */
 .settings-tabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; }
@@ -1024,7 +1067,7 @@ body {
   color: var(--on-accent);
   box-shadow: 0 12px 30px -10px var(--accent), inset 0 1px 0 rgba(255,255,255,0.3);
 }
-.login-card h1 { font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.login-card h1 { font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; font-family: var(--font-serif); }
 .login-card p.lede { font-size: var(--fs-body); color: var(--muted); margin: 0 0 26px; }
 .login-foot { margin-top: 22px; font-size: var(--fs-meta); color: var(--faint); line-height: 1.5; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .sso-detail { margin-top: 14px; font-size: var(--fs-meta); color: var(--faint); display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -1114,12 +1157,12 @@ body {
 /* button-based animated checkbox */
 .check-btn {
   appearance: none; width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px;
-  border-radius: var(--r-sm); border: 1.75px solid var(--line-strong); background: transparent;
+  border-radius: var(--r-sm); border: 2px solid var(--line-strong); background: transparent;
   cursor: pointer; position: relative; transition: background .15s, border-color .15s, transform .1s;
 }
 .check-btn:hover { border-color: var(--accent); }
 .check-btn.on { background: var(--accent-grad); border-color: transparent; }
-.check-btn.on::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(43deg); }
+.check-btn.on::after { content: ""; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 9px; border: solid var(--on-accent); border-width: 0 2.5px 2.5px 0; transform: rotate(43deg); }
 .check-btn.burst { animation: checkPop .42s cubic-bezier(.2,.8,.3,1); }
 @keyframes checkPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
@@ -1245,7 +1288,10 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .dash-tab-btn { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 6px 14px; font-size: var(--fs-ctrl); font-weight: 600; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
 .dash-tab-btn:hover { color: var(--text); }
 .dash-tab.on .dash-tab-btn { color: var(--on-accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
-.dash-tab-x { margin-left: -4px; background: none; border: none; color: rgba(255, 255, 255, .85); font-size: var(--fs-title); line-height: 1; cursor: pointer; padding: 0 8px 0 2px; }
+/* Sits on the active tab's accent-grad fill — follow --on-accent (not a
+   hardcoded white) so it stays legible now that dark/light themes disagree
+   on whether accent needs light or ink text. */
+.dash-tab-x { margin-left: -4px; background: none; border: none; color: color-mix(in oklab, var(--on-accent) 85%, transparent); font-size: var(--fs-title); line-height: 1; cursor: pointer; padding: 0 8px 0 2px; }
 .dash-tab-x:hover { color: var(--on-accent); }
 .dash-tab-edit { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 6px 12px; font-size: var(--fs-ctrl); font-weight: 600; color: var(--text); width: 150px; outline: none; }
 .dash-tab-add { background: var(--panel); color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r-pill); width: 30px; height: 30px; font-size: 18px; /* glyph sizing */ line-height: 1; cursor: pointer; transition: color .15s, border-color .15s; }
@@ -1405,7 +1451,7 @@ button.rem-head:hover .g-title { color: var(--accent); }
 /* Themed prompt dialog (replaces window.prompt). */
 .prompt-overlay { align-items: center; justify-content: center; }
 .prompt-modal { width: min(380px, 92vw); background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 18px; animation: modalIn 140ms ease; }
-.prompt-title { font-size: var(--fs-title); font-weight: 700; color: var(--text); }
+.prompt-title { font-size: var(--fs-title); font-weight: 700; color: var(--text); font-family: var(--font-serif); }
 .prompt-label { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
 .prompt-input { width: 100%; font-size: var(--fs-body); padding: 8px 10px; margin-top: 12px; }
 .prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
