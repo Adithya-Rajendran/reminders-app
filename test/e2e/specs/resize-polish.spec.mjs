@@ -15,6 +15,26 @@ const AUDIT_WIDGETS = WIDGET_FILTER.length
   ? RESIZE_WIDGETS.filter((w) => WIDGET_FILTER.includes(w.type) || WIDGET_FILTER.includes(w.label))
   : RESIZE_WIDGETS
 
+// ---- opt-in "capture everything" mode for the local fidelity harness (test/e2e/shots/fidelity.sh) ----
+// Default (unset/anything else): byte-identical to the historical behavior — the
+// per-scenario `expect(...).toEqual([])` below throws immediately on the first
+// widget/scenario with issues, aborting the rest of that viewport's loop (no
+// contact sheet, no shots for the widgets after the failing one). CI relies on
+// exactly that fail-fast behavior, so this flag is opt-in and never flips on by
+// itself.
+// RESIZE_SHOTS=all: don't abort the loop on an individual widget/scenario issue —
+// keep seeding+shooting every remaining widget x scenario so the full matrix (and
+// a complete contact sheet) always gets written, then fail the test ONCE at the
+// end (after every artifact is on disk) if anything was collected.
+const RESIZE_SHOTS_ALL = process.env.RESIZE_SHOTS === 'all'
+
+// Opt-in theme override for the local fidelity harness: forces the SPA's
+// pre-paint theme localStorage key (see app/client/src/main.jsx) before every
+// navigation in this test. No-op when unset — matches the app's own default
+// (host/theme.js normalizes an unset/garbage pref to 'dark'), so CI is
+// unaffected either way.
+const THEME = ['dark', 'light'].includes(process.env.RESIZE_THEME) ? process.env.RESIZE_THEME : null
+
 const todayAt = (h) => {
   const d = new Date()
   d.setHours(h, 0, 0, 0)
@@ -189,11 +209,20 @@ async function auditWidget(page, frame, widgetType, widgetLabel) {
 
 async function contactSheet(page, viewport, rows) {
   const cells = await Promise.all(rows.map(async (r) => {
-    const b64 = await fs.readFile(r.screenshot, 'base64')
+    // A missing PNG only happens under RESIZE_SHOTS=all (a scenario's
+    // frame.screenshot() failed but the loop carried on); in the default
+    // fail-fast mode a screenshot failure aborts the test long before this
+    // function runs, so the placeholder branch is dead there.
+    let img
+    try {
+      img = `<img src="data:image/png;base64,${await fs.readFile(r.screenshot, 'base64')}">`
+    } catch {
+      img = '<div class="noshot">no screenshot</div>'
+    }
     const cls = r.ok ? (r.warnings.length ? 'warn' : '') : 'fail'
     const msg = r.ok ? 'OK' : r.issues.join('<br>')
     const warn = r.warnings.length ? '<br>Warn: ' + r.warnings.slice(0, 2).join('<br>') : ''
-    return `<div class="cell ${cls}"><div class="label">${r.widget} · ${r.scenario}</div><img src="data:image/png;base64,${b64}"><div class="msg">${msg}${warn}</div></div>`
+    return `<div class="cell ${cls}"><div class="label">${r.widget} · ${r.scenario}</div>${img}<div class="msg">${msg}${warn}</div></div>`
   }))
   await page.setViewportSize({ width: 1800, height: 1600 })
   await page.setContent(`<!doctype html><meta charset="utf-8"><style>
@@ -202,6 +231,7 @@ async function contactSheet(page, viewport, rows) {
     .cell{background:white;border:1px solid #d7dbe0;border-radius:6px;padding:8px;break-inside:avoid}.fail{border-color:#d73a49;box-shadow:0 0 0 2px #d73a4930}.warn{border-color:#d29922}
     .label{font-weight:700;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     img{display:block;width:100%;height:180px;object-fit:contain;background:#fff;border:1px solid #edf0f2}.msg{margin-top:5px;color:#57606a;line-height:1.3}
+    .noshot{display:flex;align-items:center;justify-content:center;width:100%;height:180px;background:#fff;border:1px dashed #d73a49;color:#d73a49}
   </style><h1>${viewport.label} ${viewport.width}x${viewport.height}</h1><div class="grid">${cells.join('')}</div>`, { waitUntil: 'load' })
   await page.waitForFunction(() => [...document.images].every((img) => img.complete && img.naturalWidth > 0), null, { timeout: 30_000 })
   const out = path.join(ARTIFACT_DIR, `contact-${viewport.name}.png`)
@@ -218,7 +248,12 @@ async function appendResults(viewport, rows, contact) {
 }
 
 test.beforeAll(async () => {
-  await fs.rm(ARTIFACT_DIR, { recursive: true, force: true })
+  // RESIZE_SHOTS=all: the harness (fidelity.sh) owns cleaning the artifact dir
+  // instead. A deferred end-of-test failure restarts the Playwright worker,
+  // which re-runs this hook before the next viewport's test — the
+  // unconditional rm would then wipe the previous viewport's already-written
+  // matrix, defeating the whole point of the capture-everything mode.
+  if (!RESIZE_SHOTS_ALL) await fs.rm(ARTIFACT_DIR, { recursive: true, force: true })
   await fs.mkdir(SHOT_DIR, { recursive: true })
 })
 
@@ -231,20 +266,40 @@ for (const viewport of PRIMARY_VIEWPORTS) {
   test(`@resize every widget keeps polished resize states on ${viewport.label}`, async ({ page, request }) => {
     test.setTimeout(180_000)
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    if (THEME) {
+      // Persists across every subsequent page.goto() this test makes (one
+      // addInitScript call covers the whole scenario loop below).
+      await page.addInitScript((t) => localStorage.setItem('reminders-theme', t), THEME)
+    }
     const rows = []
+    const failures = [] // only populated/used when RESIZE_SHOTS_ALL
 
     for (const w of AUDIT_WIDGETS) {
       for (const scenario of w.scenarios) {
         const scenarioName = `${scenario.name}-${scenario.size.w}x${scenario.size.h}`
+        const label = `${viewport.name} ${w.type} ${scenarioName}`
         await seedLayout(request, [{ type: w.type, w: scenario.size.w, h: scenario.size.h }], DASH)
         await gotoApp(page)
         const frame = widget(page, w.label)
-        await expect(frame).toBeVisible()
-        await expectPrimary(frame, w.type)
+        if (RESIZE_SHOTS_ALL) {
+          try {
+            await expect(frame).toBeVisible()
+            await expectPrimary(frame, w.type)
+          } catch (e) {
+            failures.push(`${label}: ${String(e.message || e).split('\n')[0]}`)
+          }
+        } else {
+          await expect(frame).toBeVisible()
+          await expectPrimary(frame, w.type)
+        }
 
         const screenshot = path.join(SHOT_DIR, viewport.name, w.type, `${scenarioName}.png`)
         await fs.mkdir(path.dirname(screenshot), { recursive: true })
-        await frame.screenshot({ path: screenshot })
+        if (RESIZE_SHOTS_ALL) {
+          await frame.screenshot({ path: screenshot }).catch((e) => failures.push(`${label}: screenshot failed (${e.message})`))
+        } else {
+          await frame.screenshot({ path: screenshot })
+        }
         const audit = await auditWidget(page, frame, w.type, w.label)
         const row = {
           viewport: viewport.name,
@@ -259,11 +314,22 @@ for (const viewport of PRIMARY_VIEWPORTS) {
           screenshot,
         }
         rows.push(row)
-        expect(row.issues, `${viewport.name} ${w.type} ${scenarioName}`).toEqual([])
+        if (RESIZE_SHOTS_ALL) {
+          if (row.issues.length) failures.push(`${label}: ${row.issues.join('; ')}`)
+        } else {
+          expect(row.issues, label).toEqual([])
+        }
       }
     }
 
     const contact = await contactSheet(page, viewport, rows)
     await appendResults(viewport, rows, contact)
+    // Deferred failure: everything above already wrote its screenshot + the
+    // contact sheet before we ever throw, so a `RESIZE_SHOTS=all` run always
+    // leaves the full matrix on disk even when some widget/scenario has issues.
+    if (RESIZE_SHOTS_ALL && failures.length) {
+      console.log(`${viewport.name}: ${failures.length} issue(s) captured (RESIZE_SHOTS=all) -\n  ${failures.join('\n  ')}`)
+      expect(failures, `${viewport.name}: issues captured (see log above; artifacts were still written)`).toEqual([])
+    }
   })
 }
