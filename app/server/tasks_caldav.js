@@ -122,7 +122,26 @@ async function getModifyPut(resolved, objectUrl, mutate, attempt = 0) {
 
 export function sortTasks(tasks, sortBy = 'due_date', desc = false) {
   const key = ({ due_date: (t) => (t.due_date === ZERO ? '9999' : t.due_date), priority: (t) => t.priority, created_at: (t) => t.created, title: (t) => t.title.toLowerCase() }[sortBy]) || ((t) => (t.due_date === ZERO ? '9999' : t.due_date))
-  tasks.sort((a, b) => { const ka = key(a), kb = key(b); const c = ka < kb ? -1 : ka > kb ? 1 : 0; return desc ? -c : c })
+  tasks.sort((a, b) => {
+    const ka = key(a), kb = key(b)
+    let c = ka < kb ? -1 : ka > kb ? 1 : 0
+    // Tie-break deterministically: CalDAV listing order is filesystem-arbitrary,
+    // so equal-key tasks swap between loads without a stable tie-breaker. Compare
+    // title (case-insensitive), then uid, both ascending (to keep equal items
+    // in a consistent order regardless of primary sort direction).
+    if (c === 0) {
+      const ta = a.title?.toLowerCase() || '', tb = b.title?.toLowerCase() || ''
+      c = ta < tb ? -1 : ta > tb ? 1 : 0
+      if (c === 0) {
+        const ua = a.uid || '', ub = b.uid || ''
+        c = ua < ub ? -1 : ua > ub ? 1 : 0
+      }
+      // Tie-break: always ascending regardless of desc flag
+      return c
+    }
+    // Primary key differs: apply desc flag to primary sort only
+    return desc ? -c : c
+  })
   return tasks
 }
 

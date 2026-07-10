@@ -160,5 +160,55 @@ ok(serializeVtodo(vtodo(), LIST_ID, OBJ_URL).priority === 0, 'no PRIORITY proper
   ok(sortTasks(mk(), 'priority', true).map((t) => t.id).join(',') === 'a,c,b', 'desc=true reverses the priority order')
 }
 
+// ---- sortTasks: tie-breaks by title then uid for stable ordering ----
+// Undated tasks (all due_date === ZERO) must sort deterministically by title,
+// then uid, to avoid filesystem-arbitrary swapping between loads. Input order
+// varies to verify tie-break works regardless of input sequence.
+{
+  const undated = [
+    { uid: 'uid-3', title: 'Zebra', due_date: ZERO },
+    { uid: 'uid-1', title: 'Apple', due_date: ZERO },
+    { uid: 'uid-2', title: 'Banana', due_date: ZERO },
+  ]
+  const sorted = sortTasks([...undated])
+  ok(sorted.map((t) => t.title).join(',') === 'Apple,Banana,Zebra', 'undated tasks with different titles sort by title')
+}
+
+// ---- sortTasks: identical set in reversed order → same output ----
+{
+  const tasks = [
+    { uid: 'uid-1', title: 'Buy milk', due_date: ZERO },
+    { uid: 'uid-2', title: 'Walk dog', due_date: ZERO },
+    { uid: 'uid-3', title: 'Call mom', due_date: ZERO },
+  ]
+  const forward = sortTasks([...tasks]).map((t) => t.uid).join(',')
+  const reversed = sortTasks([...tasks].reverse()).map((t) => t.uid).join(',')
+  ok(forward === reversed, 'same set in reversed input order yields identical output order')
+}
+
+// ---- sortTasks: desc reverses primary key but tie-breaks stay ascending ----
+// Multiple tasks with same due_date but different titles should reverse their
+// due_date order when desc=true, but keep the same relative title order among
+// equal-key tasks. This locks the contract: desc only affects primary sort,
+// not tie-breakers.
+{
+  const tasks = [
+    { uid: 'uid-1', title: 'Buy milk', due_date: iso('2026-06-10T00:00:00Z') },
+    { uid: 'uid-2', title: 'Walk dog', due_date: iso('2026-06-10T00:00:00Z') },
+    { uid: 'uid-3', title: 'Call mom', due_date: iso('2026-06-05T00:00:00Z') },
+  ]
+  const asc = sortTasks([...tasks], 'due_date').map((t) => t.title).join(',')
+  const desc = sortTasks([...tasks], 'due_date', true).map((t) => t.title).join(',')
+  // Ascending: early date first, then by title → Call mom, Buy milk, Walk dog
+  // Descending: late date first, then by title → Buy milk, Walk dog, Call mom
+  ok(asc === 'Call mom,Buy milk,Walk dog', 'ascending: early date, then by title')
+  ok(desc === 'Buy milk,Walk dog,Call mom', 'descending: late date, then by title (tie-break order preserved)')
+  // Verify the tie-break (title) order is the SAME in both: among the two tasks
+  // with due_date 2026-06-10, "Buy milk" comes before "Walk dog" in both asc and desc.
+  const ascTies = ['Buy milk', 'Walk dog']
+  const descTies = ['Buy milk', 'Walk dog']
+  ok(asc.includes(ascTies.join(',')) && desc.includes(descTies.join(',')), 'equal-key items maintain relative title order regardless of desc')
+}
+
 console.log(`\nserialize.test: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
