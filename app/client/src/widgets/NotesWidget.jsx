@@ -28,7 +28,7 @@ function NoteRow({ n, active, paddingLeft, onOpen, onCtx, dnd }) {
       {n.pinned && <IconPin size={11} className="tree-pin-mark" />}
       <span className="tree-name">{n.title}</span>
       {(n.tags || []).slice(0, 2).map((t) => <span key={t} className="note-tag mini">#{t}</span>)}
-      <button type="button" className="tree-row-menu" aria-label="Note actions" title="Note actions"
+      <button type="button" className="hover-reveal tree-row-menu" aria-label="Note actions" title="Note actions"
         onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); onCtx(n, r.right, r.bottom) }}>
         <IconDots size={14} />
       </button>
@@ -478,7 +478,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                         ))}
                       </>
                     )}
-                    {matches.length === 0 && bodyHits.length === 0 && <div className="note-empty-q">No matching notes.</div>}
+                    {matches.length === 0 && bodyHits.length === 0 && <div className="inline-empty note-empty-q">No matching notes.</div>}
                   </>
                 )
                 : (
@@ -554,7 +554,7 @@ export default function NotesWidget({ notes: notesApi, onOpenSettings, instanceI
                 />
               )
               : (
-                <div className="notes-main-empty">
+                <div className="inline-empty notes-main-empty">
                   <div className="state-ic"><IconNote size={24} /></div>
                   <div className="state-title">Select a note</div>
                   <div className="state-sub">Pick one from the tree, search, or jump with <kbd>Ctrl</kbd>+<kbd>O</kbd>.</div>

@@ -45,7 +45,7 @@ export default function TriageQuadrant({
           </div>
         ))}
         {extra > 0 && <div className="eq-more">+{extra} more</div>}
-        {tasks.length === 0 && <div className="eq-empty">Drop a task here</div>}
+        {tasks.length === 0 && <div className="inline-empty start faint eq-empty">Drop a task here</div>}
       </div>
     </div>
   )

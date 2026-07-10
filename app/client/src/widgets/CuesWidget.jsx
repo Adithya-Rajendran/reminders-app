@@ -188,7 +188,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
       <div className="flow-compact-list">
         <div className="flow-compact-sec">
           <div className="flow-queue-head">Placed · {placed.length}</div>
-          {placed.length === 0 && <div className="flow-queue-empty">Drag cards onto the board when there is more room.</div>}
+          {placed.length === 0 && <div className="inline-empty start faint flow-queue-empty">Drag cards onto the board when there is more room.</div>}
           {placed.map((t) => (
             <div key={t.id} className="flow-compact-card">
               <button className={`check-btn${t.done ? ' on' : ''}`} title="Complete" aria-label={`Complete: ${t.title}`} onClick={() => onToggle(t)} />
@@ -201,7 +201,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
         </div>
         <div className="flow-compact-sec">
           <div className="flow-queue-head">Queue · {queue.length}</div>
-          {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
+          {queue.length === 0 && <div className="inline-empty start faint flow-queue-empty">All placed ✓</div>}
           {queue.map((t) => (
             <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
               <span className="flow-qitem-t">{t.title}</span>
@@ -217,7 +217,7 @@ export default function CuesWidget({ tasks: tasksCap, groups, group: initialGrou
         {(!compact || queueOpen) && (
           <div className="flow-queue">
             <div className="flow-queue-head">Queue · {queue.length}</div>
-            {queue.length === 0 && <div className="flow-queue-empty">All placed ✓</div>}
+            {queue.length === 0 && <div className="inline-empty start faint flow-queue-empty">All placed ✓</div>}
             {queue.map((t) => (
               <button key={t.id} type="button" className="flow-qitem" onPointerDown={(e) => onMoveStart(t, e, true)} title="Drag onto the board">
                 <span className="flow-qitem-t">{t.title}</span>

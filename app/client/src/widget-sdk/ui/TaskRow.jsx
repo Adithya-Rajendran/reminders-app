@@ -143,7 +143,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
             {!dense && isQuickWin(task) && <span className="chip qw-badge" title="Two-minute win — just do it now">⚡ 2 min</span>}
             {!dense && (task.labels || []).filter((l) => !isTwoMinName(l.title)).map((l) => <span key={l.id} className="label-chip">{`*${l.title}`}</span>)}
             {!dense && canSubtask && (
-              <button type="button" className={`chip subtask-chip${total ? '' : ' empty'}`} aria-expanded={expanded} title={total ? `${doneKids}/${total} subtasks done` : 'Add a subtask'} onClick={() => setExpanded((e) => !e)}>
+              <button type="button" className={`chip subtask-chip${total ? '' : ' hover-reveal empty'}`} aria-expanded={expanded} title={total ? `${doneKids}/${total} subtasks done` : 'Add a subtask'} onClick={() => setExpanded((e) => !e)}>
                 <IconChevR size={11} className={`rem-chev${expanded ? ' open' : ''}`} />
                 {total ? `${doneKids}/${total}` : '+ subtask'}
               </button>
@@ -154,7 +154,7 @@ function TaskRow({ task, onToggle, onDelete, onSchedule, onSetPriority, onSetCue
         </div>
         {onDelete && (
           <button
-            className="iconbtn sm task-del danger-hover"
+            className="iconbtn sm task-del danger-hover hover-reveal"
             title="Delete task"
             aria-label={`Delete: ${task.title}`}
             onClick={() => onDelete(task)}
@@ -243,7 +243,7 @@ function CueControl({ task, onSetCue, onSetTrigger }) {
   const clear = () => { onSetCue(task, ''); if (onSetTrigger) onSetTrigger(task, null); setOpen(false) }
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className={`chip cue-chip${cue ? '' : ' empty'}`} title={task.cue_trigger ? `If-then cue (${task.cue_trigger.kind})` : 'If-then cue'} onClick={() => (open ? setOpen(false) : openEdit())}>
+      <button className={`chip cue-chip${cue ? '' : ' hover-reveal empty'}`} title={task.cue_trigger ? `If-then cue (${task.cue_trigger.kind})` : 'If-then cue'} onClick={() => (open ? setOpen(false) : openEdit())}>
         <span className="cue-arrow">→</span> {cue || 'cue'}
       </button>
       {open && (
@@ -283,7 +283,7 @@ export function EstimateControl({ task, onSet }) {
   const est = Math.max(0, Math.trunc(Number(task.time_estimate) || 0))
   return (
     <span className="inline-ctl" ref={ref}>
-      <button className={`chip est-chip${est ? '' : ' empty'}`} title="Estimated time" aria-haspopup="menu" aria-expanded={open} onKeyDown={openOnArrowDown(open, setOpen)} onClick={() => setOpen((o) => !o)}>
+      <button className={`chip est-chip${est ? '' : ' hover-reveal empty'}`} title="Estimated time" aria-haspopup="menu" aria-expanded={open} onKeyDown={openOnArrowDown(open, setOpen)} onClick={() => setOpen((o) => !o)}>
         {est ? '~' + fmtEst(est) : 'est'}
       </button>
       {open && (

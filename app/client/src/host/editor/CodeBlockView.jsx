@@ -14,7 +14,7 @@ export default function CodeBlockView({ node, updateAttributes }) {
   return (
     <NodeViewWrapper className="cb-wrap">
       <select
-        className="cb-lang" contentEditable={false} value={lang}
+        className="hover-reveal cb-lang" contentEditable={false} value={lang}
         onChange={(e) => updateAttributes({ language: e.target.value })}
         onMouseDown={(e) => e.stopPropagation()} aria-label="Code language"
       >

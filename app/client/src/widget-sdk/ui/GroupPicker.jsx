@@ -37,8 +37,8 @@ export function GroupList({ groups = [], recent = [], value, onPick, onNew, neut
             <span className="pdot" style={{ background: 'var(--accent)', width: 9, height: 9 }} /> {g}
           </button>
         ))}
-        {query && !matches.length && <div className="gp-empty">No matching group</div>}
-        {!query && !recent.length && <div className="gp-empty">No recent groups — search or create one</div>}
+        {query && !matches.length && <div className="inline-empty start gp-empty">No matching group</div>}
+        {!query && !recent.length && <div className="inline-empty start gp-empty">No recent groups — search or create one</div>}
         <div className="gp-sep" />
         <button type="button" className="gp-item gp-new" role="option" onClick={() => onNew(q.trim())}>
           <IconPlus size={14} /> New group{query && !exact ? ` “${q.trim()}”` : '…'}

@@ -10,7 +10,7 @@ export default function Outline({ items, onPick, onClose }) {
         <button type="button" className="note-outline-x" onClick={onClose} aria-label="Close outline"><IconX size={13} /></button>
       </div>
       {items.length === 0
-        ? <div className="note-outline-empty">No headings yet.</div>
+        ? <div className="inline-empty start note-outline-empty">No headings yet.</div>
         : (
           <div className="note-outline-list">
             {items.map((h, i) => (

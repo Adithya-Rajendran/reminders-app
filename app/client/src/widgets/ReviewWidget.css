@@ -67,6 +67,6 @@
 .rv-flow-title { font-size: var(--fs-title); font-weight: 800; letter-spacing: -.01em; color: var(--text); }
 .rv-flow-sub { font-size: var(--fs-meta); color: var(--muted); line-height: 1.4; }
 .rv-flow-body { flex: 1; min-height: 0; overflow-y: auto; margin: 2px 0; }
-.rv-flow-empty { font-size: 12.5px; color: var(--muted); padding: 14px 6px; text-align: center; }
+.rv-flow-empty { font-size: 12.5px; padding: 14px 6px; }
 .rv-reflect { width: 100%; min-height: 96px; resize: vertical; font: inherit; font-size: var(--fs-ctrl); line-height: 1.5; padding: 8px 10px; }
 .rv-flow-nav { display: flex; justify-content: space-between; gap: 8px; padding-top: 2px; }

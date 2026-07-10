@@ -74,7 +74,7 @@ export default function AreaPicker({ value = '', areas = [], onSet }) {
               </button>
               {renderGroup('Projects', projects)}
               {renderGroup('Areas', otherAreas)}
-              {!areas.length && <div className="gp-empty">No projects or areas yet</div>}
+              {!areas.length && <div className="inline-empty start gp-empty">No projects or areas yet</div>}
             </div>
           </div>
         </AnchoredPopover>
