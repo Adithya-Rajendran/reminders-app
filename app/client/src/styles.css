@@ -1495,7 +1495,11 @@ button.rem-head:hover .g-title { color: var(--accent); }
 .tiptap-tb-btn.on { background: var(--accent-soft); color: var(--accent); }
 .tiptap-tb-sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
 .tiptap-editor { flex: 1; min-height: 0; overflow: auto; }
-.tiptap-content { outline: none; padding: 22px 28px; color: var(--text); font-size: 15px; line-height: 1.65; min-height: 100%; box-sizing: border-box; }
+/* Cap the prose measure like task rows (--measure, ~66ch) so a wide Notes widget
+   or the note editor modal doesn't stretch text edge-to-edge. This lives on the
+   editable content node, not .tiptap-editor — that stays full-width so its
+   scrollbar sits at the true edge; only the text column centers under it. */
+.tiptap-content { outline: none; padding: 22px 28px; color: var(--text); font-size: 15px; line-height: 1.65; min-height: 100%; box-sizing: border-box; max-width: var(--measure); margin-inline: auto; }
 .tiptap-content > * + * { margin-top: .7em; }
 .tiptap-content > :first-child { margin-top: 0; }
 .tiptap-content h1 { font-size: 1.7em; font-weight: 750; margin-top: 1.1em; }
