@@ -21,6 +21,7 @@ const todayAt = (h) => {
   return d.toISOString()
 }
 
+let notesConfigured = true // set per beforeEach from the target's /api/notes
 async function seedResizeData(request) {
   const pid = await taskProjectId(request)
   const focus = await createTask(request, pid, {
@@ -50,7 +51,17 @@ async function seedResizeData(request) {
     priority: 1,
     clarified: true,
   })
-  await seedNote(request, 'Pinned resize note', 'This pinned note stays readable in compact, tall, wide, and max widget shapes.', { pinned: true })
+  // Notes are WebDAV-backed; the in-cluster dev fixture is CalDAV-only, where
+  // /api/notes reports configured:false — the audit then covers the Notes and
+  // NotePin widgets' unconfigured (connect) states instead. The local e2e
+  // stack provisions a real WebDAV account and keeps full note coverage.
+  const notesState = await (await request.get('/api/notes')).json()
+  notesConfigured = !!notesState.configured
+  if (notesState.configured) {
+    await seedNote(request, 'Pinned resize note', 'This pinned note stays readable in compact, tall, wide, and max widget shapes.', { pinned: true })
+  } else {
+    console.log('notes unconfigured on this target — auditing the connect states instead')
+  }
   const plan = await request.put('/api/daily-plan', { data: { date: ymd(), ids: [focus.id] } })
   expect(plan.ok(), `seed daily plan -> ${plan.status()}`).toBeTruthy()
 }
@@ -73,10 +84,14 @@ async function expectPrimary(frame, type) {
       await expect(frame.locator('.cal-mini, .fc').first()).toBeVisible()
       break
     case 'notes':
-      await expect(frame.getByLabel(/Search notes/i)).toBeVisible()
+      // CalDAV-only targets (in-cluster dev fixture) have no WebDAV: the widget
+      // shows its connect state — that state must survive resizing too.
+      if (notesConfigured) await expect(frame.getByLabel(/Search notes/i)).toBeVisible()
+      else await expect(frame.getByText('Notes need a Nextcloud account')).toBeVisible()
       break
     case 'notepin':
-      await expect(frame.getByText('Pinned resize note')).toBeVisible()
+      if (notesConfigured) await expect(frame.getByText('Pinned resize note')).toBeVisible()
+      else await expect(frame.getByText('Notes aren’t connected')).toBeVisible()
       break
     case 'review':
       await expect(frame.locator('.rv-big')).toBeVisible()
