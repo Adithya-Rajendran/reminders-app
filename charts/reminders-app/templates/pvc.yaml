@@ -1,0 +1,21 @@
+{{- if not .Values.persistence.existingClaim }}
+# Small block volume for the SQLite config DB. Use a ReadWriteOnce
+# block-storage class (real ext4/xfs) so SQLite's POSIX file locking + WAL
+# are safe — never put SQLite on a shared filesystem (NFS/CephFS).
+# RWO + single replica + Recreate means exactly one process ever opens it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "reminders-app.pvcName" . }}
+  labels:
+    {{- include "reminders-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+{{- end }}

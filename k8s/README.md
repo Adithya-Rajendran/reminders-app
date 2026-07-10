@@ -1,5 +1,10 @@
 # Kubernetes deployment
 
+> Prefer Helm? `charts/reminders-app/` in this repo is the equivalent
+> packaged install (same securityContexts, Recreate strategy, optional
+> Valkey, HTTPRoute) — see its README. These raw manifests remain the
+> documented default.
+
 Example manifests for any conformant cluster — set your own StorageClass,
 ingress/Gateway and hostname. `kubectl apply -f k8s/` after creating the
 `reminders-app-env` secret (see the wiki → Deployment on Kubernetes). SQLite

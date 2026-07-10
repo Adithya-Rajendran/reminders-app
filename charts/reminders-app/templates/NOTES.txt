@@ -1,0 +1,37 @@
+reminders-app {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+
+1. Secret contract
+   The app reads its runtime secrets (SESSION_SECRET, ...) via envFrom from
+   the pre-existing Secret "{{ .Values.existingSecret }}" in namespace
+   {{ .Release.Namespace }} — the chart does NOT create it. If it's missing
+   the pod will not start. See the wiki -> Deployment on Kubernetes.
+
+2. Rollouts
+   The SQLite volume is ReadWriteOnce, so the Deployment uses strategy
+   Recreate — `kubectl rollout status` can exceed its timeout while the
+   volume detaches. Verify with:
+     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+   and GET /healthz through the Service.
+
+3. Paused-by-default is supported
+   replicas=0 is a valid steady state (this project's CD skips rollouts on a
+   0-scaled Deployment). Resume with:
+     kubectl scale deployment/{{ include "reminders-app.fullname" . }} -n {{ .Release.Namespace }} --replicas=1
+
+{{- if .Values.route.enabled }}
+
+4. Route
+   HTTPRoute "{{ include "reminders-app.fullname" . }}" -> https://{{ .Values.route.hostname }}
+   (Gateway {{ .Values.route.parentRef.namespace }}/{{ .Values.route.parentRef.name }})
+{{- else }}
+
+4. No route rendered (route.enabled=false). Reach the app in-cluster:
+     kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "reminders-app.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}
+
+{{- if .Values.valkey.enabled }}
+
+5. Valkey read cache is enabled ({{ include "reminders-app.valkey.fullname" . }}, ClusterIP only,
+   no persistence). Cached task/event payloads are PLAINTEXT — never expose
+   this Service outside the cluster or share the instance with other apps.
+{{- end }}

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: reminders-app
+description: >-
+  Self-hosted task + calendar dashboard (React SPA + Node/Express BFF).
+  Tasks, reminders and events live in your own CalDAV server, notes in your
+  WebDAV (Nextcloud); a small SQLite volume holds only layouts, encrypted
+  account config and sessions. Packaged equivalent of the raw manifests in
+  k8s/ (which remain the documented default install).
+type: application
+version: 0.1.0
+# Tracks the app version (app/package.json). Note the app image is normally
+# consumed as :latest / by digest (CD pins digests) rather than by this tag.
+appVersion: "0.1.0"
+home: https://github.com/Adithya-Rajendran/reminders-app
+sources:
+  - https://github.com/Adithya-Rajendran/reminders-app
+keywords:
+  - tasks
+  - reminders
+  - caldav
+  - webdav
+  - dashboard

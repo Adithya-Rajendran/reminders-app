@@ -1,0 +1,80 @@
+{{- if .Values.valkey.enabled }}
+# Optional Valkey cache so the CalDAV/VEVENT read cache survives a pod
+# restart instead of re-REPORTing every list cold on the next load.
+#
+# SECURITY: cached values are parsed task/event payloads in PLAINTEXT (no
+# separate encryption — the CalDAV credentials that produced them are
+# encrypted at rest in SQLite, but the task titles/descriptions/etc. cached
+# here are not). ClusterIP only, NO route — keep it in the app's own
+# namespace and never expose it. Do not reuse a shared/multi-tenant Valkey.
+#
+# No persistence (no PVC, --save "", --appendonly no) — it's a cache, not a
+# store; losing it just means the next read pays a cold REPORT again.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "reminders-app.valkey.fullname" . }}
+  labels:
+    {{- include "reminders-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  replicas: 1
+  # No persistence, no state to hand off — just don't run two.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "reminders-app.valkey.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "reminders-app.labels" . | nindent 8 }}
+        app.kubernetes.io/component: valkey
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.valkey.podSecurityContext | nindent 8 }}
+      containers:
+        - name: valkey
+          image: "{{ .Values.valkey.image.repository }}:{{ .Values.valkey.image.tag }}"
+          imagePullPolicy: {{ .Values.valkey.image.pullPolicy }}
+          args:
+            - valkey-server
+            - --maxmemory
+            - {{ .Values.valkey.maxmemory | quote }}
+            - --maxmemory-policy
+            - allkeys-lru
+            - --save
+            - ""            # no RDB snapshots — cache only, nothing worth persisting
+            - --appendonly
+            - "no"
+          securityContext:
+            {{- toYaml .Values.valkey.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: valkey
+              containerPort: 6379
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp     # valkey wants a writable /tmp even with no persistence
+            - name: run
+              mountPath: /run
+          resources:
+            {{- toYaml .Values.valkey.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 20
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: run
+          emptyDir:
+            sizeLimit: 4Mi
+{{- end }}

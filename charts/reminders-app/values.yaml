@@ -1,0 +1,125 @@
+# Default values for reminders-app.
+# The raw manifests in k8s/ are the documented reference install; every
+# security-relevant field there is preserved here as a default.
+
+image:
+  repository: ghcr.io/adithya-rajendran/reminders-app
+  # Tag used when no digest is set. Empty -> the chart's appVersion. The
+  # project's CD pipeline deploys :latest and then pins by digest.
+  tag: latest
+  # When set (e.g. "sha256:<64 hex>"), the digest WINS over the tag and the
+  # image is rendered as "<repository>@<digest>" — this is how CD pins images.
+  digest: ""
+  pullPolicy: Always
+
+# 0 is a SUPPORTED steady state, not an error: this app is habitually
+# "paused" by scaling to 0 replicas to save resources (CD detects 0 and
+# skips rollouts — see k8s/README.md "Paused-by-default"). Never set > 1:
+# the SQLite volume is ReadWriteOnce and the Deployment uses Recreate.
+replicas: 1
+
+# Name of an existing Secret consumed via envFrom (the "reminders-app-env"
+# secret contract: SESSION_SECRET etc. — see the wiki → Deployment on
+# Kubernetes). The chart does not create it.
+existingSecret: reminders-app-env
+
+# Extra plain env vars for the app container, name -> value. Appended after
+# the chart-set vars (NODE_ENV, CONFIG_DB_PATH, and VALKEY_URL when
+# valkey.enabled) — don't redefine those names here; to point at an external
+# Valkey, set valkey.enabled=false and put VALKEY_URL in this map.
+env: {}
+
+service:
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+
+# PSA `restricted`-compliant defaults, identical to k8s/30-app.yaml.
+# fsGroup lets uid 1000 write the freshly-attached /data volume.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+# App container probes (both hit GET /healthz on 8080).
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 20
+
+persistence:
+  # Small block volume for the SQLite config DB. Must be a ReadWriteOnce
+  # BLOCK-storage class (real ext4/xfs) — never NFS/CephFS: SQLite needs
+  # POSIX locking + WAL. Empty storageClass -> the cluster default.
+  size: 1Gi
+  storageClass: ""
+  # Use a pre-existing PVC instead of creating one (e.g. when adopting the
+  # raw-manifest install's "reminders-data" claim).
+  existingClaim: ""
+
+# Gateway API HTTPRoute (not Ingress). Disabled by default because the
+# hostname and Gateway parentRef are cluster-specific.
+route:
+  enabled: false
+  hostname: ""
+  parentRef:
+    name: shared-gateway
+    namespace: gateway
+    # Optional listener sectionName on the Gateway; empty -> omitted.
+    sectionName: ""
+
+# Optional Valkey read cache (ClusterIP only, NO persistence, NO route).
+# SECURITY: cached values are parsed task/event payloads in PLAINTEXT (the
+# CalDAV credentials that produced them stay encrypted in SQLite, but the
+# cached titles/descriptions/dates are not separately encrypted). Keep it
+# cluster-internal and in the app's own namespace; never add a route to it,
+# and never point a shared/multi-tenant Valkey at this app.
+# Disabling it just means the read cache is in-process and cold after every
+# pod restart — no other behavior change.
+valkey:
+  enabled: true
+  image:
+    repository: valkey/valkey
+    tag: "8"
+    pullPolicy: IfNotPresent
+  # Cache ceiling (allkeys-lru). Keep the memory limit above it: the default
+  # 160Mi limit is headroom over 128mb for client buffers/overhead.
+  maxmemory: 128mb
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 160Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    readOnlyRootFilesystem: true
+
+# Merged into every rendered object's labels/annotations (optional).
+commonLabels: {}
+
+nameOverride: ""
+fullnameOverride: ""

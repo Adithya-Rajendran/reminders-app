@@ -1,0 +1,19 @@
+{{- if .Values.valkey.enabled }}
+# ClusterIP only, deliberately no HTTPRoute/Ingress — the cache holds
+# plaintext task/event payloads (see valkey-deployment.yaml header).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "reminders-app.valkey.fullname" . }}
+  labels:
+    {{- include "reminders-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "reminders-app.valkey.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: 6379
+{{- end }}
