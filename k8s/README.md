@@ -12,6 +12,16 @@ needs **block** storage (`ReadWriteOnce`), so the Deployment uses `Recreate` —
 `kubectl rollout status` may exceed its timeout while the volume detaches;
 verify with `kubectl get pods` + `/healthz` instead.
 
+## DAV backend (Radicale + wsgidav)
+
+`26-dav.yaml` is the app's upstream: Radicale (CalDAV — tasks/reminders/events)
+and wsgidav (WebDAV — notes) behind one nginx router, one Service (`dav`), one
+RWO PVC. One app account (server URL `http://dav.reminders-app.svc.cluster.local`)
+serves both protocols, mirroring the Nextcloud URL shape (`/files/<user>/…` for
+notes). ClusterIP only — never expose it without adding TLS + a route. The
+`dav-credentials` Secret (bcrypt htpasswd + wsgidav.yaml with the same
+passwords) is created out-of-band; see the header of `26-dav.yaml`.
+
 ## Optional: Valkey read cache
 
 `server/cache.js` backs the CalDAV/VEVENT read cache (server/readcache.js,

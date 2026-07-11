@@ -1,0 +1,203 @@
+# The app's DAV backend: Radicale (CalDAV — tasks/reminders/events) and
+# wsgidav (WebDAV — notes files) behind one nginx router, so a single app
+# "account" (one server URL + one credential) serves both protocols the same
+# way Nextcloud did: CalDAV discovery at `/`, notes at `/files/<user>/…`
+# (webdav.js derives the files URL as `<server_url>/files/<username>/`).
+#
+# This replaces a full Nextcloud install as the upstream. It is intentionally
+# minimal: in-cluster only (ClusterIP, no HTTPRoute — the BFF talks to it
+# server-side; add a route + TLS before ever exposing it), htpasswd/bcrypt
+# auth shared by both servers via one Secret, one RWO PVC for state.
+#
+# The `dav-credentials` Secret is NOT in this file (it holds real passwords).
+# Create it once, with the same password per user in both entries:
+#   htpasswd -nbB <user> <password>            # one line per user -> htpasswd
+#   wsgidav.yaml simple_dc user_mapping        # same passwords, plaintext (see
+#                                              # the wsgidav docs; keep in the Secret)
+#   kubectl -n reminders-app create secret generic dav-credentials \
+#     --from-file=htpasswd=<htpasswd-file> --from-file=wsgidav.yaml=<config>
+#
+# Adding a user = append an htpasswd line + a wsgidav user_mapping/provider
+# entry + `mkdir /data/files/<user>` (the init container creates dirs listed
+# in DAV_USERS below) — then the user adds the account in the app's Settings.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dav-config
+  namespace: reminders-app
+  labels: { app: dav }
+data:
+  radicale.config: |
+    [server]
+    hosts = 127.0.0.1:5232
+    [auth]
+    type = htpasswd
+    htpasswd_filename = /credentials/htpasswd
+    htpasswd_encryption = bcrypt
+    [storage]
+    filesystem_folder = /data/collections
+    [rights]
+    type = owner_only
+    [logging]
+    level = warning
+  nginx.conf: |
+    worker_processes 1;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+    events { worker_connections 256; }
+    http {
+      access_log off;
+      client_max_body_size 64m;
+      # The stock nginx binary's compiled-in temp paths live under
+      # /var/cache/nginx — not writable as uid 1000, so point them at /tmp.
+      client_body_temp_path /tmp/client_body;
+      proxy_temp_path /tmp/proxy;
+      fastcgi_temp_path /tmp/fastcgi;
+      uwsgi_temp_path /tmp/uwsgi;
+      scgi_temp_path /tmp/scgi;
+      # WebDAV/CalDAV verbs + bodies pass through untouched.
+      server {
+        listen 8080;
+        # Notes: wsgidav serves /files/<user>/… (matches webdav.js's
+        # `<server_url>/files/<username>/` derivation).
+        location /files/ {
+          proxy_pass http://127.0.0.1:8081;
+          proxy_set_header Host $host;
+          proxy_request_buffering off;
+        }
+        # Everything else (well-known, principals, calendars): Radicale.
+        location / {
+          proxy_pass http://127.0.0.1:5232;
+          proxy_set_header Host $host;
+          proxy_set_header X-Script-Name "";
+          proxy_request_buffering off;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dav-data
+  namespace: reminders-app
+  labels: { app: dav }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dav
+  namespace: reminders-app
+  labels: { app: dav }
+spec:
+  type: ClusterIP
+  selector: { app: dav }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dav
+  namespace: reminders-app
+  labels: { app: dav }
+spec:
+  replicas: 1
+  strategy: { type: Recreate } # RWO PVC — never two writers
+  selector:
+    matchLabels: { app: dav }
+  template:
+    metadata:
+      labels: { app: dav, app.kubernetes.io/part-of: reminders-app }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Create the per-user notes dirs the wsgidav provider_mapping points
+        # at (wsgidav 404s a share whose backing dir is missing).
+        - name: init-dirs
+          image: busybox:1.37
+          env:
+            - name: DAV_USERS
+              value: "claude adithya"
+          command: ["sh", "-c", "for u in $DAV_USERS; do mkdir -p /data/files/$u; done; mkdir -p /data/collections"]
+          securityContext: &davSecCtx
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: radicale
+          image: python:3.12-slim
+          command: ["sh", "-c"]
+          # Runtime pip keeps this image-free (mirrors the proven dev fixture);
+          # versions pinned so a restart can't silently pick up a new major.
+          args: ["export HOME=/tmp && pip install --quiet --user 'radicale==3.5.*' bcrypt && exec python -m radicale --config /config/radicale.config"]
+          securityContext: *davSecCtx
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: credentials
+              mountPath: /credentials
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }
+        - name: wsgidav
+          image: python:3.12-slim
+          command: ["sh", "-c"]
+          args: ["export HOME=/tmp && pip install --quiet --user 'wsgidav==4.*' cheroot pyyaml && exec /tmp/.local/bin/wsgidav --config /credentials/wsgidav.yaml"]
+          securityContext: *davSecCtx
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }
+        - name: router
+          image: nginxinc/nginx-unprivileged:stable-alpine
+          args: ["nginx", "-c", "/config/nginx.conf", "-g", "daemon off;"]
+          securityContext: *davSecCtx
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: nginx-tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet: { path: /.web, port: 8080 } # Radicale's web page — proves router+radicale
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+      volumes:
+        - name: config
+          configMap: { name: dav-config }
+        - name: credentials
+          secret: { secretName: dav-credentials }
+        - name: data
+          persistentVolumeClaim: { claimName: dav-data }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+        - name: nginx-tmp
+          emptyDir: { sizeLimit: 64Mi }
