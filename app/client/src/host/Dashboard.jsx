@@ -681,7 +681,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
         <IconPlus size={16} /> Add widget <IconChevDown size={14} style={{ marginLeft: -2, opacity: 0.85 }} />
       </button>
       {open && (
-        <div className="menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}>
+        <div className="menu add-widget-menu" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)' }}>
           {!sub ? (
             <>
               <div className="menu-label">Add a widget</div>
