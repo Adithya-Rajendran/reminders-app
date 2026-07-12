@@ -481,10 +481,11 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
     return () => { alive = false }
   }, [metaTick])
 
-  // Aspect enforcement is split by resize phase. During drag, RGL's raw item tracks
-  // the pointer while the placeholder previews the committed shape. On release, the
-  // item itself is snapped and persists exactly. Neighbors can reflow against the
-  // unclamped drag size mid-drag, then settle to the placeholder shape on release.
+  // Enforce the aspect band while RGL is still updating its live layout item.
+  // RGL compacts/clones that layout before onResizeStop, so a stop-time mutation is
+  // discarded. snapAspectDrag preserves the pointer-controlled axis: horizontal
+  // handles derive height, while vertical/corner handles retain clampAspect's
+  // height anchor. Mutating the placeholder keeps neighbor reflow in lockstep.
   const typeOf = useMemo(() => new Map(widgets.map((w) => [w.i, w.type])), [widgets])
   const aspectSize = useCallback((oldItem, newItem) => {
     const aspect = constraintsFor(typeOf.get(newItem.i)).aspect
@@ -494,13 +495,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
     const h = clamp(snapped.h, newItem.minH || 1, newItem.maxH || Infinity)
     return { w, h }
   }, [typeOf])
-  const previewAspect = useCallback((_layout, oldItem, newItem, placeholder) => {
-    if (!placeholder || !newItem) return
-    const snapped = aspectSize(oldItem, newItem)
-    if (!snapped) return
-    placeholder.w = snapped.w; placeholder.h = snapped.h
-  }, [aspectSize])
-  const commitAspect = useCallback((_layout, oldItem, newItem, placeholder) => {
+  const enforceAspect = useCallback((_layout, oldItem, newItem, placeholder) => {
     if (!newItem) return
     const snapped = aspectSize(oldItem, newItem)
     if (!snapped) return
@@ -583,8 +578,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
             draggableHandle=".widget-head"
             draggableCancel="button,.iconbtn,.widget-head-actions"
             resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
-            onResize={previewAspect}
-            onResizeStop={commitAspect}
+            onResize={enforceAspect}
             onLayoutChange={onLayoutChange}
           >
             {widgets.map((w) => {

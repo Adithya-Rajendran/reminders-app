@@ -1055,7 +1055,7 @@ body {
    design's CSS grid. A widget fills its grid item via height:100%.
    ============================================================ */
 .react-grid-layout { position: relative; transition: height var(--dur-settle) var(--ease-out); }
-.react-grid-item { transition: all var(--dur-3) ease; transition-property: left, top, width, height; box-sizing: border-box; }
+.react-grid-item { transition-duration: var(--dur-settle); transition-timing-function: var(--ease-out); transition-property: left, top, width, height; box-sizing: border-box; }
 .react-grid-item img { pointer-events: none; user-select: none; }
 .react-grid-item.cssTransforms { transition-property: transform, width, height; }
 .react-grid-item.resizing { z-index: 3; will-change: width, height, transform; transition: transform var(--dur-1) var(--ease-out); }
