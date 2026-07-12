@@ -22,6 +22,7 @@ import {
 import { appCache } from '../data/fetchcache.js'
 import { useElementSize, WidgetSizeContext } from '../widget-sdk/useWidgetSize.js'
 import { usePopover } from '../widget-sdk/usePopover.js'
+import { useMenuKeyNav } from '../widget-sdk/ui/useMenuKeyNav.js'
 import WidgetBoundary from '../widgets/WidgetBoundary.jsx'
 import { GroupList } from '../widget-sdk'
 import { recentGroups, pushRecentGroup } from '../domain/groups.js'
@@ -96,10 +97,9 @@ const DEFAULT_BOARD_LG = {
   calendar: { x: 8, y: 7, w: 11, h: 8 },
 }
 // A clean default dashboard (DEFAULT_BOARD in the registry). The curated lg base is
-// the only authored tier; every other breakpoint is DERIVED by fillBreakpoints —
-// wider tiers (xl…xxxxl) scale to FILL the width (so a fresh 5K2K board uses the
-// display, clamped to each widget's aspect band), narrower tiers repack — exactly
-// as a loaded board is rebuilt on every load.
+// the only authored tier; every other breakpoint is DERIVED by fillBreakpoints.
+// Wider tiers (xl…xxxxl) scale, pack, and center into a cohesive block; narrower
+// tiers repack exactly as a loaded board is rebuilt on every load.
 function buildDefault() {
   const def = DEFAULT_BOARD.map((type) => ({ i: newId(), type }))
   const lg = def.map((w) => ({ i: w.i, ...(DEFAULT_BOARD_LG[w.type] || { x: 0, y: 0, ...sizeFor(w.type) }) }))
@@ -183,26 +183,20 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
         const storedV = saved.layout.gridV || 1
         let lay = saved.layout.layouts || {}
         const f = SCALE_TO_CURRENT[storedV] ?? 2.5
-        const needsGrid = f !== 1
-        if (needsGrid) lay = scaleLayouts(lay, f)
-        // Ultrawide tiers (xl+) are always DERIVED from the base by scaling to
-        // fill the width — never authoritative. Drop any persisted copy and
-        // rebuild on EVERY load, so the fill is robust even when react-grid-layout
-        // re-saves a de-scaled copy at a narrow viewport (otherwise that sticks
-        // and the next wide load shows a half-empty board). fillBreakpoints scales
-        // the base up into each wide tier; narrower tiers it leaves untouched.
-        lay = stripDerivedTiers(lay)
-        // Keep the ultrawide fill inside each widget's aspect band + max, so a wide
-        // screen doesn't stretch widgets past a cohesive shape (it may leave a gap).
+        const needsGrid = storedV !== GRID_V
+        if (f !== 1) lay = scaleLayouts(lay, f)
+        // Older grid versions may contain stale auto-generated ultrawide tiers;
+        // rebuild those during migration. Current-version tiers are authoritative
+        // once saved, so a resize made on an ultrawide display survives reload.
+        if (needsGrid) lay = stripDerivedTiers(lay)
+        // Keep scaled widgets inside their aspect band + max before packing, so a
+        // wide screen does not stretch them past a cohesive shape.
         const typeById = new Map(sw.map((w) => [w.i, w.type]))
         lay = fillBreakpoints(lay, (id) => constraintsFor(typeById.get(id)))
         setWidgets(sw)
         setLayouts(lay)
-        // Seed the no-op-save guard with what's on the server (as we'd persist
-        // it), so react-grid-layout's mount-time onLayoutChange echo doesn't PUT
-        // an identical board back on every plain page load. Rebuilding the
-        // derived tiers is NOT a persistable change (they're stripped from every
-        // save); only real cleanups below warrant a boot write.
+        // Seed the no-op-save guard with the hydrated board so react-grid-layout's
+        // mount-time onLayoutChange echo does not PUT an identical payload.
         lastSavedSig.current = boardSignature(sw, lay)
         // Remember this board's widget types so the NEXT visit can warm their
         // chunks before this layouts fetch even resolves (see App's preload).
@@ -210,7 +204,7 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
         if (sw.length !== original.length || needsGrid || remapped) {
           api('/api/layouts/' + dashboardId, {
             method: 'PUT',
-            body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: stripDerivedTiers(lay) } }),
+            body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: sw, layouts: lay } }),
           }).catch(() => { lastSavedSig.current = null }) // failed migration save -> the next real change re-persists it
         }
       } else {
@@ -262,14 +256,13 @@ export default function Dashboard({ onOpenSettings, onCapture, dashboardId = 'ma
     saveTimer.current = setTimeout(() => {
       // Skip no-op saves: RGL fires onLayoutChange on mount and on modal
       // scrollbar jitter with nothing semantically changed — each was a
-      // needless PUT + SQLite write on every page view. Derived tiers are
-      // stripped from the persisted body (they're rebuilt on every load).
+      // needless PUT + SQLite write on every page view.
       const sig = boardSignature(nextWidgets, nextLayouts)
       if (sig === lastSavedSig.current) return
       lastSavedSig.current = sig
       api('/api/layouts/' + dashboardId, {
         method: 'PUT',
-        body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: stripDerivedTiers(nextLayouts) } }),
+        body: JSON.stringify({ layout: { version: 1, gridV: GRID_V, widgets: nextWidgets, layouts: nextLayouts } }),
       }).catch(() => { lastSavedSig.current = null }) // failed save -> next layout event retries instead of no-op-skipping
     }, 600)
   }, [loaded, dashboardId])
@@ -665,6 +658,7 @@ function AddWidgetMenu({ onAdd, onReset, onNewGroup }) {
   const [sub, setSub] = useState(false)   // false | a pickGroup widget type
   const [groups, setGroups] = useState([])
   const ref = usePopover(open, setOpen)
+  useMenuKeyNav(open, ref)
   useEffect(() => { if (!open) setSub(false) }, [open])
   useEffect(() => {
     if (!sub) return

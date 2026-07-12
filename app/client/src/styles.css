@@ -71,11 +71,9 @@
   --density: 1;
 
   /* Max width of the dashboard canvas (.toolbar/.grid-wrap/.dash-tabs). `none` lets
-     the board fill the display: the breakpoint ladder in dashlayout.js turns extra
-     width into more COLUMNS (scaleItems/fitWidthToContract keep each widget inside
-     its aspect band — cohesion over fill) instead of stretching a few wide widgets,
-     so a 5K2K ultrawide is used rather than centering a 2600px island in a sea of
-     gutter. Set a px value (e.g. 2600px) to re-cap + center on very wide displays. */
+     the breakpoint ladder keep its ~40px pitch while derived ultrawide layouts
+     pack contract-sized widgets into a cohesive centered block. Set a px value
+     (e.g. 2600px) to re-cap the entire dashboard on very wide displays. */
   --canvas-max: none;
   /* Readable line-length cap for list/text widget bodies (~66ch ≈ WCAG 1.4.8).
      Has no effect at normal widget widths; on a wide (ultrawide-filled) widget it

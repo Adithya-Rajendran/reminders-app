@@ -1,14 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, seedLayout } from '../lib.mjs'
+import { gotoApp, PRIMARY_VIEWPORTS, seedLayout } from '../lib.mjs'
 
-const VIEWPORTS = [
-  { name: 'mbp14', width: 1512, height: 982 },
-  { name: 'qhd', width: 2560, height: 1440 },
-  { name: 'macos-5k2k', width: 3840, height: 1620 },
-  { name: '5k2k', width: 5120, height: 2160 },
-]
-
-for (const viewport of VIEWPORTS) {
+for (const viewport of PRIMARY_VIEWPORTS) {
   test.describe(viewport.name, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
@@ -56,10 +49,9 @@ for (const viewport of VIEWPORTS) {
       expect(await page.evaluate(() => scrollY)).toBe(pageScroll)
 
       await menu.evaluate((node) => { node.scrollTop = 0 })
-      await trigger.focus()
       const items = menu.getByRole('menuitem')
-      const count = await items.count()
-      for (let i = 0; i < count; i++) await page.keyboard.press('Tab')
+      await items.first().focus()
+      await page.keyboard.press('End')
       await expect(items.last()).toBeFocused()
       const lastBox = await items.last().boundingBox()
       const focusedMenuBox = await menu.boundingBox()

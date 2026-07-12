@@ -24,8 +24,8 @@ export const GRID_V = 5
 // layout's stored gridV (1 = old 12-col, 2 = 24-col, 3+ = current 30-col base).
 // v4/v5 did NOT change the base columns (factor 1, same as v3); the bumps are
 // stamps that a board's ultrawide tiers must be rebuilt from the base layout on
-// load (see Dashboard.jsx) — v4 rebuilt them at constant size, v5 rebuilds them
-// scaled-to-fill — so both scale the base by 1.
+// load (see Dashboard.jsx) — v4 rebuilt them at constant size, while v5 scales
+// their widths and packs them into a centered block — so both scale the base by 1.
 export const SCALE_TO_CURRENT = { 1: 2.5, 2: 1.25, 3: 1, 4: 1, 5: 1 }
 
 export const DEFAULT_SIZE = { w: 10, h: 9 } // a default widget spans ~1/3 at lg (10 of 30)
@@ -105,12 +105,11 @@ export function fitWidthToContract(c, w, h) {
 }
 
 // Proportionally scale a layout's x/w to a wider column count, preserving each
-// widget's ROW (y) — so a sparse board fills the extra width instead of leaving
-// a right-side void, while keeping the user's row arrangement. Widths are clamped
-// to the tier and x kept in range. Heights/rows are untouched. With a
+// widget's ROW (y). Widths are clamped to the tier and x kept in range;
+// packAndCenter then removes the gaps left by contract-clamped widths. Heights /
+// rows are untouched. With a
 // `getConstraints(id)` accessor, the auto-widened width is additionally clamped
-// into the widget's aspect band + ceiling (cohesion over fill); without it,
-// behavior is unchanged.
+// into the widget's aspect band + ceiling.
 function scaleItems(items, cols, f, getConstraints) {
   return (items || []).map((it) => {
     const h = Math.max(1, Math.round(it.h || 1))
@@ -121,14 +120,50 @@ function scaleItems(items, cols, f, getConstraints) {
   })
 }
 
+// Pack an existing layout horizontally without changing its rows or sizes. Items
+// are processed in reading order and placed in the first collision-free x cell;
+// the resulting occupied block is then centered in the tier. The normalized
+// source is returned if an anomalous layout has no legal horizontal placement,
+// rather than introducing a collision or moving an item vertically.
+// Non-mutating, deterministic, and idempotent for valid RGL layouts.
+export function packAndCenter(items, cols) {
+  const cc = Math.max(1, Math.round(cols || 1))
+  const normalized = (items || []).map((it) => {
+    const w = Math.max(1, Math.min(cc, Math.round(it.w || 1)))
+    return {
+      ...it,
+      x: Math.max(0, Math.min(cc - w, Math.round(it.x || 0))),
+      y: Math.max(0, Math.round(it.y || 0)),
+      w,
+      h: Math.max(1, Math.round(it.h || 1)),
+    }
+  }).sort((a, b) => a.y - b.y || a.x - b.x)
+  if (!normalized.length) return normalized
+
+  const placed = []
+  const collides = (candidate) => placed.some((it) => (
+    candidate.x < it.x + it.w && it.x < candidate.x + candidate.w &&
+    candidate.y < it.y + it.h && it.y < candidate.y + candidate.h
+  ))
+  for (const it of normalized) {
+    let x = 0
+    while (x + it.w <= cc && collides({ ...it, x })) x++
+    if (x + it.w > cc) return normalized
+    placed.push({ ...it, x })
+  }
+
+  const right = placed.reduce((max, it) => Math.max(max, it.x + it.w), 0)
+  const shift = Math.floor((cc - right) / 2)
+  return placed.map((it) => ({ ...it, x: it.x + shift }))
+}
+
 // Fill in any breakpoint that has no saved layout from the densest one present
 // (usually lg). Older boards predate the ultrawide tiers (xl…xxxxl), so without
 // this react-grid-layout would clone lg's columns and leave the right of a wide
 // canvas empty. Two regimes:
-//   • WIDER tiers (more columns than the source) → scale widget x/w to FILL the
-//     width, preserving rows. A sparse board (e.g. 3 widgets) thus spreads across
-//     the ultrawide screen rather than hugging the left third. The ~66ch text cap
-//     (styles.css) keeps the now-wider widgets readable.
+//   • WIDER tiers (more columns than the source) → scale widget widths, clamp
+//     them to their contracts, then pack + center a cohesive block while keeping
+//     every row unchanged.
 //   • NARROWER/equal tiers → constant-size shelf repack, so phones/tablets stack
 //     widgets at their normal size (unchanged).
 // Non-mutating. No source breakpoint present -> returned untouched. `getConstraints`
@@ -140,17 +175,19 @@ export function fillBreakpoints(layouts, getConstraints) {
   const source = present.reduce((a, b) => (COLS[b] > COLS[a] ? b : a))
   for (const bp of Object.keys(COLS)) {
     if (Array.isArray(out[bp])) continue
-    out[bp] = COLS[bp] > COLS[source]
-      ? scaleItems(out[source], COLS[bp], COLS[bp] / COLS[source], getConstraints)
-      : repack(out[source], COLS[bp])
+    if (COLS[bp] > COLS[source]) {
+      const scaled = scaleItems(out[source], COLS[bp], COLS[bp] / COLS[source], getConstraints)
+      out[bp] = packAndCenter(scaled, COLS[bp])
+    } else {
+      out[bp] = repack(out[source], COLS[bp])
+    }
   }
   return out
 }
 
-// The ultrawide tiers are DERIVED from the base on every load (fillBreakpoints
-// above) — never authoritative — so they must never be persisted: they bloat the
-// saved payload and a de-scaled copy re-saved by react-grid-layout at a narrow
-// viewport would otherwise stick and leave the next wide load half-empty.
+// Ultrawide tiers are generated from the base when missing. Older grid versions
+// can contain stale generated copies, so migrations strip those tiers before
+// rebuilding them; current-version tiers may be user-authored and are preserved.
 export const DERIVED_TIERS = ['xl', 'xxl', 'xxxl', 'xxxxl']
 export function stripDerivedTiers(layouts) {
   const out = {}
@@ -159,16 +196,16 @@ export function stripDerivedTiers(layouts) {
 }
 
 // Canonical signature of the PERSISTED board state: widget identity/type/group +
-// authoritative-tier placements only, ignoring stamped constraint props
-// (minW/maxW/isResizable/…), item order, and derived tiers. Lets the dashboard
-// skip no-op saves — react-grid-layout fires onLayoutChange on mount and on
-// scrollbar jitter with nothing semantically changed. Pure + node-tested.
+// every authored-tier placement, ignoring stamped constraint props
+// (minW/maxW/isResizable/…) and item order. Lets the dashboard skip no-op saves —
+// react-grid-layout fires onLayoutChange on mount and on scrollbar jitter with
+// nothing semantically changed. Pure + node-tested.
 export function boardSignature(widgets, layouts) {
   const byI = (a, b) => (a.i < b.i ? -1 : a.i > b.i ? 1 : 0)
   // `collapsed` is part of the persisted state (a header-only minimize), so a
   // collapse/expand must count as a real change — otherwise the no-op guard skips it.
   const w = (widgets || []).map(({ i, type, group, collapsed }) => ({ i, type, group: group ?? null, collapsed: !!collapsed })).sort(byI)
-  const src = stripDerivedTiers(layouts)
+  const src = layouts || {}
   const l = {}
   for (const bp of Object.keys(src).sort()) {
     l[bp] = (src[bp] || [])

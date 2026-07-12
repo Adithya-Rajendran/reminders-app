@@ -3,7 +3,7 @@
 //   node test/dashlayout.test.mjs
 import {
   COLS, BREAKPOINTS, GRID_V, SCALE_TO_CURRENT, DEFAULT_SIZE, DERIVED_TIERS,
-  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, applyConstraints, clampAspect, snapAspectDrag, fitWidthToContract, nextSlot,
+  scaleLayouts, defaultLayouts, appendToLayouts, fillBreakpoints, repack, packAndCenter, applyConstraints, clampAspect, snapAspectDrag, fitWidthToContract, nextSlot,
   stripDerivedTiers, boardSignature, applyCollapsed, restoreCollapsedHeights,
 } from '../client/src/dashlayout.js'
 
@@ -32,22 +32,23 @@ for (const bp of byWidth) {
   ok(pitch >= 38 && pitch <= 52, `${bp}: column pitch ${pitch.toFixed(1)}px stays in the ~40px band`)
 }
 
-// --- fillBreakpoints (scale-to-fill on WIDER tiers; constant-size repack on narrower) ---
+// --- fillBreakpoints (scale, pack + center WIDER tiers; repack narrower tiers) ---
 const partial = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 20, y: 0, w: 10, h: 9 }] }
 const filled = fillBreakpoints(partial)
 const fW = COLS.xxxxl / COLS.lg
+const filledW = Math.round(10 * fW)
+const filledX = Math.floor((COLS.xxxxl - filledW * 2) / 2)
 ok(Object.keys(filled).sort().join() === Object.keys(COLS).sort().join(), 'fills every missing breakpoint from the densest present one')
 ok(partial.lg.length === 2 && partial.lg[1].x === 20 && !partial.xxxxl, 'fillBreakpoints is non-mutating')
 ok(filled.lg === partial.lg, 'present breakpoints are reused untouched')
-// On a WIDER tier widgets scale up proportionally to fill the extra width (no void); height unchanged.
-ok(filled.xxxxl.every((it) => it.w === Math.round(10 * fW) && it.h === 9), 'widget width scales to fill a wider tier; height unchanged')
-// Rows are preserved and x scales proportionally, staying within the tier.
-ok(filled.xxxxl[0].y === 0 && filled.xxxxl[1].y === 0 && filled.xxxxl.map((it) => it.x).join() === `0,${Math.round(20 * fW)}` && filled.xxxxl.every((it) => it.x + it.w <= COLS.xxxxl), 'x scales proportionally and stays within the wider tier')
+// On a WIDER tier widths scale proportionally, then gaps are removed and the row is centered.
+ok(filled.xxxxl.every((it) => it.w === filledW && it.h === 9), 'widget width scales on a wider tier; height unchanged')
+ok(filled.xxxxl[0].y === 0 && filled.xxxxl[1].y === 0 && filled.xxxxl.map((it) => it.x).join() === `${filledX},${filledX + filledW}` && filled.xxxxl.every((it) => it.x + it.w <= COLS.xxxxl), 'wider tier packs the row and centers its occupied span')
 // Narrower tiers still constant-size repack (phones/tablets stack at normal size).
 ok(filled.xs.every((it) => it.x + it.w <= COLS.xs && it.w === 10), 'narrower tiers keep widgets at their original size')
-// On a wider tier a lower widget keeps its row (it widens to fill, rather than flowing up).
+// On a wider tier a lower widget keeps its row while both independent rows center.
 const stacked = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 0, y: 9, w: 10, h: 9 }] })
-ok(stacked.xxxxl.find((it) => it.i === 'b').y === 9 && stacked.xxxxl.find((it) => it.i === 'b').w === Math.round(10 * fW), 'a lower widget keeps its row and widens to fill on a wider tier')
+ok(stacked.xxxxl.every((it) => it.x === Math.floor((COLS.xxxxl - filledW) / 2)) && stacked.xxxxl.find((it) => it.i === 'b').y === 9, 'independent rows keep y and share the centered x position')
 // Wrapping: at md (25 cols) two 10-wide widgets fit a shelf, the third wraps below.
 const wrapped = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }, { i: 'b', x: 10, y: 0, w: 10, h: 9 }, { i: 'c', x: 20, y: 0, w: 10, h: 9 }] }).md
 ok(wrapped.filter((it) => it.y === 0).length === 2 && wrapped.find((it) => it.i === 'c').x === 0 && wrapped.find((it) => it.i === 'c').y === 9, 'a third widget wraps to a new shelf below (shelf height = max h)')
@@ -58,6 +59,34 @@ const allThere = defaultLayouts([{ i: 'w-1', type: 'a' }], () => ({ ...DEFAULT_S
 ok(fillBreakpoints(allThere) !== allThere && Object.keys(fillBreakpoints(allThere)).length === Object.keys(allThere).length, 'a fully-populated layout gains no breakpoints (returns a copy)')
 ok(Object.keys(fillBreakpoints(null)).length === 0 && Object.keys(fillBreakpoints({})).length === 0, 'null/empty input -> empty object (no throw)')
 
+// --- packAndCenter (fixed rows/sizes, collision-free cohesive block) ---
+{
+  const source = [
+    { i: 'a', x: 10, y: 0, w: 8, h: 8 },
+    { i: 'b', x: 0, y: 4, w: 6, h: 4 },
+    { i: 'c', x: 20, y: 8, w: 7, h: 5 },
+  ]
+  const before = JSON.stringify(source)
+  const packed = packAndCenter(source, 30)
+  const collides = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  const noCollisions = packed.every((a, i) => packed.every((b, j) => i >= j || !collides(a, b)))
+  ok(JSON.stringify(source) === before, 'packAndCenter is non-mutating')
+  ok(noCollisions, 'staggered vertical spans stay collision-free')
+  ok(packed.every((it) => it.x >= 0 && it.x + it.w <= 30), 'every packed item stays in bounds')
+  ok(packed.every((it) => {
+    const old = source.find((s) => s.i === it.i)
+    return it.y === old.y && it.w === old.w && it.h === old.h
+  }), 'packAndCenter preserves y/w/h exactly')
+  const left = Math.min(...packed.map((it) => it.x))
+  const right = Math.max(...packed.map((it) => it.x + it.w))
+  ok(Math.abs(left - (30 - right)) <= 1, 'occupied block is centered to within one column')
+  ok(JSON.stringify(packAndCenter(packed, 30)) === JSON.stringify(packed), 'packAndCenter is idempotent')
+  ok(JSON.stringify(packAndCenter([...source].reverse(), 30)) === JSON.stringify(packed), 'reading-order sort makes packing deterministic')
+  const dense = packAndCenter([{ i: 'a', x: 0, y: 0, w: 15, h: 4 }, { i: 'b', x: 15, y: 0, w: 15, h: 4 }], 30)
+  ok(dense.map((it) => it.x).join() === '0,15', 'a dense full-width row remains full-width')
+  ok(packAndCenter([], 30).length === 0 && packAndCenter(null, 30).length === 0, 'packAndCenter handles empty/null input')
+}
+
 // --- fitWidthToContract (keep the auto-fill width inside a widget's band/ceiling) ---
 ok(fitWidthToContract(null, 20, 9) === 20, 'no contract -> width unchanged')
 ok(fitWidthToContract({ aspect: { min: 0.9, max: 1.4 } }, 20, 9) === Math.round(9 * 1.4), 'aspect clamps width down to the band edge (anchored on height)')
@@ -66,15 +95,17 @@ ok(fitWidthToContract({ aspect: { min: 0.9, max: 1.4 } }, 5, 9) === 5, 'never wi
 ok(fitWidthToContract({ max: { w: 13 } }, 20, 9) === 13, 'max ceiling clamps width')
 ok(fitWidthToContract({ max: { w: 10 }, aspect: { min: 0.9, max: 1.4 } }, 20, 9) === 10, 'max + aspect take the tighter bound')
 
-// --- fillBreakpoints with constraints (cohesion: clamp the ultrawide fill into-band) ---
+// --- fillBreakpoints with constraints (clamp wide items into-band before packing) ---
 const gcAspect = (id) => (id === 'a' ? { aspect: { min: 0.9, max: 1.4 } } : null)
 const clampedFill = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }, gcAspect)
 ok(clampedFill.xxxxl[0].w === Math.round(9 * 1.4), 'auto-fill clamps a widget into its aspect band on a wider tier')
 ok(clampedFill.xxxxl[0].h === 9, 'the aspect clamp leaves height untouched')
+ok(clampedFill.xxxxl[0].x === Math.floor((COLS.xxxxl - clampedFill.xxxxl[0].w) / 2), 'contract-clamped widget is centered')
 const clampedMax = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }, () => ({ max: { w: 12 } }))
 ok(clampedMax.xxxxl[0].w === 12, 'auto-fill clamps a widget to its max width on a wider tier')
-// Without constraints the fill is unchanged (back-compat with the calls above).
-ok(fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }).xxxxl[0].w === Math.round(10 * (COLS.xxxxl / COLS.lg)), 'no constraints -> fill scales to fill as before')
+// Without constraints the width still scales; the resulting item is centered.
+const unconstrained = fillBreakpoints({ lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }] }).xxxxl[0]
+ok(unconstrained.w === filledW && unconstrained.x === Math.floor((COLS.xxxxl - filledW) / 2), 'no constraints -> scaled widget is centered')
 
 // --- scaleLayouts ---
 const old12 = { lg: [{ i: 'a', x: 4, y: 0, w: 4, h: 9 }, { i: 'b', x: 8, y: 9, w: 1, h: 5 }] }
@@ -185,7 +216,7 @@ ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interio
   ok(Number.isInteger(rounded.w) && Number.isInteger(rounded.h) && rounded.w >= 1 && rounded.h >= 1, 'snapAspectDrag returns integer cells >= 1')
 }
 
-// --- stripDerivedTiers (never persist the rebuilt-on-load ultrawide tiers) ---
+// --- stripDerivedTiers (migration cleanup for stale ultrawide tiers) ---
 {
   const src = { lg: [{ i: 'a', x: 0, y: 0, w: 10, h: 9 }], xl: [{ i: 'a', x: 0, y: 0, w: 15, h: 9 }], xxs: [{ i: 'a', x: 0, y: 0, w: 5, h: 9 }] }
   const s = stripDerivedTiers(src)
@@ -207,7 +238,7 @@ ok(filledGap.lg[2].x === 10 && filledGap.lg[2].y === 0, 'append fills an interio
   const stamped = { lg: lay.lg.map((it) => ({ ...it, minW: 4, minH: 4, maxW: 20, isResizable: true, moved: false, static: false })) }
   ok(boardSignature(widgets, stamped) === sig, 'stamped constraint/RGL props do not change the signature')
   const withDerived = { ...lay, xl: [{ i: 'a', x: 0, y: 0, w: 15, h: 9 }, { i: 'b', x: 15, y: 0, w: 15, h: 9 }] }
-  ok(boardSignature(widgets, withDerived) === sig, 'derived tiers do not change the signature')
+  ok(boardSignature(widgets, withDerived) !== sig, 'an authored ultrawide tier changes the signature')
   // Sensitivity: every real board change must register.
   ok(boardSignature(widgets, { lg: lay.lg.map((it) => (it.i === 'a' ? { ...it, x: 5 } : it)) }) !== sig, 'a moved widget changes the signature')
   ok(boardSignature(widgets, { lg: lay.lg.map((it) => (it.i === 'a' ? { ...it, w: 12 } : it)) }) !== sig, 'a resized widget changes the signature')

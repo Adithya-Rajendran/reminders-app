@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { COLS } from '../../../app/client/src/dashlayout.js'
+import { BREAKPOINTS, COLS, GRID_V } from '../../../app/client/src/dashlayout.js'
 import { gotoApp, seedLayout } from '../lib.mjs'
 
 const OVERVIEW = {
@@ -35,46 +35,83 @@ async function savedOverview(request) {
   }
 }
 
+async function dragResize(page, item, handle, dx, dy) {
+  await expect(item).toBeVisible()
+  await item.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished.catch(() => {}))))
+  await expect(handle).toBeVisible()
+  await handle.hover()
+  const before = await item.boundingBox()
+  expect(before).toBeTruthy()
+
+  // Handles straddle the widget border and can overlap neighboring content.
+  // Pick an integer pixel that the browser currently resolves to this handle
+  // instead of assuming its geometric center is the actionable point.
+  const hitPoint = () => handle.evaluate((node) => {
+    const rect = node.getBoundingClientRect()
+    const fractions = [0.5, 0.25, 0.75, 0.1, 0.9]
+    for (const y of fractions) {
+      for (const x of fractions) {
+        const clientX = Math.round(rect.left + rect.width * x)
+        const clientY = Math.round(rect.top + rect.height * y)
+        const target = document.elementFromPoint(clientX, clientY)
+        if (target === node || node.contains(target)) return { x: clientX, y: clientY }
+      }
+    }
+    return null
+  })
+  let start = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await handle.hover()
+    start = await hitPoint()
+    expect(start).toBeTruthy()
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(
+      start.x + Math.sign(dx) * 8,
+      start.y + Math.sign(dy) * 8,
+      { steps: 4 },
+    )
+    await page.waitForTimeout(50)
+    if (await item.evaluate((node) => node.classList.contains('resizing'))) break
+    await page.mouse.up()
+    await page.evaluate(() => document.getSelection()?.removeAllRanges())
+    start = null
+  }
+  expect(start).toBeTruthy()
+  const { x: startX, y: startY } = start
+  await expect(item).toHaveClass(/resizing/)
+  await page.mouse.move(startX + dx, startY + dy, { steps: 12 })
+  const placeholder = page.locator('.react-grid-placeholder')
+  await expect(placeholder).toBeVisible()
+  const preview = await placeholder.boundingBox()
+  expect(Math.abs(preview.width - before.width) + Math.abs(preview.height - before.height)).toBeGreaterThan(20)
+  await page.mouse.up()
+  await expect(item).not.toHaveClass(/resizing/)
+  return { before, preview }
+}
+
 test.describe('live aspect-constrained resize', () => {
   test.use({ viewport: { width: 1512, height: 982 } })
 
   for (const scenario of HANDLES) {
     test(`${scenario.handle} handle persists the previewed aspect-safe layout`, async ({ page, request }) => {
       await seedLayout(request, [
-        { i: OVERVIEW.id, type: 'overview', x: 8, size: OVERVIEW.size },
-        { i: 'focus-neighbor', type: 'focus', x: 8, size: { w: 7, h: 8 } },
+        { i: OVERVIEW.id, type: 'overview', x: 1, size: OVERVIEW.size },
+        { i: 'focus-neighbor', type: 'focus', x: 1, size: { w: 7, h: 8 } },
       ])
       await gotoApp(page)
 
       const grid = page.locator('.react-grid-layout')
       const item = page.locator('.react-grid-item').filter({ has: page.getByText('Overview', { exact: true }) })
       const handle = item.locator(`.react-resizable-handle-${scenario.handle}`)
-      await expect(item).toBeVisible()
-      await expect(handle).toBeAttached()
-
-      const [gridBox, before, handleBox] = await Promise.all([
-        grid.boundingBox(),
-        item.boundingBox(),
-        handle.boundingBox(),
-      ])
+      const gridBox = await grid.boundingBox()
       expect(gridBox).toBeTruthy()
-      expect(before).toBeTruthy()
-      expect(handleBox).toBeTruthy()
 
       const colPitch = (gridBox.width + 16) / COLS.lg
       const rowPitch = 46
-      const startX = handleBox.x + handleBox.width / 2
-      const startY = handleBox.y + handleBox.height / 2
-      await page.mouse.move(startX, startY)
-      await page.mouse.down()
-      await page.mouse.move(startX + scenario.dx * colPitch, startY + scenario.dy * rowPitch, { steps: 12 })
-
-      await expect(page.locator('.react-grid-placeholder')).toBeVisible()
-      const during = await item.boundingBox()
-      expect(during).toBeTruthy()
-      if (scenario.w) expect(Math.sign(during.width - before.width)).toBe(scenario.w)
-      if (scenario.h) expect(Math.sign(during.height - before.height)).toBe(scenario.h)
-      await page.mouse.up()
+      const dx = scenario.dx * colPitch
+      const dy = scenario.dy * rowPitch
+      await dragResize(page, item, handle, dx, dy)
 
       await expect.poll(async () => {
         const { item: persisted } = await savedOverview(request)
@@ -108,4 +145,69 @@ test.describe('live aspect-constrained resize', () => {
       expect({ w: afterReload.w, h: afterReload.h, x: afterReload.x, y: afterReload.y }).toEqual(savedSize)
     })
   }
+})
+
+test.describe('ultrawide resize persistence', () => {
+  test.use({ viewport: { width: 3840, height: 1620 } })
+
+  test('an edited generated tier becomes authoritative without changing lg', async ({ page, request }) => {
+    const layout = {
+      version: 1,
+      gridV: GRID_V,
+      widgets: [
+        { i: OVERVIEW.id, type: 'overview' },
+        { i: 'focus-neighbor', type: 'focus' },
+      ],
+      layouts: {
+        lg: [
+          { i: OVERVIEW.id, x: 1, y: 0, ...OVERVIEW.size },
+          { i: 'focus-neighbor', x: 1, y: 10, w: 7, h: 8 },
+        ],
+      },
+    }
+    const seeded = await request.put('/api/layouts/main', { data: { layout } })
+    expect(seeded.ok(), `seed ultrawide layout -> ${seeded.status()}`).toBeTruthy()
+    await gotoApp(page)
+
+    const grid = page.locator('.react-grid-layout')
+    const item = page.locator('.react-grid-item').filter({ has: page.getByText('Overview', { exact: true }) })
+    const gridBox = await grid.boundingBox()
+    expect(gridBox).toBeTruthy()
+    const activeTier = Object.entries(BREAKPOINTS)
+      .sort((a, b) => b[1] - a[1])
+      .find(([, minWidth]) => gridBox.width >= minWidth)?.[0]
+    expect(activeTier).toBe('xxl')
+
+    await dragResize(page, item, item.locator('.react-resizable-handle-e'), 300, 0)
+    await expect.poll(async () => {
+      const response = await request.get('/api/layouts/main')
+      const { layout: saved } = await response.json()
+      const edited = saved.layouts[activeTier]?.find((entry) => entry.i === OVERVIEW.id)
+      return edited ? { saved, edited } : null
+    }, { timeout: 5000 }).not.toBeNull()
+
+    const response = await request.get('/api/layouts/main')
+    const { layout: saved } = await response.json()
+    const edited = saved.layouts[activeTier].find((entry) => entry.i === OVERVIEW.id)
+    expect(`${edited.w}x${edited.h}`).not.toBe(`${OVERVIEW.size.w}x${OVERVIEW.size.h}`)
+    expect(saved.layouts.lg.find((entry) => entry.i === OVERVIEW.id)).toMatchObject({ x: 1, y: 0, ...OVERVIEW.size })
+    for (let i = 0; i < saved.layouts[activeTier].length; i++) {
+      for (let j = i + 1; j < saved.layouts[activeTier].length; j++) {
+        expect(overlaps(saved.layouts[activeTier][i], saved.layouts[activeTier][j])).toBe(false)
+      }
+    }
+
+    const settled = await item.boundingBox()
+    await page.reload()
+    await expect(page.locator('.app')).toBeVisible()
+    await page.waitForTimeout(800)
+    const reloaded = await item.boundingBox()
+    expect(Math.abs(reloaded.width - settled.width)).toBeLessThanOrEqual(1)
+    expect(Math.abs(reloaded.height - settled.height)).toBeLessThanOrEqual(1)
+    const afterReload = await request.get('/api/layouts/main')
+    const afterLayout = (await afterReload.json()).layout
+    expect(afterLayout.layouts[activeTier].find((entry) => entry.i === OVERVIEW.id)).toMatchObject({
+      x: edited.x, y: edited.y, w: edited.w, h: edited.h,
+    })
+  })
 })

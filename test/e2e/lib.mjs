@@ -146,6 +146,8 @@ export async function resetE2EState(request) {
 // ---- resize audit helpers ----
 export const PRIMARY_VIEWPORTS = [
   { name: 'mbp14', label: 'MacBook Pro 14', width: 1512, height: 982 },
+  { name: 'qhd', label: '1440p', width: 2560, height: 1440 },
+  { name: 'macos-5k2k', label: 'macOS 5k2k scaled', width: 3840, height: 1620 },
   { name: '5k2k', label: '5k2k monitor', width: 5120, height: 2160 },
 ]
 
